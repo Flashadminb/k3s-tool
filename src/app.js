@@ -38,6 +38,7 @@ const HELP = {
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
+  DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
 
@@ -48,24 +49,38 @@ function log(msg) {
   const t = new Date().toLocaleTimeString("th-TH");
   $("log").textContent = `[${t}] ${msg}\n` + $("log").textContent.slice(0, 20000);
 }
-// Progress toast at the bottom + tab title, with seconds counter for long jobs
-const busyState = { text: "", start: 0, timer: null };
-function busyMsg(t) {
-  const b = $("busy");
-  if (t && !busyState.text) busyState.start = Date.now();
-  busyState.text = t || "";
-  const paint = () => {
-    const sec = Math.round((Date.now() - busyState.start) / 1000);
-    b.textContent = busyState.text + (sec >= 3 ? ` · ${sec} วิ` : "");
-  };
+// Progress toast at the bottom + tab title. Several jobs can run at once (one per device), one line each.
+const TITLE = "IDATA TOOLS";
+const toast = { lines: new Map(), last: null, timer: null, firstStart: 0 };
+function busyMsg(t, key) {
+  // no key: the detail belongs to the job started most recently
+  if (!key) key = toast.last || "misc";
   if (t) {
-    paint(); b.hidden = false; document.title = "⏳ K3S Tool";
-    if (!busyState.timer) busyState.timer = setInterval(paint, 1000);
+    const j = toast.lines.get(key);
+    if (j) j.text = t; else { toast.lines.set(key, { text: t, start: Date.now() }); if (key.startsWith("job")) toast.last = key; }
+    if (!toast.firstStart) toast.firstStart = Date.now();
   } else {
-    b.hidden = true; b.classList.remove("prog"); clearInterval(busyState.timer); busyState.timer = null;
-    const long = Date.now() - busyState.start > 8000;
-    document.title = long ? "✅ เสร็จแล้ว · K3S Tool" : "K3S Tool";
-    if (long) setTimeout(() => { if (!busyState.text) document.title = "K3S Tool"; }, 15000);
+    toast.lines.delete(key);
+    if (toast.last === key) toast.last = [...toast.lines.keys()].reverse().find((k) => k.startsWith("job")) || null;
+    if (key === "prog") $("busy").classList.remove("prog");
+  }
+  paintBusy();
+}
+function paintBusy() {
+  const b = $("busy");
+  if (toast.lines.size) {
+    b.textContent = [...toast.lines.values()].map((j) => {
+      const sec = Math.round((Date.now() - j.start) / 1000);
+      return j.text + (sec >= 3 ? ` · ${sec} วิ` : "");
+    }).join("\n");
+    b.hidden = false; document.title = `⏳ ${TITLE}`;
+    if (!toast.timer) toast.timer = setInterval(paintBusy, 1000);
+  } else {
+    b.hidden = true; b.classList.remove("prog"); clearInterval(toast.timer); toast.timer = null;
+    const long = toast.firstStart && Date.now() - toast.firstStart > 8000;
+    toast.firstStart = 0;
+    document.title = long ? `✅ เสร็จแล้ว · ${TITLE}` : TITLE;
+    if (long) setTimeout(() => { if (!toast.lines.size) document.title = TITLE; }, 15000);
   }
 }
 
@@ -110,18 +125,34 @@ function codeOf(e) {
   return "UNKNOWN";
 }
 
-let busy = false;
+/*
+ * Jobs lock only the devices they work on. While one device is deleting, the others (and the rest of the page)
+ * stay usable; a second job on a device that is already busy is refused with a clear message.
+ */
+let jobSeq = 0;
+const anyBusy = () => toast.lines.size > 0;
 async function run(name, fn, helpCode) {
-  if (busy) { log("รอให้งานก่อนหน้าเสร็จก่อน"); return; }
-  busy = true;
-  const btns = document.querySelectorAll("button[data-act]");
-  btns.forEach((b) => (b.disabled = true));
+  let devs = [];
+  try { devs = targets(); } catch (e) {}
+  const clash = devs.find((d) => d.busy);
+  if (clash) {
+    log(`${label(clash)} กำลัง${clash.busy}อยู่ รอให้เสร็จก่อน หรือเลือกเครื่องอื่น`);
+    showHelp("DEV_BUSY", `${label(clash)}: ${clash.busy}`);
+    return;
+  }
+  const key = "job" + ++jobSeq;
+  devs.forEach((d) => (d.busy = name));
+  if (devs.length) renderDevicesSoon();
   $("help").hidden = true;
-  busyMsg(name + " ...");
+  busyMsg(name + (devs.length === 1 ? " · " + label(devs[0]) : devs.length > 1 ? ` · ${devs.length} เครื่อง` : "") + " ...", key);
   log(name + " ...");
   try { const r = await fn(); if (r !== false) log(name + " เสร็จแล้ว"); }
   catch (e) { console.error(e); log(name + " ล้มเหลว: " + (e && e.message)); showHelp(helpCode && codeOf(e) === "UNKNOWN" ? helpCode : codeOf(e), String((e && e.message) || e)); }
-  finally { busy = false; busyMsg(""); btns.forEach((b) => (b.disabled = false)); }
+  finally {
+    devs.forEach((d) => { if (d.busy === name) d.busy = null; });
+    busyMsg("", key);
+    if (devs.length) renderDevicesSoon();
+  }
 }
 
 function confirmBox(text, word) {
@@ -340,12 +371,23 @@ function batteryIcon(level) {
   return svg;
 }
 
+const flashMain = (d) => { const f = d.info.flash || []; return f.find((x) => /courier/.test(x.pkg)) || f[0] || null; };
+/**
+ * The Flash Kit link always serves the newest build, so "latest" is learned: the highest version seen on any
+ * device (connected now or recorded in the device registry), or the number typed in Settings if that is higher.
+ */
+function latestFlash() {
+  let best = st.flashCfg().latest || "0", from = "ตั้งค่า";
+  const consider = (v, src) => { if (v && verLess(best, v)) { best = v; from = src; } };
+  all().forEach((d) => { const m = flashMain(d); if (m) consider(m.ver, label(d)); });
+  Object.values(st.registry()).forEach((r) => consider(r.flashMain, "รหัส " + String(r.serial).slice(-6)));
+  return { ver: best, from };
+}
 function flashState(d) {
   const f = d.info.flash;
   if (!f) return "";
   if (!f.length) return "missing";
-  const main = f.find((x) => /courier/.test(x.pkg)) || f[0];
-  return verLess(main.ver, st.flashCfg().latest) ? "old" : "ok";
+  return verLess(flashMain(d).ver, latestFlash().ver) ? "old" : "ok";
 }
 function verLess(a, b) {
   const pa = String(a || "0").split(/[^\d]+/).map(Number), pb = String(b || "0").split(/[^\d]+/).map(Number);
@@ -403,7 +445,7 @@ function renderOrbit(box) {
     if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
     const drain = draining.has(d.serial);
     const w = el("div", {
-      class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : ""), "data-serial": d.serial,
+      class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : d.busy ? " working" : ""), "data-serial": d.serial, title: d.busy ? "กำลัง" + d.busy : "",
       style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s;--dx:${(lay.cx - p.x).toFixed(0)}px;--dy:${(lay.cy - p.y).toFixed(0)}px`
     }, drain ? el("div", { class: "drops", "aria-hidden": "true" }, [0, 1, 2, 3, 4, 5].map((k) => el("i", { style: `--k:${k}` }))) : null,
       sat, tags.length ? el("div", { class: "sat-tags" + (compact ? " compact" : "") }, tags) : null);
@@ -444,6 +486,7 @@ function renderHubTools() {
   $("selDone").hidden = !selectMode;
   $("selAll").hidden = !selectMode;
   const need = all().filter((d) => ["missing", "old"].includes(flashState(d)));
+  renderFlashSeen();
   $("flashNeed").hidden = !need.length;
   $("flashNeedN").textContent = need.length;
 }
@@ -517,9 +560,9 @@ async function pollStatus(d) {
   return changed;
 }
 async function pollAll() {
-  if (busy || document.hidden) return;
+  if (document.hidden) return;
   let changed = false;
-  for (const d of all()) { try { if (await pollStatus(d)) changed = true; } catch (e) {} }
+  for (const d of all()) { if (d.busy) continue; try { if (await pollStatus(d)) changed = true; } catch (e) {} }
   if (changed) renderDevices();
 }
 
@@ -676,15 +719,17 @@ function renderOther(nDev) {
 
 /* ---------- Live progress while deleting: shared by every device being cleaned at the same time ---------- */
 const prog = { jobs: new Map(), start: 0 };
-function progStart() { prog.jobs.clear(); prog.start = Date.now(); }
+function progStart() { if (!prog.jobs.size) prog.start = Date.now(); }
+function progEnd(serial) { prog.jobs.delete(serial); if (!prog.jobs.size) busyMsg("", "prog"); }
 function progUpdate(serial, done, total, what) {
-  prog.jobs.set(serial, { done, total, what });
-  let D = 0, T = 0; for (const j of prog.jobs.values()) { D += j.done; T += j.total; }
-  const sec = Math.round((Date.now() - prog.start) / 1000);
-  const rate = sec ? Math.round(D / sec) : 0;
+  if (!prog.jobs.size && !prog.start) prog.start = Date.now();
+  prog.jobs.set(serial, { done, total, what, start: (prog.jobs.get(serial) || {}).start || Date.now() });
+  let D = 0, T = 0, R = 0;
+  for (const j of prog.jobs.values()) { D += j.done; T += j.total; const s = (Date.now() - j.start) / 1000; if (s >= 1) R += j.done / s; }
+  const rate = Math.round(R);
   const many = prog.jobs.size > 1 ? ` · ${prog.jobs.size} เครื่อง` : "";
   const pct = T ? Math.min(100, Math.round((D / T) * 100)) : 0;
-  busyMsg(`กำลังลบ${what}${many} · ${D.toLocaleString()}${T ? " / " + T.toLocaleString() : ""} ไฟล์${T ? ` (${pct}%)` : ""}${rate ? ` · ${rate.toLocaleString()} ไฟล์/วิ` : ""}`);
+  busyMsg(`กำลังลบ${prog.jobs.size > 1 ? "" : what}${many} · ${D.toLocaleString()}${T ? " / " + T.toLocaleString() : ""} ไฟล์${T ? ` (${pct}%)` : ""}${rate ? ` · ${rate.toLocaleString()} ไฟล์/วิ` : ""}`, "prog");
   const b = $("busy"); b.classList.toggle("prog", !!T); b.style.setProperty("--pg", pct + "%");
 }
 
@@ -711,7 +756,7 @@ async function cleanup(d, kinds, how = "กดเอง") {
       if (r.code && r.code !== 123) throw new Error(`ลบ${KIND[k].label}ไม่ครบ: ` + (r.err || r.out).trim().slice(-200));
       if (r.code) partial = true;   // xargs 123 = some file could not be removed; the recount below shows what is left
     }
-  } finally { draining.delete(d.serial); renderDevices(); }
+  } finally { draining.delete(d.serial); progEnd(d.serial); renderDevices(); }
   const after = (await df(d)).used;
   const freed = Math.max(0, before - after);
   st.addHistory({ serial: d.serial, model: d.info.model, action: kinds.map((k) => KIND[k].label).join(" + "), how, files, freedKb: freed });
@@ -797,22 +842,25 @@ function renderAuto() {
   $("autoStatus").textContent = s;
 }
 async function autoTick() {
-  if (!auto.every || Date.now() < auto.next || busy) return;
+  if (!auto.every || Date.now() < auto.next) return;
   scheduleAuto();
-  if (!all().length) return;
-  busy = true;
+  // devices busy with something else are skipped this round; the rest are cleaned at the same time
+  const ds = all().filter((d) => !d.busy);
+  if (!ds.length) return;
+  ds.forEach((d) => (d.busy = "ลบอัตโนมัติ"));
+  renderDevicesSoon();
   let kb = 0;
   try {
-    for (const d of all()) {
+    await Promise.all(ds.map(async (d) => {
       try {
         const s = await df(d);
         const pct = s.total ? (s.used / s.total) * 100 : 100;
-        if (pct < auto.pct) { log(`ลบอัตโนมัติ: ${label(d)} ใช้ ${Math.round(pct)}% ยังไม่ถึง ${auto.pct}% ข้าม`); continue; }
+        if (pct < auto.pct) { log(`ลบอัตโนมัติ: ${label(d)} ใช้ ${Math.round(pct)}% ยังไม่ถึง ${auto.pct}% ข้าม`); return; }
         kb += await cleanup(d, ["success", "trash"], "อัตโนมัติ");
       } catch (e) { log(`ลบอัตโนมัติ ${label(d)} ไม่สำเร็จ: ${e.message}`); }
-    }
+    }));
     auto.last = { time: Date.now(), kb };
-  } finally { busy = false; busyMsg(""); renderAuto(); }
+  } finally { ds.forEach((d) => { if (d.busy === "ลบอัตโนมัติ") d.busy = null; }); renderDevicesSoon(); renderAuto(); }
 }
 
 /* =====================================================================
@@ -847,7 +895,8 @@ async function loadInfo(d) {
   st.updateRegistry(d.serial, {
     model: i.model, manufacturer: i.manufacturer, android: i.android,
     battery: i.battery.level ? `${i.battery.level}% (${i.battery.health})` : "",
-    flash: i.flash.map((f) => f.ver || f.pkg).join(", ")
+    flash: i.flash.map((f) => f.ver || f.pkg).join(", "),
+    flashMain: (flashMain(d) || {}).ver || ""
   });
   renderRegistry();
 }
@@ -954,7 +1003,8 @@ function renderApps(d) {
     if ($("appCount")) $("appCount").textContent = "";
     // Opening the Apps menu loads the full list of the device on screen by itself
     const onApps = document.querySelector(".tabs .on") && document.querySelector(".tabs .on").dataset.tab === "apps";
-    if (d && onApps && !busy) { box.replaceChildren(el("div", { class: "item mut", text: "กำลังโหลดแอปทั้งหมด..." })); setTimeout(() => { if (!d.info.apps && !busy) actions.apps(); }, 0); return; }
+    if (d && onApps && !d.busy) { box.replaceChildren(el("div", { class: "item mut", text: "กำลังโหลดแอปทั้งหมด..." })); setTimeout(() => { if (!d.info.apps && !d.busy) actions.apps(); }, 0); return; }
+    if (d && onApps && d.busy) { box.replaceChildren(el("div", { class: "item mut", text: "เครื่องนี้กำลังทำงานอื่นอยู่ เสร็จแล้วกด โหลดใหม่" })); return; }
     box.replaceChildren(el("div", { class: "item mut", text: d ? "เปิดเมนูนี้แล้วจะโหลดให้เอง หรือกด โหลดใหม่" : "-" })); hid.replaceChildren(el("div", { class: "item mut", text: "-" })); return;
   }
   if ($("appCount")) { const u = a.list.filter((x) => !x.sys).length; $("appCount").textContent = `${label(d)} · ทั้งหมด ${a.list.length} แอป (ติดตั้งเอง ${u} · แอประบบ ${a.list.length - u})`; }
@@ -1083,6 +1133,12 @@ function loadFlashForm() {
   const c = st.flashCfg();
   $("flUrl").value = c.url; $("flLatest").value = c.latest;
   document.querySelectorAll("a.flash-link").forEach((a) => (a.href = c.url));
+  renderFlashSeen();
+}
+function renderFlashSeen() {
+  if (!$("flSeen")) return;
+  const L = latestFlash();
+  $("flSeen").textContent = `เวอร์ชันล่าสุดที่ใช้เช็กตอนนี้: ${L.ver} (จาก ${L.from}) · ติดตั้งเวอร์ชันใหม่ให้เครื่องไหนสักเครื่อง เว็บจะจำเลขใหม่เอง`;
 }
 function loadBannedText() { $("bannedText").value = st.banned().join("\n"); }
 
@@ -1436,7 +1492,7 @@ function showTab(name) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => (t.hidden = t.id !== "tab-" + name));
   renderDevices();
-  if (name === "wifi" && all().length && !busy) renderWifiNow().catch(() => {});
+  if (name === "wifi" && all().length) renderWifiNow().catch(() => {});
   if (name === "apps") renderApps(devices.get(selected));
 }
 

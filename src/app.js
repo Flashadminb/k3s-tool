@@ -164,6 +164,16 @@ async function run(name, fn, helpCode, opts = {}) {
   }
 }
 
+/** A dialog with several answers: choices = [[key, label], ...]; resolves to the key, or null when cancelled */
+function choiceBox(text, choices) {
+  return new Promise((resolve) => {
+    let pick = null;
+    $("dlgList").replaceChildren(el("div", { class: "choice-list" }, ...choices.map(([k, t], i) => el("button", { class: i ? "" : "blue", text: t, onclick: () => { pick = k; $("dlgOk").click(); } }))));
+    $("dlgOk").hidden = true;
+    confirmBox(text).then((ok) => { $("dlgOk").hidden = false; $("dlgList").replaceChildren(); resolve(ok ? pick : null); });
+  });
+}
+
 function confirmBox(text, word) {
   return new Promise((resolve) => {
     $("dlgText").textContent = text;
@@ -1574,6 +1584,7 @@ function loadFlashForm() {
   renderFlashSeen();
 }
 function renderFlashSeen() {
+  renderFlashCache();
   if (!$("flSeen")) return;
   const L = latestFlash();
   $("flSeen").textContent = `เวอร์ชันล่าสุดที่ใช้เช็กตอนนี้: ${L.ver} (จาก ${L.from}) · ติดตั้งเวอร์ชันใหม่ให้เครื่องไหนสักเครื่อง เว็บจะจำเลขใหม่เอง`;
@@ -1841,6 +1852,8 @@ const actions = {
   selAll: () => { all().forEach((d) => group.add(d.serial)); renderAll(); },
   selClear: () => { group.clear(); groupPin = null; renderAll(); log("ล้างกลุ่มแล้ว คำสั่งจะทำกับเครื่องที่เลือกเครื่องเดียว"); },
   selDone: () => { selectMode = false; renderAll(); if (group.size) log(`กลุ่ม ${group.size} เครื่อง: ทุกคำสั่งจะทำกับทั้งกลุ่ม จนกว่าจะกด ล้างกลุ่ม`); },
+  flashDownload: () => run("โหลดไฟล์ Flash Kit เก็บไว้", async () => { await getFlashFile("new"); }, "FLASH_DL", { free: true }),
+  flashPick: () => run("เลือกไฟล์ Flash Kit เก็บไว้", async () => { await getFlashFile("pick"); }, "FLASH_DL", { free: true }),
   flashNeed: () => flashInstall(all().filter((d) => ["missing", "old"].includes(flashState(d)))),
   flashSelected: () => { try { flashInstall(targets()); } catch (e) { showHelp(codeOf(e)); } },
   flashSave: () => {
@@ -1988,24 +2001,62 @@ async function flashViaDownloads(url) {
   throw new Error("รอไฟล์โหลดเกิน 5 นาที");
 }
 
+/*
+ * The Flash Kit APK is kept in this browser (IndexedDB) after one download, so updating many devices does not
+ * download it again each time. "โหลดใหม่" refreshes it; the version is learnt the first time it is installed.
+ */
+async function cachedFlash() { const c = await kvGet("flashApk"); return c && c.blob ? c : null; }
+function cacheText(c) {
+  if (!c) return "ยังไม่มีไฟล์เก็บไว้ในเว็บ";
+  const days = Math.floor((Date.now() - c.at) / 86400000);
+  return `ไฟล์ที่เก็บไว้: ${c.ver ? "เวอร์ชัน " + c.ver + " · " : ""}${human(c.size / 1024)} · โหลดเมื่อ ${new Date(c.at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}${days >= 7 ? ` (${days} วันก่อน อาจมีรุ่นใหม่ กดโหลดใหม่ได้)` : ""}`;
+}
+async function renderFlashCache() { const b = $("flCache"); if (b) b.textContent = cacheText(await cachedFlash()); }
+// how=new: download from the link (direct, else Chrome + pick the file); how=pick: choose an .apk on the computer
+async function getFlashFile(how) {
+  const cfg = st.flashCfg();
+  let file;
+  try {
+    if (how === "pick") file = await pickApkFile("เลือกไฟล์ Flash Kit .apk ในคอม (กด ยืนยัน แล้วเลือกไฟล์)");
+    else {
+      try { file = await flashDirect(cfg.url); }
+      catch (e) { log("โหลดตรงจากลิงก์ไม่ได้ (" + e.message + ") ใช้วิธีให้ Chrome โหลดแทน"); file = await flashViaDownloads(cfg.url); }
+    }
+  } finally { busyMsg("", "flash"); }
+  if (!file) throw new Error("ยกเลิกการเลือกไฟล์");
+  const blob = new Blob([await file.arrayBuffer()], { type: "application/vnd.android.package-archive" });
+  await kvSet("flashApk", { blob, name: "FlashKit.apk", size: blob.size, at: Date.now(), ver: "" });
+  renderFlashCache();
+  log(`เก็บไฟล์ Flash Kit ไว้ในเว็บแล้ว (${human(blob.size / 1024)}) ครั้งหน้าไม่ต้องโหลดซ้ำ`);
+  return new File([blob], "FlashKit.apk", { type: blob.type });
+}
 async function flashInstall(list, quiet) {
   list = list.filter((d) => d && !d.closed);
   if (!list.length) return;
-  const cfg = st.flashCfg();
-  if (!quiet && !(await confirmBox(`ติดตั้ง / อัปเดต Flash Kit ให้ ${list.length} เครื่อง:\n${list.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ยังไม่มี)" : flashState(d) === "old" ? " (เก่า)" : "")).join("\n")}\n\nเว็บจะโหลดไฟล์ล่าสุดจากลิงก์ แล้วติดตั้งให้ทุกเครื่องพร้อมกัน`))) return;
+  const c = await cachedFlash();
+  const who = list.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ยังไม่มี)" : flashState(d) === "old" ? " (เก่า " + ((flashMain(d) || {}).ver || "") + ")" : "")).join("\n");
+  let how = c ? "cache" : "new";
+  if (!quiet) {
+    how = c
+      ? await choiceBox(`ติดตั้ง / อัปเดต Flash Kit ให้ ${list.length} เครื่อง:\n${who}\n\n${cacheText(c)}`, [["cache", "ใช้ไฟล์ที่เก็บไว้"], ["new", "โหลดใหม่จากลิงก์"], ["pick", "เลือกไฟล์ .apk เอง"]])
+      : await choiceBox(`ติดตั้ง / อัปเดต Flash Kit ให้ ${list.length} เครื่อง:\n${who}\n\nยังไม่มีไฟล์เก็บไว้ในเว็บ: โหลดครั้งเดียว ครั้งต่อไปใช้ไฟล์เดิมได้เลย`, [["new", "โหลดจากลิงก์"], ["pick", "เลือกไฟล์ .apk เอง"]]);
+    if (!how) return;
+  }
   list.forEach((d) => setStatus(d, { title: "รอไฟล์ Flash Kit", big: "…" }));
-  let file = null;
-  try {
-    try { file = await flashDirect(cfg.url); }
-    catch (e) { log("โหลดตรงจากลิงก์ไม่ได้ (" + e.message + ") ใช้วิธีให้ Chrome โหลดแทน"); file = await flashViaDownloads(cfg.url); }
-  } catch (e) {
+  let file;
+  try { file = how === "cache" ? new File([c.blob], "FlashKit.apk", { type: "application/vnd.android.package-archive" }) : await getFlashFile(how); }
+  catch (e) {
     list.forEach((d) => setStatus(d, null));
     showHelp(e.message === "NO_FS" ? "NO_FS" : "FLASH_DL", e.message);
     return;
-  } finally { busyMsg("", "flash"); }
-  log(`ได้ไฟล์ Flash Kit แล้ว (${human(file.size / 1024)}) กำลังติดตั้ง`);
+  }
+  log(`ใช้ไฟล์ Flash Kit ${human(file.size / 1024)} กำลังติดตั้ง`);
   pendingInstall = { list, t: Date.now() };
   await installApk(file);
+  // learn which version the kept file is, from a device it was just installed on
+  const v = list.map((d) => (flashMain(d) || {}).ver).filter(Boolean).sort((a, b) => (verLess(a, b) ? 1 : -1))[0];
+  const now = await cachedFlash();
+  if (v && now && now.size === file.size) { now.ver = v; await kvSet("flashApk", now); renderFlashCache(); }
 }
 
 async function installApk(file) {

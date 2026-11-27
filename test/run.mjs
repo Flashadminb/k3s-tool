@@ -132,12 +132,22 @@ console.log("Flash Kit check");
 ok(await page.isVisible("#flashNeed"), "old Flash Kit version flagged at the hub");
 // the download site is replaced by a fake APK so the one-click flow can be checked end to end
 await page.evaluate(() => { const b = new Uint8Array(600000); b[0] = 0x50; b[1] = 0x4b; window.fetch = async () => new Response(new Blob([b])); });
-await click("flashNeed"); await accept();
+await click("flashNeed"); await page.waitForSelector("#dlg:not([hidden])"); await page.click('.choice-list button:has-text("โหลดจากลิงก์")');
 await page.waitForFunction(() => /ติดตั้ง FlashKit\.apk (สำเร็จ|ล้มเหลว)|ใช้วิธีให้ Chrome/.test(document.getElementById("log").textContent), null, { timeout: 20000 }).catch(() => {});
 await idle();
 const flLog = await page.textContent("#log");
 ok(flLog.includes("ติดตั้ง FlashKit.apk สำเร็จ"), "one click: Flash Kit downloaded and installed" + (flLog.includes("สำเร็จ") ? "" : "\n" + flLog.slice(0, 600)));
 ok((await page.textContent(".satw")).includes("ติดตั้งแล้ว"), "circle shows the install finished");
+await page.click("button[data-tab=setup]");
+await page.waitForFunction(() => document.getElementById("flCache").textContent.includes("โหลดเมื่อ"), null, { timeout: 5000 }).catch(() => {});
+ok((await page.textContent("#flCache")).includes("โหลดเมื่อ") && (await page.textContent("#flCache")).includes("เวอร์ชัน"), "downloaded file kept, with date and learnt version: " + await page.textContent("#flCache"));
+// second update uses the kept file: no download at all
+await page.evaluate(() => { window.__fetches = 0; const f = window.fetch; window.fetch = async (...a) => { window.__fetches++; return f(...a); }; });
+await click("flashSelected"); await page.waitForSelector("#dlg:not([hidden])");
+ok((await page.textContent("#dlgText")).includes("ไฟล์ที่เก็บไว้"), "update offers the kept file");
+await page.click('.choice-list button:has-text("ใช้ไฟล์ที่เก็บไว้")'); await idle();
+ok(await page.evaluate(() => window.__fetches === 0) && (await page.textContent("#log")).includes("ใช้ไฟล์ Flash Kit"), "kept file installed without downloading again");
+await page.click("button[data-tab=data]");
 
 console.log("delete success");
 await click("success"); await accept(); await idle();

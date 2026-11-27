@@ -1,6 +1,6 @@
 import * as adb from "./adb.js";
 import * as st from "./store.js";
-import { appName, CRITICAL } from "./appnames.js";
+import { appName, CRITICAL, APP_NAMES } from "./appnames.js";
 
 const q = adb.q;
 const $ = (id) => document.getElementById(id);
@@ -40,7 +40,7 @@ const HELP = {
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
-  FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกโฟลเดอร์: เลือกโฟลเดอร์ Downloads ที่ Chrome เก็บไฟล์ที่โหลด แล้วกด อนุญาต", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
+  FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกโฟลเดอร์: คลิก Downloads ทางซ้าย แล้วกดปุ่ม Select Folder ด้านล่าง (หน้าต่างนั้นไม่โชว์ไฟล์ เป็นปกติ)", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
@@ -239,6 +239,7 @@ async function addDevice(d) {
   const old = devices.get(d.serial);
   if (old && !old.closed) { await d.close(); return old; }
   d.info.model = (await d.sh("getprop ro.product.model")).out.trim();
+  await probeCaps(d).catch(() => {});
   d.info.profile = st.profileFor(d.info.model);
   await learnProfile(d).catch(() => {});
   devices.set(d.serial, d);
@@ -275,13 +276,41 @@ async function addDevice(d) {
  * A model seen for the first time is learned: find where Flash Kit keeps its photos (imagePath) on that device
  * and save it as a model profile (visible and editable in Settings > models).
  */
+/*
+ * Older devices (Android 6 and the like) lack tools newer ones have: `cmd` arrived in Android 7, and some builds have
+ * no find, no find -H or no xargs -0. Each is tried once at connect; the commands below pick what works per device.
+ * Anything not probed (probe failed) is assumed present, i.e. the modern path.
+ */
+async function probeCaps(d) {
+  const r = await d.sh([
+    "getprop ro.build.version.sdk",
+    "find /sdcard/ -maxdepth 0 >/dev/null 2>&1 && echo has:find",
+    "find -H /sdcard -maxdepth 0 >/dev/null 2>&1 && echo has:findH",
+    "echo x | xargs -0 echo >/dev/null 2>&1 && echo has:x0",
+    "echo x | awk '{print}' >/dev/null 2>&1 && echo has:awk",
+    "cmd -l >/dev/null 2>&1 && echo has:cmd",
+    "cmd package help >/dev/null 2>&1 && echo has:cmd"
+  ].join("; "));
+  const has = new Set([...r.out.matchAll(/has:(\w+)/g)].map((m) => m[1]));
+  const sdk = parseInt(r.out, 10) || 0;
+  d.caps = { sdk, find: has.has("find"), findH: has.has("findH"), x0: has.has("x0"), awk: has.has("awk"), cmd: has.has("cmd") };
+  const miss = ["find", "x0", "awk", "cmd"].filter((k) => !d.caps[k]);
+  if (sdk && sdk < 24) log(`${label(d)}: Android รุ่นเก่า (API ${sdk}) ใช้วิธีสำรองที่เครื่องรุ่นนี้รองรับ${miss.length ? " (ไม่มี " + miss.join(", ") + ")" : ""}`);
+}
+const caps = (d) => d.caps || {};
+const hasCap = (d, k) => caps(d)[k] !== false;
+// `find` over a folder that may be a symlink (/sdcard is one): -H follows it; without -H a trailing slash does the same
+const findIn = (d, dir) => (hasCap(d, "findH") ? `find -H ${q(dir)}` : `find ${q(dir.replace(/\/?$/, "/"))}`);
+// Trash (.trashed-*) is Android 11+ only: older devices have none, so skip the whole-storage search
+const noTrash = (d) => caps(d).sdk > 0 && caps(d).sdk < 30;
+
 async function learnProfile(d) {
   const model = (d.info.model || "").trim();
   if (!model || st.profileFor(model) !== st.DEFAULT_PROFILE) return;
   let base = "/sdcard/imagePath";
   const here = (await d.sh(`[ -d ${q(base)} ] && echo yes`)).out.includes("yes");
   if (!here) {
-    const found = (await d.sh("find -H /sdcard -maxdepth 4 -path /sdcard/Android -prune -o -type d -name imagePath -print 2>/dev/null | head -1")).out.trim();
+    const found = (await d.sh(hasCap(d, "find") ? `${findIn(d, "/sdcard")} -maxdepth 4 -path /sdcard/Android -prune -o -type d -name imagePath -print 2>/dev/null` : "for x in /sdcard/*/imagePath /sdcard/*/*/imagePath; do [ -d \"$x\" ] && echo \"$x\"; done")).out.trim().split("\n")[0].trim().replace(/\/+$/, "").replace("/sdcard//", "/sdcard/");
     if (!found) { log(`${label(d)}: รุ่นใหม่ (${model}) ยังไม่เจอโฟลเดอร์รูปของ Flash Kit อาจยังไม่เคยถ่ายรูปงาน ใช้แบบ K3S ไปก่อน แล้วจะเรียนรู้ใหม่ครั้งหน้า`); return; }
     base = found;
   }
@@ -687,11 +716,13 @@ const TRASH = "-name '.trashed-*'";
 // Every find uses -H: on Android /sdcard is a symlink, and find does not enter a symlinked start folder without it
 // One pass per folder: number of files and total KB. Missing folder -> 0 0
 // Fast: list names (readdir only) for the count and one `du -sk` for the size, instead of a stat per file
-const statCmd = (dir) =>
-  `if [ -d ${q(dir)} ]; then echo $(find -H ${q(dir)} -type f 2>/dev/null | wc -l) $(du -sk ${q(dir)} 2>/dev/null | cut -f1); else echo 0 0; fi`;
+// "files KB" for one folder. Without find: count with ls -lR (lines starting with "-" are files)
+const statCmd = (d, dir) => hasCap(d, "find")
+  ? `if [ -d ${q(dir)} ]; then echo $(${findIn(d, dir)} -type f 2>/dev/null | wc -l) $(du -sk ${q(dir + "/")} 2>/dev/null | cut -f1); else echo 0 0; fi`
+  : `if [ -d ${q(dir)} ]; then n=$(ls -lR ${q(dir + "/")} 2>/dev/null | grep -c '^-'); set -- $(du -sk ${q(dir + "/")} 2>/dev/null) 0; echo $n $1; else echo 0 0; fi`;
 // Trash lives next to the photos; Android/ (every app's private data, huge) is skipped instead of searched
 const TRASH_FIND = `find -H /sdcard -path /sdcard/Android -prune -o -type f ${TRASH}`;
-const trashStatCmd = `${TRASH_FIND} -exec du -k {} + 2>/dev/null | awk '{s+=$1;n++} END {print n+0, s+0}'`;
+const trashStatCmd = (d) => noTrash(d) || !hasCap(d, "find") ? "echo 0 0" : `${TRASH_FIND} -exec du -k {} + 2>/dev/null | awk '{s+=$1;n++} END {print n+0, s+0}'`;
 // Delete in batches of 300, up to 4 at a time (xargs -P), and print how many each batch removed so the page can
 // show progress. Phones whose xargs has no -P fall back to one batch at a time.
 // (the -P check runs before the pipeline: put inside it, it would swallow the file list)
@@ -699,11 +730,33 @@ const PAR_CHECK = `if echo | xargs -P 2 true 2>/dev/null; then P="-P 4"; else P=
 const BATCH_DEL = `xargs -0 -n 300 $P sh -c 'rm -f "$@"; echo $#' _`;
 // Photos and videos outside Flash Kit's own folders (camera, screenshots, Pictures, other apps)
 const MEDIA = "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.heic' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.3gp' \\)";
-const OTHER_MEDIA = `find -H /sdcard -type f ${MEDIA} -not -path '/sdcard/Android/*' -not -path '*/imagePath/*' -not -name '.trashed-*'`;
+const OTHER_MEDIA = (d) => `${findIn(d, "/sdcard")} -type f ${MEDIA} -not -path '/sdcard/Android/*' -not -path '*/imagePath/*' -not -name '.trashed-*'`;
 
+/*
+ * Storage size. Newer phones: `df -k` gives plain KB numbers. Android 6 toolbox df has no -k and prints sizes like
+ * "11.6G 2.1G 9.5G"; long filesystem names can also push the numbers onto their own line. Every line is tried.
+ */
+const KB = { "": 1, K: 1, M: 1024, G: 1024 * 1024, T: 1024 * 1024 * 1024 };
+function dfSize(tok, plainKb) {
+  const m = /^(\d+(?:\.\d+)?)([KMGT]?)i?B?$/i.exec(tok || "");
+  if (!m) return null;
+  const u = m[2].toUpperCase();
+  return Math.round(parseFloat(m[1]) * (u ? KB[u] : plainKb ? 1 : 1 / 1024));
+}
+function parseDf(text, plainKb) {
+  for (const line of text.split("\n").reverse()) {
+    const t = line.trim().split(/\s+/);
+    for (let i = 0; i + 1 < t.length; i++) {
+      const total = dfSize(t[i], plainKb), used = dfSize(t[i + 1], plainKb);
+      if (total && used !== null && used <= total) return { total, used };
+    }
+  }
+  return null;
+}
 async function df(d) {
-  const p = (await d.sh("df -k /sdcard | tail -1")).out.trim().split(/\s+/);
-  return { total: parseInt(p[1], 10) || 0, used: parseInt(p[2], 10) || 0 };
+  const r = await d.sh("df -k /sdcard/ 2>/dev/null; echo @@; df /sdcard/ 2>/dev/null; df /storage/emulated/0 2>/dev/null; df /data 2>/dev/null");
+  const [a, b = ""] = r.out.split("@@");
+  return parseDf(a, true) || parseDf(b.split("\n").filter((l) => /\d/.test(l)).slice(0, 2).join("\n"), true) || { total: 0, used: 0 };
 }
 
 async function refreshStorage(d) {
@@ -715,7 +768,7 @@ async function refreshStorage(d) {
   if (d.serial === selected) renderStorage(d);
   // the three counts run side by side over separate ADB streams
   const num = (r) => { const v = r.out.trim().split(/\s+/).map((x) => parseInt(x, 10) || 0); return [v[0] || 0, v[1] || 0]; };
-  const [sc, fc, tc] = await Promise.all([d.sh(statCmd(p.success)), d.sh(statCmd(p.fail)), d.sh(trashStatCmd)]);
+  const [sc, fc, tc] = await Promise.all([d.sh(statCmd(d, p.success)), d.sh(statCmd(d, p.fail)), d.sh(trashStatCmd(d))]);
   d.info.storage = { ...s, success: num(sc), fail: num(fc), trash: num(tc), at: Date.now() };
   if (counting && d.status && d.status.title === "กำลังนับไฟล์") setStatus(d, null);
   st.updateRegistry(d.serial, { model: d.info.model, storage: `${human(s.used)} / ${human(s.total)}` });
@@ -742,14 +795,19 @@ function renderToday() {
 }
 
 const KIND = {
-  success: { label: "รูป success", short: "ลบ success", cmd: (p) => delCmd(p.success) },
-  fail: { label: "รูป fail", short: "ลบ fail", cmd: (p) => delCmd(p.fail) },
-  trash: { label: "ขยะ .trashed", short: "ล้างถังขยะ", cmd: () => `${PAR_CHECK} ${TRASH_FIND} -print0 2>/dev/null | ${BATCH_DEL}` }
+  success: { label: "รูป success", short: "ลบ success", cmd: (p, d) => delCmd(d, p.success) },
+  fail: { label: "รูป fail", short: "ลบ fail", cmd: (p, d) => delCmd(d, p.fail) },
+  trash: { label: "ขยะ .trashed", short: "ล้างถังขยะ", cmd: (p, d) => noTrash(d) || !hasCap(d, "find") ? "true" : hasCap(d, "x0") ? `${PAR_CHECK} ${TRASH_FIND} -print0 2>/dev/null | ${BATCH_DEL}` : `${TRASH_FIND} 2>/dev/null | ${LOOP_DEL("rm -f")}` }
 };
 // Files go through find -print0 | xargs (never `rm -rf dir/*`, which fails with "argument list too long").
 // Missing folder (fresh device) means nothing to delete, not an error. Each output line = files removed by one batch.
-function delCmd(dir) {
-  return `${PAR_CHECK} [ -d ${q(dir)} ] || exit 0; find -H ${q(dir)} -type f -print0 | ${BATCH_DEL}`;
+// Older devices without find or xargs -0: a plain shell loop, printing a count every 100 files for the progress bar
+const LOOP_DEL = (rm) => `{ n=0; while IFS= read -r f; do ${rm} "$f"; n=$((n+1)); if [ $n -ge 100 ]; then echo $n; n=0; fi; done; echo $n; }`;
+function delCmd(d, dir) {
+  if (hasCap(d, "find") && hasCap(d, "x0")) return `${PAR_CHECK} [ -d ${q(dir)} ] || exit 0; ${findIn(d, dir)} -type f -print0 | ${BATCH_DEL}`;
+  if (hasCap(d, "find")) return `[ -d ${q(dir)} ] || exit 0; ${findIn(d, dir)} -type f 2>/dev/null | ${LOOP_DEL("rm -f")}`;
+  // no find at all: remove each entry of the folder (subfolders whole), the folder itself stays for Flash Kit
+  return `cd ${q(dir + "/")} 2>/dev/null || exit 0; ls -a | grep -vx '\\.\\{1,2\\}' | sed 's|^|./|' | ${LOOP_DEL("rm -rf")}`;
 }
 
 /* ---------- File manager: every file and folder in the phone storage, biggest first, delete what is ticked ---------- */
@@ -806,7 +864,7 @@ async function scanOther(ts) {
   const merged = new Map();
   for (const d of ts) {
     busyMsg("กำลังหารูปอื่นในเครื่อง · " + label(d));
-    const out = (await d.sh(`${OTHER_MEDIA} -exec du -k {} + 2>/dev/null | awk '{s=$1; sub(/^[0-9]+[ \\t]+/, ""); p=$0; sub(/\\/[^\\/]*$/, "", p); n[p]++; k[p]+=s} END {for (x in n) print k[x] "\\t" n[x] "\\t" x}'`)).out;
+    const out = (await d.sh(`${OTHER_MEDIA(d)} -exec du -k {} + 2>/dev/null | awk '{s=$1; sub(/^[0-9]+[ \\t]+/, ""); p=$0; sub(/\\/[^\\/]*$/, "", p); n[p]++; k[p]+=s} END {for (x in n) print k[x] "\\t" n[x] "\\t" x}'`)).out.replace(/\/\/+/g, "/");
     for (const line of out.split("\n")) {
       const [kb, n, dir] = line.split("\t");
       if (!dir) continue;
@@ -862,7 +920,7 @@ async function cleanup(d, kinds, how = "กดเอง") {
       const showLeft = () => setStatus(d, { title: stTitle, big: Math.max(0, total - done).toLocaleString(), unit: total ? "ไฟล์ที่เหลือ" : "ไฟล์", ring: total ? (done / total) * 100 : 0 });
       progUpdate(d.serial, 0, total, KIND[k].label);
       showLeft();
-      const r = await d.shStream(KIND[k].cmd(d.info.profile), (line) => {
+      const r = await d.shStream(KIND[k].cmd(d.info.profile, d), (line) => {
         const n = parseInt(line, 10);
         if (!n) return;
         done += n; files += n;
@@ -906,7 +964,7 @@ async function pickBackupFolder() {
 }
 async function backupFail(d, root) {
   const dir = d.info.profile.fail;
-  const list = (await d.sh(`[ -d ${q(dir)} ] && find -H ${q(dir)} -type f`)).out.split("\n").map((s) => s.trim()).filter(Boolean);
+  const list = (await d.sh(`[ -d ${q(dir)} ] && ${findIn(d, dir)} -type f`)).out.replace(/\/\/+/g, "/").split("\n").map((s) => s.trim()).filter(Boolean);
   if (!list.length) { log(`${label(d)}: ไม่มีรูปใน fail ให้สำรอง`); return 0; }
   const top = await root.getDirectoryHandle(`fail-${d.serial.slice(-6)}-${stamp()}`, { create: true });
   const cache = new Map();
@@ -930,7 +988,7 @@ async function backupFail(d, root) {
 async function bigFiles(d) {
   busyMsg("กำลังค้นหาไฟล์ใหญ่ (อาจใช้เวลาเป็นนาที) ...");
   const dirs = (await d.sh("du -sk /sdcard/* 2>/dev/null | sort -rn | head -15")).out;
-  const files = (await d.sh("find -H /sdcard -type f -size +1024k -exec du -k {} + 2>/dev/null | sort -rn | head -30")).out;
+  const files = (await d.sh(findIn(d, "/sdcard") + " -type f -size +1024k -exec du -k {} + 2>/dev/null | sort -rn | head -30")).out.replace(/\/\/+/g, "/");
   const parse = (t) => t.split("\n").map((l) => l.match(/^(\d+)\s+(.+)$/)).filter(Boolean).map((m) => ({ kb: +m[1], path: m[2].trim() }));
   $("bigCard").hidden = false;
   $("bigDirs").replaceChildren(...parse(dirs).map((x) => el("div", { class: "item" }, el("div", { class: "nm", text: x.path }), el("b", { text: human(x.kb) }))));
@@ -1007,7 +1065,10 @@ async function loadInfo(d) {
   i.ram = { total: mv("MemTotal"), avail: mv("MemAvailable") };
   i.uptime = parseFloat((await d.sh("cat /proc/uptime")).out) || 0;
   // Which app is the home screen? iLauncher (company kiosk) switches USB debugging off when you leave Settings
-  const home = (await d.sh("cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN 2>/dev/null | tail -1")).out.trim();
+  const home = hasCap(d, "cmd")
+    ? (await d.sh("cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN 2>/dev/null | tail -1")).out.trim()
+    // Android 6 has no `cmd`: an installed iLauncher/kiosk app is taken as the home screen
+    : ((await d.sh("pm list packages 2>/dev/null | grep -iE 'ilauncher|kiosk'")).out.match(/package:([\w.]+)/) || ["", ""])[1] + "/";
   i.home = (home.match(/^([\w.]+)\//) || [])[1] || "";
   i.kiosk = /ilauncher|kiosk/i.test(i.home);
   i.flash = [];
@@ -1093,8 +1154,7 @@ async function loadApps(d) {
   const isProt = (p) => prot.has(p) || /flash/i.test(p) || CRITICAL.includes(p);
   const sysSet = new Set(sys);
   // apps that have an icon on the home screen (Gmail, Chrome, Flash Kit...) are what people look for: list them first
-  const icons = new Set([...(await d.sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER 2>/dev/null")).out
-    .matchAll(/([a-zA-Z][\w.]*)\/[\w.$]+/g)].map((m) => m[1]));
+  const icons = await launcherApps(d, user);
   d.info.apps = {
     list: [...user.map((p) => ({ pkg: p, sys: false })), ...sys.map((p) => ({ pkg: p, sys: true }))]
       .map((a) => ({ ...a, name: appName(a.pkg), ver: ver[a.pkg] || "", prot: isProt(a.pkg), icon: icons.has(a.pkg) }))
@@ -1103,6 +1163,24 @@ async function loadApps(d) {
     at: Date.now()
   };
   d.info.bannedFound = bannedIn(d);
+}
+
+/*
+ * Apps with a home-screen icon. Android 7+: `cmd package query-activities`. Android 6 has no `cmd`, so the
+ * resolver table in `dumpsys package` is read instead (component lines followed by their LAUNCHER category).
+ * If both come back empty, every user app plus Settings and the known Google apps count as having an icon.
+ */
+async function launcherApps(d, user) {
+  const pk = (txt) => new Set([...txt.matchAll(/([a-zA-Z][\w.]*)\/[\w.$]+/g)].map((m) => m[1]));
+  if (hasCap(d, "cmd")) {
+    const s = pk((await d.sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER 2>/dev/null")).out);
+    if (s.size) return s;
+  }
+  if (hasCap(d, "awk")) {
+    const s = pk((await d.sh("dumpsys package r 2>/dev/null | awk '/^Activity Resolver Table:/{a=1;next} /Resolver Table:/{a=0} a && / filter /{c=$2} a && /category.LAUNCHER/ && c {print c; c=\"\"}' | sort -u")).out);
+    if (s.size) return s;
+  }
+  return new Set([...user, SETTINGS_PKG, ...Object.keys(APP_NAMES)]);
 }
 
 function bannedIn(d) {
@@ -1328,6 +1406,13 @@ function removeBanned(ds) {
    Wi-Fi: saved networks, scan, connect one device or the whole group
    ===================================================================== */
 async function wifiNow(d) {
+  if (!hasCap(d, "cmd")) {
+    // Android 6: read it from dumpsys wifi ("Wi-Fi is enabled" / mWifiInfo SSID: name, ...)
+    const t = (await d.sh("dumpsys wifi 2>/dev/null | grep -m3 -E 'Wi-Fi is|mWifiInfo'")).out;
+    if (/Wi-Fi is disabled/i.test(t)) return "Wi-Fi ปิดอยู่";
+    const m = t.match(/SSID: "?([^",]+)"?,/);
+    return m && !/unknown ssid|<none>/i.test(m[1]) && /CONNECTED|COMPLETED/.test(t) ? "ต่ออยู่กับ " + m[1] : "ยังไม่ได้ต่อ Wi-Fi";
+  }
   const r = await d.sh("cmd wifi status");
   const t = r.out + r.err;
   const m = t.match(/connected to "([^"]*)"/i);
@@ -1367,7 +1452,7 @@ function wifiConnect(w) {
       const t = (r.out + r.err).trim();
       // Older Android (11 and below) keeps these Wi-Fi commands for root only: not a company block, a version limit.
       // Then the page opens the device's Wi-Fi screen and can type the saved password for you.
-      if (/does not have access to wifi commands|checkRootPermission/i.test(t)) {
+      if (!hasCap(d, "cmd") || /does not have access to wifi commands|checkRootPermission|cmd: not found|can't find service/i.test(t)) {
         manual.push(d);
         await d.sh("input keyevent 224; am start -a android.settings.WIFI_SETTINGS");
         setStatus(d, { title: "แตะ Wi-Fi ที่เครื่อง", big: w.ssid.slice(0, 10) });
@@ -1582,7 +1667,7 @@ const actions = {
       let files = 0;
       for (const dir of dirs) {
         busyMsg("กำลังลบ " + dir.replace(/^\/sdcard\/?/, "") + " · " + label(d));
-        const r = await d.sh(`[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(find -H ${q(dir)} -maxdepth 1 -type f ${MEDIA} -not -name '.trashed-*' | wc -l); find -H ${q(dir)} -maxdepth 1 -type f ${MEDIA} -not -name '.trashed-*' -delete; echo $n`);
+        const r = await d.sh(`[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(${findIn(d, dir)} -maxdepth 1 -type f ${MEDIA} -not -name '.trashed-*' | wc -l); ${findIn(d, dir)} -maxdepth 1 -type f ${MEDIA} -not -name '.trashed-*' -delete; echo $n`);
         files += parseInt(r.out.trim().split(/\s+/).pop(), 10) || 0;
       }
       const freed = Math.max(0, before - (await df(d)).used);
@@ -1706,6 +1791,7 @@ const actions = {
   },
   wifiScan: () => run("ค้นหา Wi-Fi", async () => {
     const d = cur();
+    if (!hasCap(d, "cmd")) { $("wifiScanList").replaceChildren(el("div", { class: "item mut", text: "Android รุ่นนี้ (เก่ากว่า 7) ค้นหา Wi-Fi จากคอมไม่ได้ พิมพ์ชื่อ Wi-Fi เองได้เลย" })); return; }
     await d.sh("svc wifi enable; cmd wifi start-scan");
     await new Promise((res) => setTimeout(res, 4000));
     const r = await d.sh("cmd wifi list-scan-results");
@@ -1757,6 +1843,14 @@ async function flashDirect(url) {
 }
 
 /** Way 2: Chrome downloads it as usual and the page picks the new .apk up from the Downloads folder */
+// Ask for an APK file directly (the confirm click is the gesture the file window needs)
+async function pickApkFile(text) {
+  if (!(await confirmBox(text))) return null;
+  const inp = el("input", { type: "file", accept: ".apk,application/vnd.android.package-archive" });
+  const f = await new Promise((res) => { inp.onchange = () => res(inp.files[0] || null); inp.oncancel = () => res(null); inp.click(); });
+  if (f && !(await isApk(f))) { showHelp("FLASH_DL", "ไฟล์ที่เลือกไม่ใช่ APK"); return null; }
+  return f;
+}
 async function flashViaDownloads(url) {
   if (!window.showDirectoryPicker) throw new Error("NO_FS");
   let dir = await kvGet("dlDir");
@@ -1767,12 +1861,15 @@ async function flashViaDownloads(url) {
     if (p !== "granted") dir = null;
   }
   if (!dir) {
-    const pick = () => window.showDirectoryPicker({ id: "downloads", startIn: "downloads", mode: "read" });
-    try { dir = await pick(); }
+    // The folder window shows folders only, never files: people look for the APK there and get stuck. Say so first.
+    if (!(await askGesture("ครั้งแรกครั้งเดียว: เว็บจะเปิดหน้าต่างเลือกโฟลเดอร์\n\n1. คลิก Downloads ทางซ้าย\n2. กดปุ่ม Select Folder (เลือกโฟลเดอร์) ด้านล่างขวา แล้วกด View files / อนุญาต\n\nในหน้าต่างนั้นจะเห็นแต่โฟลเดอร์ ไม่เห็นไฟล์ เป็นเรื่องปกติ ไม่ต้องหาไฟล์ Flash Kit\nเว็บจะหยิบไฟล์ที่โหลดเสร็จไปติดตั้งให้เอง"))) throw new Error("ยกเลิก");
+    try { dir = await window.showDirectoryPicker({ id: "downloads", startIn: "downloads", mode: "read" }); }
     catch (e) {
-      if (e && e.name === "AbortError") throw new Error("ยกเลิกการเลือกโฟลเดอร์");
-      if (!(await askGesture("ครั้งแรกครั้งเดียว: เลือกโฟลเดอร์ Downloads (ที่ Chrome เก็บไฟล์ที่โหลด) แล้วกด อนุญาต\nเว็บจะหยิบไฟล์ Flash Kit ที่โหลดเสร็จไปติดตั้งให้เอง"))) throw new Error("ยกเลิก");
-      dir = await pick();
+      if (e && e.name !== "AbortError") throw e;
+      // gave up on the folder window: let them pick the downloaded APK file itself instead
+      const f = await pickApkFile("ไม่เลือกโฟลเดอร์ก็ได้: ถ้าโหลด Flash Kit ไว้แล้ว กด ยืนยัน แล้วเลือกไฟล์ .apk เอง");
+      if (f) return f;
+      throw new Error("ยกเลิกการเลือกโฟลเดอร์");
     }
     await kvSet("dlDir", dir);
   }
@@ -1797,6 +1894,8 @@ async function flashViaDownloads(url) {
     }
     if (newest) { if (cand && cand.name === newest.name && cand.size === newest.size && (await isApk(newest))) return newest; cand = newest; }
   }
+  const f = await pickApkFile("รอไฟล์ในโฟลเดอร์ " + dir.name + " เกิน 5 นาทีแล้ว ถ้าโหลดเสร็จแล้ว กด ยืนยัน แล้วเลือกไฟล์ .apk เอง");
+  if (f) return f;
   throw new Error("รอไฟล์โหลดเกิน 5 นาที");
 }
 

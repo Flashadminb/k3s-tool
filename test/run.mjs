@@ -25,7 +25,12 @@ put(join(SD, "Download/big video.mp4"), 3000);
 mkdirSync(BIN, { recursive: true }); mkdirSync(TMP, { recursive: true });
 
 const stub = (name, body) => { writeFileSync(join(BIN, name), "#!/bin/sh\n" + body + "\n"); chmodSync(join(BIN, name), 0o755); };
-stub("getprop", `case "$1" in ro.product.model) [ "$SERIAL" = TESTSERIAL002 ] && echo Q9 || echo K3S;; ro.product.manufacturer) echo Urovo;; ro.build.version.release) echo 11;; ro.build.version.sdk) echo 30;; esac`);
+stub("getprop", `OLD=; [ "$SERIAL" = TESTSERIAL003 ] && OLD=1
+case "$1" in ro.product.model) [ "$SERIAL" = TESTSERIAL002 ] && echo Q9 || { [ -n "$OLD" ] && echo "95W Series" || echo K3S; };; ro.product.manufacturer) echo Urovo;; ro.build.version.release) [ -n "$OLD" ] && echo 6.0 || echo 11;; ro.build.version.sdk) [ -n "$OLD" ] && echo 23 || echo 30;; esac`);
+// TESTSERIAL003 plays an Android 6 device: no cmd, no find, no xargs, toolbox df ("11.6G 2.1G ..." and no -k)
+stub("find", `[ "$SERIAL" = TESTSERIAL003 ] && { echo "sh: find: not found" >&2; exit 127; }; exec /usr/bin/find "$@"`);
+stub("xargs", `[ "$SERIAL" = TESTSERIAL003 ] && { echo "sh: xargs: not found" >&2; exit 127; }; exec /usr/bin/xargs "$@"`);
+stub("df", `if [ "$SERIAL" = TESTSERIAL003 ]; then [ "$1" = -k ] && { echo "df: Unknown option 'k'" >&2; exit 1; }; printf 'Filesystem               Size     Used     Free   Blksize\n%s     11.6G     2.1G     9.5G   4096\n' "$1"; else exec /usr/bin/df "$@"; fi`);
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
  package) if [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
@@ -46,7 +51,8 @@ case "$1" in
  install) echo Success;;
  trim-caches) ;;
 esac`);
-stub("cmd", `[ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3" "$PMSTATE" > "$PMSTATE.n"; mv "$PMSTATE.n" "$PMSTATE"; echo "Package $3 installed for user: 0"; }
+stub("cmd", `[ "$SERIAL" = TESTSERIAL003 ] && { echo "sh: cmd: not found" >&2; exit 127; }
+[ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3" "$PMSTATE" > "$PMSTATE.n"; mv "$PMSTATE.n" "$PMSTATE"; echo "Package $3 installed for user: 0"; }
 if [ "$2" = query-activities ]; then
   for p in com.flashexpress.kit jp.naver.line.android com.android.chrome com.android.settings; do grep -qx "$p" "$PMSTATE.dis" 2>/dev/null || echo "$p/.Main"; done
 fi
@@ -308,6 +314,24 @@ ok(await page.isVisible("#help.info") && (await page.textContent("#help")).inclu
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("android.settings.WIFI_SETTINGS"), "device Wi-Fi screen opened");
 await page.click('#help button:has-text("พิมพ์รหัส")'); await idle();
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("input text abcdefgh"), "saved password typed into the device");
+
+console.log("old Android 6 device (95W Series)");
+for (let i = 0; i < 7; i++) put(join(SD, "imagePath/success", `old${i}.jpg`), 40);
+put(join(SD, "imagePath/success/sub/old-in-folder.jpg"), 40);
+await page.click("button[data-tab=data]");
+await click("connect"); await idle();
+await page.click('#devices .satw:has-text("IAL003")');
+await page.waitForFunction(() => !document.getElementById("cSuccess").textContent.includes("กำลัง"), null, { timeout: 20000 });
+const card3 = await page.textContent("#devCard");
+ok(card3.includes("95W Series") && !card3.includes("0 KB (0%)") && /2\.1 GB|2,1|GB/.test(card3), "Android 6 storage read from toolbox df: " + card3.replace(/\s+/g, " ").slice(0, 160));
+ok((await page.textContent("#cSuccess")).startsWith("8 ไฟล์"), "Android 6 count without find = 8: " + await page.textContent("#cSuccess"));
+ok((await page.textContent("#cTrash")).startsWith("0 ไฟล์"), "no trash search on Android 6");
+await click("success"); await accept(); await idle();
+ok(count("imagePath/success") === "0" && existsSync(join(SD, "imagePath/success")), "Android 6 delete without find/xargs: folder emptied, kept");
+ok(!(await page.isVisible("#help:not(.info)")), "no error on Android 6 delete");
+await page.click("button[data-tab=apps]");
+await page.waitForFunction(() => document.getElementById("appCount").textContent.includes("ทั้งหมด"), null, { timeout: 30000 }); await idle();
+ok(!(await page.textContent("#lockCount")).includes("จะปิด 0 แอป"), "Android 6 lock plan has apps without cmd: " + await page.textContent("#lockCount"));
 
 console.log("mobile width");
 await page.setViewportSize({ width: 375, height: 800 });

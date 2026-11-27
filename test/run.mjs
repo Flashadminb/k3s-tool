@@ -230,8 +230,10 @@ await click("lockApply"); await accept(); await idle();
 const dis = () => (existsSync(join(ROOT, "pm-TESTSERIAL001.dis")) ? readFileSync(join(ROOT, "pm-TESTSERIAL001.dis"), "utf8") : "");
 ok(dis().includes("jp.naver.line.android") && dis().includes("com.android.chrome") && !dis().includes("flash") && !dis().includes("com.android.settings"), "lock: LINE and Chrome off, Flash Kit and Settings untouched");
 ok(await page.isVisible(".sat-tag.lock"), "device circle tagged as locked");
+// unlocking from another computer/phone: this browser's memory is wiped, the list kept on the device is used
+await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); localStorage.removeItem("k3s-tool:fieldLock"); });
 await click("lockRelease"); await idle();
-ok(dis().trim() === "", "unlock: every app back on");
+ok(dis().trim() === "", "unlock from a different browser: every app back on (list read from the device)");
 
 console.log("settings");
 await page.click("button[data-tab=setup]");

@@ -1141,12 +1141,18 @@ function lockPlan(d) {
   });
 }
 const lockedKey = (d) => "locked:" + d.serial;
+// The list of apps switched off is kept on the device too, so any computer or phone can unlock it on the spot
+const LOCK_FILE = "/data/local/tmp/idata-tools-locked.txt";
+async function deviceLockList(d) { return pkgList((await d.sh(`cat ${LOCK_FILE} 2>/dev/null`)).out); }
+async function saveDeviceLockList(d, list) {
+  await d.sh(list.length ? `printf '%s\\n' ${list.map(q).join(" ")} > ${LOCK_FILE}` : `rm -f ${LOCK_FILE}`);
+}
 async function readLockState(d) {
-  const mine = st.load(lockedKey(d), []);
+  const mine = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d))])];
   if (!mine.length) { d.info.locked = []; return; }
   const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
   d.info.locked = mine.filter((p) => disabled.has(p));
-  if (d.info.locked.length !== mine.length) st.save(lockedKey(d), d.info.locked);
+  st.save(lockedKey(d), d.info.locked);
 }
 async function lockDevice(d) {
   if (!d.info.apps) await loadApps(d);
@@ -1158,8 +1164,9 @@ async function lockDevice(d) {
     if (/disabled/i.test(r.out + r.err)) done.push(x.pkg); else fails.push(x.name);
     setStatus(d, { title: "กำลังล็อก", big: `${i + 1}/${plan.length}`, ring: ((i + 1) / plan.length) * 100 });
   }
-  const all = [...new Set([...st.load(lockedKey(d), []), ...done])];
+  const all = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d)), ...done])];
   st.save(lockedKey(d), all); d.info.locked = all;
+  await saveDeviceLockList(d, all);
   await loadApps(d);
   setStatus(d, { title: "ล็อกออกงานแล้ว", big: String(done.length), unit: "แอปถูกปิด", ring: 100, done: true });
   log(`${label(d)}: โหมดออกงาน ปิด ${done.length} แอป${fails.length ? " (ปิดไม่ได้: " + fails.join(", ") + ")" : ""}`);
@@ -1170,10 +1177,11 @@ async function unlockDevice(d) {
   // everything this page switched off, plus anything in today's plan that is still off
   const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
   const plan = (lockPlan(d) || []).filter((x) => x.block && disabled.has(x.pkg)).map((x) => x.pkg);
-  const list = [...new Set([...st.load(lockedKey(d), []), ...plan])];
+  const list = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d)), ...plan])];
   let n = 0;
   for (const p of list) { const r = await d.sh(`pm enable ${q(p)}`); if (/enabled/i.test(r.out + r.err)) n++; }
   st.save(lockedKey(d), []); d.info.locked = [];
+  await saveDeviceLockList(d, []);
   await loadApps(d);
   setStatus(d, { title: "ปลดล็อกแล้ว", big: String(n), unit: "แอปกลับมา", ring: 100, done: true });
   log(`${label(d)}: ปลดล็อก เปิดคืน ${n} แอป`);

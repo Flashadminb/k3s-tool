@@ -159,6 +159,15 @@ body.grouped #dcDetail .facts{grid-template-columns:1fr 1fr;font-size:15px}
 .stagenote{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:min(620px,92%);padding:18px 22px;z-index:5}
 .stagenote .part{font:700 20px/1.3 var(--body);margin-bottom:6px}
 #authWait{border:2px solid var(--gold)}
+/* A device is already on the stage: the "tap Allow" card floats over the right panel instead of covering the devices */
+.satw.ghost{animation:none;opacity:.85}
+.satw.ghost .sat{cursor:default}
+.satw.ghost .sat-ring{background:none;border:2px dashed var(--gold);-webkit-mask:none;mask:none;animation:spin 8s linear infinite}
+.satw.ghost .sat-body{background:rgba(20,26,44,.9)}
+.sat-wait{font:700 max(12px,calc(var(--s)*.12))/1.1 var(--body);color:var(--gold-hi)}
+#authWho{font:700 18px/1.3 var(--display);color:var(--gold-hi);margin-bottom:4px}
+body.has-dev #authWait{position:fixed;top:88px;right:28px;left:auto;bottom:auto;transform:none;width:min(460px,34vw);z-index:12;background:rgba(12,16,28,.97);box-shadow:0 24px 60px -16px rgba(0,0,0,.9)}
+@media (max-width:980px){body.has-dev #authWait{position:fixed;top:auto;bottom:150px;left:16px;right:16px;width:auto}}
 .step{display:flex;gap:14px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}.step:last-child{border-bottom:0}
 .step .n{flex:0 0 34px;height:34px;border-radius:50%;border:1.5px solid var(--gold);color:var(--gold-hi);font:700 17px/1 var(--display);display:flex;align-items:center;justify-content:center}
 .step .t{flex:1}.step .t small{display:block;color:var(--mut);font-size:15px}
@@ -321,7 +330,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
         </div>
         <div id="dcDetail">
         <div class="sub">เครื่องที่เลือก · ชี้ที่ดาวเพื่อดูเครื่องอื่น</div>
-        <h2 id="model">-</h2>
+        <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 id="model">-</h2><button class="tool" data-act="findDev" title="เปิดจอเครื่องนี้ และขึ้นข้อความบอกรหัส จะได้รู้ว่าเป็นเครื่องไหนบนโต๊ะ">หาเครื่องนี้</button></div>
         <div class="used"><b id="used">-</b><span id="total"></span></div>
         <div class="barbox"><div id="bar" class="bar"></div></div>
         <dl class="facts">
@@ -365,6 +374,8 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
 
       <div id="authWait" class="stagenote glass" hidden>
         <div class="part">ดูที่หน้าจอเครื่อง</div>
+        <div id="authWho"></div>
+        <div class="mut" style="margin-bottom:6px">เครื่องที่รอจะขึ้นเป็นวงประใต้ข้อความ "รอ Allow" · เสียบหลายเครื่อง: ทำทีละเครื่อง เสียบ → กด Allow → แล้วค่อยเสียบเครื่องถัดไป</div>
         <div class="step"><div class="n">1</div><div class="t">ปลดล็อกหน้าจอเครื่อง</div></div>
         <div class="step"><div class="n">2</div><div class="t">ติ๊ก <b>Always allow from this computer</b> (อนุญาตเสมอ) แล้วกด <b>Allow</b> (อนุญาต)</div></div>
         <div id="authMore" class="warnbox" hidden>ยังไม่เห็นหน้าต่างที่เครื่อง? ถอดสาย รอ 3 วินาที เสียบใหม่ แล้วกดวงกลมอีกครั้ง</div>

@@ -1,6 +1,7 @@
 // In-browser fake devices for the design preview (no USB). Numbers are made up and the page says so.
 // 15 serials so the orbit layout can be tried with a full USB hub.
 window.__serials = Array.from({ length: 15 }, (_, i) => String(4660067 + i * 97));
+window.__authDelay = 1800;   // pretend someone takes a moment to tap "Allow"
 const state = {};
 let made = 0;
 const st = (s) => (state[s] ||= (() => {

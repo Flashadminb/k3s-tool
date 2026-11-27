@@ -95,7 +95,7 @@ async function open(usbDev, onAuth) {
     throw e;
   }
   // From here the device may show "Allow USB debugging?" and we wait until someone taps it
-  onAuth && onAuth();
+  onAuth && onAuth(usbDev.serial);
   const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: store });
   return new Device(new Adb(transport), usbDev.serial);
 }

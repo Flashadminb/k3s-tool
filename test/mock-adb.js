@@ -13,6 +13,6 @@ export class Device {
   async close() { this._bye(); }
 }
 let n = 0;
-export async function requestAndOpen(onAuth) { n++; onAuth && onAuth(); return new Device((window.__serials && window.__serials[n - 1]) || "TESTSERIAL00" + n); }
+export async function requestAndOpen(onAuth) { n++; const s = (window.__serials && window.__serials[n - 1]) || "TESTSERIAL00" + n; onAuth && onAuth(s); if (window.__authDelay) await new Promise((r) => setTimeout(r, window.__authDelay)); return new Device((window.__serials && window.__serials[n - 1]) || "TESTSERIAL00" + n); }
 export async function knownDevices() { return []; }
 export async function openUsb(u) { return new Device(u.serial); }

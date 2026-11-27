@@ -69,15 +69,24 @@ function busyMsg(t) {
   }
 }
 
-// Big card while waiting for someone to tap "Allow" on the device
+// Big card while waiting for someone to tap "Allow" on the device; it names every device still waiting
 let authTimer = null;
-function authWait(on) {
+const pending = new Set();   // serials waiting for "Allow"
+function authWait(on, serial) {
   const c = $("authWait");
+  if (serial) on ? pending.add(serial) : pending.delete(serial);
+  else if (!on) pending.clear();
+  const show = on || pending.size > 0;
+  if ($("authWho")) $("authWho").textContent = pending.size ? "เครื่องที่รอ: " + [...pending].map((s) => "รหัส " + s.slice(-6)).join(", ") : "";
+  if (c.hidden === !show) { renderDevicesSoon(); return; }
   clearTimeout(authTimer);
-  c.hidden = !on;
+  c.hidden = !show;
   $("authMore").hidden = true;
-  if (on) { c.scrollIntoView({ behavior: "smooth", block: "nearest" }); authTimer = setTimeout(() => ($("authMore").hidden = false), 15000); }
+  if (show) { c.scrollIntoView({ behavior: "smooth", block: "nearest" }); authTimer = setTimeout(() => ($("authMore").hidden = false), 15000); }
+  renderDevicesSoon();
 }
+let rdTimer = 0;
+function renderDevicesSoon() { clearTimeout(rdTimer); rdTimer = setTimeout(() => { if (typeof renderDevices === "function") renderDevices(); }, 0); }
 
 function showHelp(code, detail, info) {
   const [title, steps, link] = HELP[HELP[code] ? code : "UNKNOWN"];
@@ -218,8 +227,9 @@ async function addDevice(d) {
 async function connectNew() {
   log("รอเลือกเครื่องในหน้าต่างของเบราว์เซอร์ ...");
   let d;
-  try { d = await adb.requestAndOpen(() => { busyMsg("รอกด อนุญาต ที่หน้าจอเครื่อง"); authWait(true); }); }
-  finally { authWait(false); }
+  let waiting = null;
+  try { d = await adb.requestAndOpen((s) => { waiting = s; busyMsg(`รอกด Allow ที่เครื่องรหัส ${String(s || "").slice(-6)}`); authWait(true, s); }); }
+  finally { authWait(false, waiting); }
   busyMsg("กำลังอ่านข้อมูลเครื่อง");
   await addDevice(d);
 }
@@ -236,13 +246,13 @@ async function autoConnect() {
       for (let tryNo = 1; tryNo <= 5; tryNo++) {
         try {
           log("พบเครื่องที่เคยอนุญาต " + usb.serial.slice(-6) + " กำลังเชื่อมต่อ ...");
-          await addDevice(await adb.openUsb(usb, () => authWait(true)));
+          await addDevice(await adb.openUsb(usb, () => authWait(true, usb.serial)));
           break;
         } catch (e) {
           if (e.message === "BUSY") { showHelp("BUSY"); break; }
           if (tryNo === 5) { log("เชื่อมต่ออัตโนมัติไม่สำเร็จ (" + (e.message || e) + ") กด + เชื่อมต่อเครื่อง เอง"); break; }
           await new Promise((r) => setTimeout(r, 3000));
-        } finally { authWait(false); }
+        } finally { authWait(false, usb.serial); }
       }
     }
   } finally { autoConnecting = false; }
@@ -250,7 +260,7 @@ async function autoConnect() {
 
 /* ---------- Group selection: actions apply to every linked device until the group is cleared ---------- */
 const group = new Set();
-let selectMode = false, hoverSerial = null, groupPin = null, pendingInstall = null;
+let selectMode = false, hoverSerial = null, groupPin = null, pendingInstall = null, cardDev = null;
 const groupDevs = () => [...group].map((s) => devices.get(s)).filter((d) => d && !d.closed);
 
 function renderDevices() {
@@ -339,17 +349,20 @@ function verLess(a, b) {
 
 function renderOrbit(box) {
   const ds = all();
+  // devices plugged in but still waiting for "Allow" get a faint placeholder so it is clear which one to look at
+  const ghosts = [...pending].filter((s) => !devices.has(s));
   const narrow = innerWidth <= 980;
+  const nAll = ds.length + ghosts.length;
   // rows of tags under the busiest device (same rules as the tags drawn below: at most two)
   const tagCount = (d) => Math.min(2, (d.info.screenOn === false ? 1 : 0) + (["missing", "old"].includes(flashState(d)) ? 1 : 0) + ((d.info.bannedFound || []).length ? 1 : 0));
   const tagRows = Math.max(0, ...ds.map(tagCount));
   const fit = (rows) => {
-    let s = satSizeFor(ds.length, narrow), l;
-    for (;;) { l = orbitSlots(box, ds.length, s, rows); if (l.slots.length >= ds.length || s <= 56) return [s, l]; s = Math.round(s * 0.92); }
+    let s = satSizeFor(nAll, narrow), l;
+    for (;;) { l = orbitSlots(box, nAll, s, rows); if (l.slots.length >= nAll || s <= 56) return [s, l]; s = Math.round(s * 0.92); }
   };
   // With many devices the tags shrink into short labels on the ring itself, which frees a whole row of space
   let [size, lay] = fit(tagRows);
-  const compact = tagRows > 0 && (size < 92 || lay.slots.length < ds.length);
+  const compact = tagRows > 0 && (size < 92 || lay.slots.length < nAll);
   if (compact) [size, lay] = fit(0.75); // short labels still hang a little below the ring
   box.style.setProperty("--s", size + "px");
   const pos = new Map();
@@ -387,6 +400,11 @@ function renderOrbit(box) {
       style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s`
     }, sat, tags.length ? el("div", { class: "sat-tags" + (compact ? " compact" : "") }, tags) : null);
     return w;
+  }), ...ghosts.map((serial, j) => {
+    const p = lay.slots[ds.length + j] || { x: lay.cx, y: lay.cy + 160 };
+    return el("div", { class: "satw ghost", style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:0;--tint:#556` },
+      el("div", { class: "sat" }, el("span", { class: "sat-ring" }),
+        el("span", { class: "sat-body" }, el("b", { class: "sat-wait", text: "รอ Allow" }), el("span", { class: "sat-id", text: serial.slice(-6) }))));
   }));
   drawLinks(lay, pos);
   renderCard();
@@ -435,6 +453,7 @@ function renderCard() {
     $("dcGroupList").replaceChildren(...gs.map((x) => el("span", { class: "chip" + (d === x ? " on" : ""), text: x.serial.slice(-6) })));
   }
   $("dcDetail").hidden = !d;
+  cardDev = d || null;
   if (!d) return;
   const s = d.info.storage, i = d.info, b = i.battery;
   $("model").textContent = label(d);
@@ -1113,6 +1132,15 @@ const actions = {
     renderHistory(); renderToday();
   }),
   bigFiles: () => run("หาไฟล์ใหญ่", () => bigFiles(cur())),
+  findDev: () => run("หาเครื่อง", async () => {
+    const d = cardDev && !cardDev.closed ? cardDev : cur();
+    const id = d.serial.slice(-6);
+    await d.sh("input keyevent 224");
+    // A notification with the id on the device's own screen: easy to spot which one on the desk it is
+    const r = await d.sh(`cmd notification post -S bigtext -t ${q("IDATA TOOLS")} idata-find ${q("เครื่องนี้คือรหัส " + id + " (" + d.serial + ")")}`);
+    d.info.screenOn = true; renderDevices();
+    log(`${label(d)}: เปิดจอแล้ว${r.code ? "" : " และขึ้นแจ้งเตือนรหัส " + id + " ที่เครื่อง"}`);
+  }),
   fbOpen: () => run("เปิดไฟล์ในเครื่อง", () => fbList(cur(), FB_ROOT)),
   fbUp: () => run("ย้อนกลับ", () => fbList(cur(), fbPath.replace(/\/[^/]+$/, "") || FB_ROOT)),
   fbDelete: () => run("ลบไฟล์ที่เลือก", async () => {

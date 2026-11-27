@@ -110,6 +110,10 @@ let calls0 = readFileSync(join(ROOT, "calls.log"), "utf8");
 ok(calls0.includes("input keyevent 224") && calls0.includes("svc power stayon usb"), "screen woken and kept on after confirm");
 ok(!(await page.isVisible(".sat-tag.wake")), "screen-off tag gone");
 
+console.log("find this device");
+await click("findDev"); await idle();
+ok((await page.textContent("#log")).includes("เปิดจอแล้ว"), "find button wakes the device");
+
 console.log("Flash Kit check");
 ok(await page.isVisible("#flashNeed"), "old Flash Kit version flagged at the hub");
 

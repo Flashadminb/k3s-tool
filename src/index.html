@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IDATA TOOLS</title>
+<meta name="theme-color" content="#05070d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
@@ -291,6 +295,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
   main{grid-template-columns:1fr}
   .stage,body.has-dev .stage{--cx:50%;--cy:50%}
   .stagenote{position:relative;left:auto;bottom:auto;transform:none;width:100%;margin-top:12px}
+  .flashcorner{top:8px;bottom:auto;right:8px;font-size:14px;padding:8px 12px;min-height:40px}
   .orbitzone{position:relative;height:500px}
   #devCard{position:relative;width:100%;margin-bottom:12px}
   .panel{overflow:visible}
@@ -504,6 +509,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
         <div class="mut">ปิดแอปทุกตัวที่มีไอคอน เหลือ Flash Kit กับแอปสแกน: เข้า Chrome, Google, Play Store ไม่ได้ · ไม่ได้ถอนแอป กด ปลดล็อก แล้วกลับมาเหมือนเดิม · ทำกับเครื่องที่เลือกหรือทั้งกลุ่ม</div>
         <div class="row" style="margin:10px 0;justify-content:space-between"><b id="lockState">-</b><div class="row"><button class="blue" data-act="lockApply">ล็อกออกงาน</button><button data-act="lockRelease">ปลดล็อก</button></div></div>
         <label class="warnbox" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="lockSettings" style="margin-top:3px"> <span><b>ปิด Settings ด้วย</b> (กันคนเปิดแอปคืน) · เสี่ยง: ถ้า USB debugging ถูกปิดระหว่างล็อก จะต่อเว็บมาปลดล็อกไม่ได้ ต้องรีเซ็ตเครื่อง</span></label>
+        <label class="card" style="display:flex;gap:10px;align-items:flex-start;margin:0 0 10px;padding:12px 14px"><input type="checkbox" id="lockSettingsWifi" style="margin-top:3px"> <span><b>ปิด Settings แต่เหลือหน้า Wi-Fi</b> <span class="tag sys">ทดลอง</span><br><span class="mut">ปิดทุกหน้าใน Settings ยกเว้นหน้าเลือก Wi-Fi (เข้าทางกดค้างไอคอน Wi-Fi ในแถบแจ้งเตือน) · ลองกับเครื่องเดียวก่อน: ล็อก → ลองเข้า Settings ทุกทาง + ต่อ Wi-Fi → ถอด-เสียบสาย → ปลดล็อก · ไม่ทำกับเครื่อง iLauncher</span></span></label>
         <div id="lockKioskNote" class="kiosk-note" hidden>เครื่องนี้ใช้ iLauncher: จะไม่ปิด Settings ให้ เพราะต้องใช้ Settings เปิด USB debugging ตอนกลับมาปลดล็อก</div>
         <div class="mut" id="lockCount" style="margin:8px 0 6px"></div>
         <div class="list" id="lockList"></div>
@@ -650,6 +656,12 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
 <div class="step"><div class="n">2</div><div class="t">กดวงกลม <b>เชื่อมต่อเครื่อง</b> กลางจอ</div></div>
 <div class="step"><div class="n">3</div><div class="t">หน้าต่างเล็กของ Chrome เด้งขึ้น: คลิกชื่อเครื่อง แล้วกด <b>Connect</b> (เชื่อมต่อ)</div></div>
 <div class="step"><div class="n">4</div><div class="t">ที่เครื่องขึ้น <b>Allow USB debugging?</b> (อนุญาตไหม): ติ๊ก <b>Always allow from this computer</b> (อนุญาตจากคอมนี้เสมอ) แล้วกด <b>Allow</b> (อนุญาต)</div></div><div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง</div></div>
+<div class="card" id="phoneGuide"><div class="part">ใช้กับมือถือ Android (ไปแก้หน้างาน)</div>
+<div class="step"><div class="n">1</div><div class="t">มือถือ <b>Android</b> ที่มี <b>Chrome</b> + สาย <b>USB-C ต่อ USB-C</b> หรือหัวแปลง <b>OTG</b><small>iPhone ใช้ไม่ได้ (Safari ไม่รองรับการต่ออุปกรณ์ USB)</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">เปิดเว็บนี้ใน Chrome บนมือถือ แล้วกดเมนู 3 จุด &gt; <b>Add to Home screen</b> (เพิ่มลงในหน้าจอหลัก) หรือ <b>Install app</b><small>จะได้ไอคอน IDATA TOOLS เปิดได้เหมือนแอป</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">ที่ฮับ ทำครั้งเดียวต่อเครื่อง: ต่อ PDA กับมือถือ กดวงกลม <b>เชื่อมต่อเครื่อง</b> แล้วที่ PDA ติ๊ก <b>Always allow</b> กด <b>Allow</b><small>มือถือกับคอมต้องได้รับอนุญาตแยกกัน</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">หน้างาน: เสียบ PDA เข้ามือถือ เว็บจะต่อให้เอง แล้ว ปลดล็อก / ต่อ Wi-Fi / ลบรูป ได้เหมือนบนคอม<small>รายการที่ล็อกไว้เก็บอยู่ในตัว PDA: ล็อกจากคอม แล้วปลดล็อกด้วยมือถือได้</small></div></div>
+<div class="warnbox">ถ้าเสียบแล้ว PDA กลับชาร์จไฟให้มือถือแทน (เว็บไม่เห็นเครื่อง): กลับหัวสาย หรือใช้หัวแปลง OTG ที่ฝั่งมือถือ แล้วเสียบใหม่</div></div>
 <div class="card" id="ilauncher"><div class="part">เครื่องที่อยู่ใน iLauncher</div>
 <div class="step"><div class="n">1</div><div class="t">ใน iLauncher กดเข้า <b>Settings</b> แล้วเปิด <b>USB debugging</b></div></div>
 <div class="step"><div class="n">2</div><div class="t"><b>ค้างไว้ที่หน้า Settings</b> อย่ากด Home หรือ Back แล้วใช้เว็บได้ตามปกติ<small>iLauncher ของบริษัทปิด USB ทันทีที่ออกจาก Settings: ตั้งใจไว้ ห้ามหาทางเลี่ยง</small></div></div>
@@ -805,6 +817,10 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
   let pref = "auto"; try { pref = JSON.parse(localStorage.getItem("k3s-tool:fx") || '"auto"'); } catch (e) {}
   window.__fx(pref);
 })();
+</script>
+<script>
+// Lets Chrome on Android "Add to Home screen" / install the page as an app (only when served from the website)
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
 <script>/*__BUNDLE__*/</script>
 </body>

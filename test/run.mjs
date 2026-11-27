@@ -28,7 +28,7 @@ const stub = (name, body) => { writeFileSync(join(BIN, name), "#!/bin/sh\n" + bo
 stub("getprop", `case "$1" in ro.product.model) [ "$SERIAL" = TESTSERIAL002 ] && echo Q9 || echo K3S;; ro.product.manufacturer) echo Urovo;; ro.build.version.release) echo 11;; ro.build.version.sdk) echo 30;; esac`);
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
- package) echo "    versionName=1.2.$RANDOM";;
+ package) if [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
  device_policy) echo "  Device Owner: admin=ComponentInfo{com.mdm.agent/com.mdm.agent.Admin} package=com.mdm.agent";;
  power) [ -f "${join(ROOT, "awake-")}$SERIAL" ] && echo "  mWakefulness=Awake" || echo "  mWakefulness=Asleep";;
 esac`);
@@ -41,7 +41,8 @@ case "$1" in
  uninstall) p=$(eval echo \\$$#); [ "$p" = com.mdm.agent ] && { echo "Failure [DELETE_FAILED_DEVICE_POLICY_MANAGER]"; exit 1; }; echo "$p" >> "$S"; echo Success;;
  install-existing) echo "Package $2 installed for user: 0";;
  disable-user) p=$(eval echo \\$$#); echo "$p" >> "$S.dis"; echo "Package $p new state: disabled-user";;
- enable) touch "$S.dis"; grep -vx "$2" "$S.dis" > "$S.dis.n"; mv "$S.dis.n" "$S.dis"; echo "Package $2 new state: enabled";;
+ disable) p=$(eval echo \\$$#); echo "$p" >> "$S.comp"; echo "Component {$p} new state: disabled";;
+ enable) p=$(eval echo \\$$#); touch "$S.dis" "$S.comp"; grep -vx "$p" "$S.dis" > "$S.dis.n"; mv "$S.dis.n" "$S.dis"; grep -vxF "$p" "$S.comp" > "$S.comp.n"; mv "$S.comp.n" "$S.comp"; echo "Package $p new state: enabled";;
  install) echo Success;;
  trim-caches) ;;
 esac`);
@@ -234,6 +235,17 @@ ok(await page.isVisible(".sat-tag.lock"), "device circle tagged as locked");
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); localStorage.removeItem("k3s-tool:fieldLock"); });
 await click("lockRelease"); await idle();
 ok(dis().trim() === "", "unlock from a different browser: every app back on (list read from the device)");
+// experimental: Settings off except its Wi-Fi screens
+const comp = () => (existsSync(join(ROOT, "pm-TESTSERIAL001.comp")) ? readFileSync(join(ROOT, "pm-TESTSERIAL001.comp"), "utf8") : "");
+await page.check("#lockSettingsWifi");
+await click("lockApply"); await accept(); await idle();
+const c1 = comp();
+ok(c1.includes("com.android.settings/.Settings\n") && c1.includes(".SubSettings") && c1.includes("AppInfoActivity"), "Settings screens switched off");
+ok(!c1.includes("Wifi") && !c1.includes("NetworkProvider") && !c1.includes("FallbackHome") && !c1.includes("Receiver"), "Wi-Fi screens, start-up screen and non-screens kept");
+await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); });
+await click("lockRelease"); await idle();
+ok(comp().trim() === "" && dis().trim() === "", "unlock: Settings screens and apps all back");
+await page.uncheck("#lockSettingsWifi");
 
 console.log("settings");
 await page.click("button[data-tab=setup]");

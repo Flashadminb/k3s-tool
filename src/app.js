@@ -451,7 +451,7 @@ function renderOrbit(box) {
   const narrow = innerWidth <= 980;
   const nAll = ds.length + ghosts.length;
   // rows of tags under the busiest device (same rules as the tags drawn below: at most two)
-  const tagCount = (d) => Math.min(2, (d.info.screenOn === false ? 1 : 0) + (["missing", "old"].includes(flashState(d)) ? 1 : 0) + ((d.info.bannedFound || []).length ? 1 : 0) + ((d.info.locked || []).length ? 1 : 0));
+  const tagCount = (d) => Math.min(2, (d.info.screenOn === false ? 1 : 0) + (["missing", "old"].includes(flashState(d)) ? 1 : 0) + ((d.info.bannedFound || []).length ? 1 : 0) + ((d.info.locked || []).length || d.info.settingsLocked ? 1 : 0));
   const tagRows = Math.max(0, ...ds.map(tagCount));
   const fit = (rows) => {
     let s = satSizeFor(nAll, narrow), l;
@@ -489,7 +489,7 @@ function renderOrbit(box) {
     if (fs === "missing") tags.push(el("span", { class: "sat-tag bad", text: compact ? "ไม่มี Flash" : "ไม่มี Flash Kit" }));
     else if (fs === "old") tags.push(el("span", { class: "sat-tag warn", text: compact ? "Flash เก่า" : "Flash Kit เก่า" }));
     if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
-    if ((d.info.locked || []).length && tags.length < 2) tags.push(el("span", { class: "sat-tag lock", text: compact ? "ล็อก" : "ล็อกออกงาน" }));
+    if (((d.info.locked || []).length || d.info.settingsLocked) && tags.length < 2) tags.push(el("span", { class: "sat-tag lock", text: compact ? "ล็อก" : "ล็อกออกงาน" }));
     const drain = draining.has(d.serial);
     const w = el("div", {
       class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : d.busy ? " working" : "") + statusClass(d), "data-serial": d.serial, title: d.busy ? "กำลัง" + d.busy : "",
@@ -1147,7 +1147,24 @@ async function deviceLockList(d) { return pkgList((await d.sh(`cat ${LOCK_FILE} 
 async function saveDeviceLockList(d, list) {
   await d.sh(list.length ? `printf '%s\\n' ${list.map(q).join(" ")} > ${LOCK_FILE}` : `rm -f ${LOCK_FILE}`);
 }
+/*
+ * Experimental: Settings stays installed but every screen in it is switched off except the Wi-Fi screens and the
+ * ones the phone needs to start up. The switched-off screens are listed in a file on the device for unlocking.
+ */
+const SETTINGS_FILE = "/data/local/tmp/idata-tools-settings.txt";
+const SETTINGS_KEEP = "wifi|NetworkProvider|SettingsPanel|Internet|FallbackHome|CryptKeeper|Encrypt|Provision|SetupRedirect";
+const SETTINGS_ACTIVITIES = "dumpsys package com.android.settings | awk '/^Activity Resolver Table:/{a=1;next} /Resolver Table:/{a=0} a' | grep -oE 'com\\.android\\.settings/[A-Za-z0-9_.$]+' | sort -u";
+async function lockSettingsScreens(d, onCount) {
+  // decided and done on the device in one go: list Settings screens, keep the Wi-Fi ones, switch the rest off
+  const r = await d.shStream(`${SETTINGS_ACTIVITIES} | grep -viE '${SETTINGS_KEEP}' | while read c; do o=$(pm disable --user 0 "$c" 2>&1); case "$o" in *disabled*) echo "$c" >> ${SETTINGS_FILE}; echo "$c";; esac; done`, () => onCount && onCount());
+  return r.out.split("\n").filter(Boolean).length;
+}
+async function unlockSettingsScreens(d) {
+  const r = await d.sh(`[ -f ${SETTINGS_FILE} ] || { echo 0; exit 0; }; n=0; while read c; do pm enable --user 0 "$c" >/dev/null 2>&1; n=$((n+1)); done < ${SETTINGS_FILE}; rm -f ${SETTINGS_FILE}; echo $n`);
+  return parseInt(r.out.trim().split(/\s+/).pop(), 10) || 0;
+}
 async function readLockState(d) {
+  d.info.settingsLocked = parseInt((await d.sh(`[ -f ${SETTINGS_FILE} ] && sort -u ${SETTINGS_FILE} | wc -l || echo 0`)).out.trim(), 10) || 0;
   const mine = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d))])];
   if (!mine.length) { d.info.locked = []; return; }
   const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
@@ -1167,6 +1184,17 @@ async function lockDevice(d) {
   const all = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d)), ...done])];
   st.save(lockedKey(d), all); d.info.locked = all;
   await saveDeviceLockList(d, all);
+  const cfg = lockCfg();
+  if (cfg.settingsWifi && !cfg.settings) {
+    if (d.info.kiosk) log(`${label(d)}: ใช้ iLauncher จึงไม่ปิด Settings (ต้องใช้เปิด USB debugging)`);
+    else {
+      let n = 0;
+      setStatus(d, { title: "ปิดหน้า Settings", big: "0", ring: 50 });
+      const c = await lockSettingsScreens(d, () => { n++; if (n % 10 === 0) setStatus(d, { title: "ปิดหน้า Settings", big: String(n), ring: 50 }); });
+      d.info.settingsLocked = (d.info.settingsLocked || 0) + c;
+      log(`${label(d)}: ปิดหน้าใน Settings ${c} หน้า เหลือหน้า Wi-Fi (ทดลอง) · ลองเข้า Settings จากทุกทางที่เครื่อง แล้วลองต่อ Wi-Fi`);
+    }
+  }
   await loadApps(d);
   setStatus(d, { title: "ล็อกออกงานแล้ว", big: String(done.length), unit: "แอปถูกปิด", ring: 100, done: true });
   log(`${label(d)}: โหมดออกงาน ปิด ${done.length} แอป${fails.length ? " (ปิดไม่ได้: " + fails.join(", ") + ")" : ""}`);
@@ -1182,6 +1210,9 @@ async function unlockDevice(d) {
   for (const p of list) { const r = await d.sh(`pm enable ${q(p)}`); if (/enabled/i.test(r.out + r.err)) n++; }
   st.save(lockedKey(d), []); d.info.locked = [];
   await saveDeviceLockList(d, []);
+  const sN = await unlockSettingsScreens(d);
+  if (sN) log(`${label(d)}: เปิดหน้าใน Settings คืน ${sN} หน้า`);
+  d.info.settingsLocked = 0;
   await loadApps(d);
   setStatus(d, { title: "ปลดล็อกแล้ว", big: String(n), unit: "แอปกลับมา", ring: 100, done: true });
   log(`${label(d)}: ปลดล็อก เปิดคืน ${n} แอป`);
@@ -1192,8 +1223,10 @@ function renderLock(d) {
   const plan = d && lockPlan(d);
   const cfg = lockCfg();
   $("lockSettings").checked = !!cfg.settings;
+  if ($("lockSettingsWifi")) $("lockSettingsWifi").checked = !!cfg.settingsWifi && !cfg.settings;
   $("lockKioskNote").hidden = !(d && d.info.kiosk);
-  $("lockState").textContent = !d ? "-" : (d.info.locked || []).length ? `${label(d)}: ล็อกอยู่ (${d.info.locked.length} แอปถูกปิด)` : `${label(d)}: ใช้งานปกติ`;
+  const sL = d && d.info.settingsLocked ? ` · ปิดหน้า Settings ${d.info.settingsLocked} หน้า` : "";
+  $("lockState").textContent = !d ? "-" : (d.info.locked || []).length || sL ? `${label(d)}: ล็อกอยู่ (${(d.info.locked || []).length} แอปถูกปิด${sL})` : `${label(d)}: ใช้งานปกติ`;
   if (!plan) { box.replaceChildren(el("div", { class: "item mut", text: d ? "กำลังโหลดรายชื่อแอป..." : "-" })); return; }
   const blockN = plan.filter((x) => x.block).length;
   $("lockCount").textContent = `จะปิด ${blockN} แอป · เหลือใช้ได้ ${plan.length - blockN} แอป (ติ๊ก = ปิดตอนออกงาน)`;
@@ -1896,7 +1929,9 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("beforeunload", (e) => { if (auto.every && all().length) { e.preventDefault(); e.returnValue = ""; } });
 
   loadStdForm(); loadBannedText(); loadFlashForm(); renderWifiSaved();
-  if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked }); renderLock(devices.get(selected)); });
+  // full Settings off and "Settings off except Wi-Fi" are alternatives: ticking one clears the other
+  if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked, settingsWifi: e.target.checked ? false : lockCfg().settingsWifi }); renderLock(devices.get(selected)); });
+  if ($("lockSettingsWifi")) $("lockSettingsWifi").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settingsWifi: e.target.checked, settings: e.target.checked ? false : lockCfg().settings }); renderLock(devices.get(selected)); });
   [["typeShow", "typeText"], ["wfShow", "wfPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
   if ($("typeText")) $("typeText").addEventListener("keydown", (e) => { if (e.key === "Enter") actions.typeSend(); });
   if ($("fxMode")) {

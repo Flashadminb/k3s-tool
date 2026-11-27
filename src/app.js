@@ -451,7 +451,7 @@ function renderOrbit(box) {
   const narrow = innerWidth <= 980;
   const nAll = ds.length + ghosts.length;
   // rows of tags under the busiest device (same rules as the tags drawn below: at most two)
-  const tagCount = (d) => Math.min(2, (d.info.screenOn === false ? 1 : 0) + (["missing", "old"].includes(flashState(d)) ? 1 : 0) + ((d.info.bannedFound || []).length ? 1 : 0));
+  const tagCount = (d) => Math.min(2, (d.info.screenOn === false ? 1 : 0) + (["missing", "old"].includes(flashState(d)) ? 1 : 0) + ((d.info.bannedFound || []).length ? 1 : 0) + ((d.info.locked || []).length ? 1 : 0));
   const tagRows = Math.max(0, ...ds.map(tagCount));
   const fit = (rows) => {
     let s = satSizeFor(nAll, narrow), l;
@@ -489,6 +489,7 @@ function renderOrbit(box) {
     if (fs === "missing") tags.push(el("span", { class: "sat-tag bad", text: compact ? "ไม่มี Flash" : "ไม่มี Flash Kit" }));
     else if (fs === "old") tags.push(el("span", { class: "sat-tag warn", text: compact ? "Flash เก่า" : "Flash Kit เก่า" }));
     if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
+    if ((d.info.locked || []).length && tags.length < 2) tags.push(el("span", { class: "sat-tag lock", text: compact ? "ล็อก" : "ล็อกออกงาน" }));
     const drain = draining.has(d.serial);
     const w = el("div", {
       class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : d.busy ? " working" : "") + statusClass(d), "data-serial": d.serial, title: d.busy ? "กำลัง" + d.busy : "",
@@ -671,6 +672,7 @@ function renderAll() {
   renderApps(d);
   renderProfiles();
   renderBannedFound(d);
+  renderLock(d);
   renderToday();
   renderRegistry();
   // on the Files menu, picking another device opens that device's storage
@@ -1111,6 +1113,95 @@ async function checkBanned(d) {
   const installed = new Set(pkgList((await d.sh("pm list packages")).out));
   d.info.bannedFound = st.banned().filter((p) => installed.has(p));
   if (d.info.bannedFound.length) log(`⚠️ ${label(d)} มีแอปต้องห้าม ${d.info.bannedFound.length} แอป: ${d.info.bannedFound.map((p) => appName(p) || p).join(", ")}`);
+  await readLockState(d).catch(() => {});
+}
+
+/* =====================================================================
+   Field lock ("โหมดออกงาน"): switch off every app with a home-screen icon except Flash Kit and the scanner.
+   Apps are disabled (pm disable-user), not removed: unlocking brings them back with their data.
+   ===================================================================== */
+// never switched off: Flash Kit, scanning, the home screen, keyboard and the services Flash Kit relies on
+const FORCE_KEEP = /flash|scan|barcode|wedge|inputmethod|keyboard|launcher|\.gms$|webview|packageinstaller|permissioncontroller|systemui/i;
+// kept by default (Flash Kit may open the camera; calls), can be ticked off
+const DEFAULT_KEEP = /dialer|telecom|\.phone$|camera/i;
+const SETTINGS_PKG = "com.android.settings";
+const lockCfg = () => st.load("fieldLock", { keep: null, settings: false });
+function lockPlan(d) {
+  const a = d.info.apps;
+  if (!a) return null;
+  const cfg = lockCfg();
+  return a.list.filter((x) => x.icon || (d.info.locked || []).includes(x.pkg)).map((x) => {
+    const isSettings = x.pkg === SETTINGS_PKG;
+    const forced = !isSettings && (x.prot || CRITICAL.includes(x.pkg) || x.pkg === d.info.home || FORCE_KEEP.test(x.pkg));
+    let keep;
+    if (forced) keep = true;
+    else if (isSettings) keep = !cfg.settings || !!d.info.kiosk;
+    else keep = cfg.keep ? cfg.keep.includes(x.pkg) : DEFAULT_KEEP.test(x.pkg);
+    return { pkg: x.pkg, name: x.name || x.pkg, forced, isSettings, block: !keep };
+  });
+}
+const lockedKey = (d) => "locked:" + d.serial;
+async function readLockState(d) {
+  const mine = st.load(lockedKey(d), []);
+  if (!mine.length) { d.info.locked = []; return; }
+  const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
+  d.info.locked = mine.filter((p) => disabled.has(p));
+  if (d.info.locked.length !== mine.length) st.save(lockedKey(d), d.info.locked);
+}
+async function lockDevice(d) {
+  if (!d.info.apps) await loadApps(d);
+  const plan = lockPlan(d).filter((x) => x.block);
+  const done = [], fails = [];
+  setStatus(d, { title: "กำลังล็อก", big: "0/" + plan.length, ring: 0 });
+  for (const [i, x] of plan.entries()) {
+    const r = await d.sh(`pm disable-user --user 0 ${q(x.pkg)}`);
+    if (/disabled/i.test(r.out + r.err)) done.push(x.pkg); else fails.push(x.name);
+    setStatus(d, { title: "กำลังล็อก", big: `${i + 1}/${plan.length}`, ring: ((i + 1) / plan.length) * 100 });
+  }
+  const all = [...new Set([...st.load(lockedKey(d), []), ...done])];
+  st.save(lockedKey(d), all); d.info.locked = all;
+  await loadApps(d);
+  setStatus(d, { title: "ล็อกออกงานแล้ว", big: String(done.length), unit: "แอปถูกปิด", ring: 100, done: true });
+  log(`${label(d)}: โหมดออกงาน ปิด ${done.length} แอป${fails.length ? " (ปิดไม่ได้: " + fails.join(", ") + ")" : ""}`);
+  return fails;
+}
+async function unlockDevice(d) {
+  if (!d.info.apps) await loadApps(d);
+  // everything this page switched off, plus anything in today's plan that is still off
+  const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
+  const plan = (lockPlan(d) || []).filter((x) => x.block && disabled.has(x.pkg)).map((x) => x.pkg);
+  const list = [...new Set([...st.load(lockedKey(d), []), ...plan])];
+  let n = 0;
+  for (const p of list) { const r = await d.sh(`pm enable ${q(p)}`); if (/enabled/i.test(r.out + r.err)) n++; }
+  st.save(lockedKey(d), []); d.info.locked = [];
+  await loadApps(d);
+  setStatus(d, { title: "ปลดล็อกแล้ว", big: String(n), unit: "แอปกลับมา", ring: 100, done: true });
+  log(`${label(d)}: ปลดล็อก เปิดคืน ${n} แอป`);
+}
+function renderLock(d) {
+  const box = $("lockList");
+  if (!box) return;
+  const plan = d && lockPlan(d);
+  const cfg = lockCfg();
+  $("lockSettings").checked = !!cfg.settings;
+  $("lockKioskNote").hidden = !(d && d.info.kiosk);
+  $("lockState").textContent = !d ? "-" : (d.info.locked || []).length ? `${label(d)}: ล็อกอยู่ (${d.info.locked.length} แอปถูกปิด)` : `${label(d)}: ใช้งานปกติ`;
+  if (!plan) { box.replaceChildren(el("div", { class: "item mut", text: d ? "กำลังโหลดรายชื่อแอป..." : "-" })); return; }
+  const blockN = plan.filter((x) => x.block).length;
+  $("lockCount").textContent = `จะปิด ${blockN} แอป · เหลือใช้ได้ ${plan.length - blockN} แอป (ติ๊ก = ปิดตอนออกงาน)`;
+  box.replaceChildren(...plan.map((x) => {
+    const c = el("input", { type: "checkbox" });
+    c.checked = x.block; c.disabled = x.forced || x.isSettings;
+    c.addEventListener("change", () => {
+      const keep = new Set(lockCfg().keep || plan.filter((y) => !y.block && !y.forced && !y.isSettings).map((y) => y.pkg));
+      c.checked ? keep.delete(x.pkg) : keep.add(x.pkg);
+      st.save("fieldLock", { ...lockCfg(), keep: [...keep] });
+      renderLock(d);
+    });
+    return el("label", { class: "item" }, el("span", { class: "row", style: "gap:10px;flex-wrap:nowrap;min-width:0;flex:1" }, c,
+      el("span", { class: "nm" }, x.name, el("small", { text: x.forced ? "ไม่ปิด (Flash Kit ต้องใช้ / ระบบ)" : x.isSettings ? "ตั้งที่ช่อง Settings ด้านบน" : x.pkg }))),
+      (d.info.locked || []).includes(x.pkg) ? el("span", { class: "tag", text: "ปิดอยู่" }) : null);
+  }));
 }
 
 async function uninstall(d, pkg, isSys) {
@@ -1392,6 +1483,21 @@ const actions = {
     renderHistory(); renderToday();
   }),
   bigFiles: () => run("หาไฟล์ใหญ่", () => bigFiles(cur())),
+  lockApply: () => run("ล็อกออกงาน", async () => {
+    const ts = targets();
+    const cfg = lockCfg();
+    const warnSettings = cfg.settings ? "\n\n⚠️ ปิด Settings ด้วย: ถ้า USB debugging ถูกปิดระหว่างนั้น จะต่อเว็บกลับมาปลดล็อกไม่ได้ ต้องรีเซ็ตเครื่อง (เครื่องที่ใช้ iLauncher จะไม่ปิด Settings ให้)" : "";
+    if (!(await confirmBox(`ล็อกโหมดออกงาน ${ts.length > 1 ? ts.length + " เครื่อง" : label(ts[0])}?\nปิดทุกแอปที่ติ๊กไว้ เหลือ Flash Kit, แอปสแกน และแอปที่เลือกไว้\nไม่ได้ถอนแอป กด ปลดล็อก แล้วกลับมาเหมือนเดิม${warnSettings}`))) return false;
+    const fails = [];
+    await Promise.all(ts.map(async (d) => { const f = await lockDevice(d); if (f.length) fails.push(label(d) + ": " + f.join(", ")); }));
+    renderAll();
+    if (fails.length) log("บางแอปปิดไม่ได้ (ระบบบริษัทหรือระบบเครื่องกันไว้): " + fails.join(" / "));
+  }),
+  lockRelease: () => run("ปลดล็อก", async () => {
+    const ts = targets();
+    await Promise.all(ts.map((d) => unlockDevice(d)));
+    renderAll();
+  }),
   findDev: () => run("หาเครื่อง", async () => {
     const d = cardDev && !cardDev.closed ? cardDev : cur();
     const id = d.serial.slice(-6);
@@ -1782,6 +1888,7 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("beforeunload", (e) => { if (auto.every && all().length) { e.preventDefault(); e.returnValue = ""; } });
 
   loadStdForm(); loadBannedText(); loadFlashForm(); renderWifiSaved();
+  if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked }); renderLock(devices.get(selected)); });
   [["typeShow", "typeText"], ["wfShow", "wfPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
   if ($("typeText")) $("typeText").addEventListener("keydown", (e) => { if (e.key === "Enter") actions.typeSend(); });
   if ($("fxMode")) {

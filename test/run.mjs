@@ -36,14 +36,19 @@ stub("svc", `echo "svc $*" >> "${join(ROOT, "calls.log")}"`);
 stub("pm", `S="$PMSTATE"; touch "$S"
 case "$1" in
  list) all="com.flashexpress.kit com.zhiliaoapp.musically com.mdm.agent jp.naver.line.android"; sys="com.android.settings com.android.chrome com.oem.bloat"
-   case "$*" in *"-3"*) l="$all";; *"-s -u"*) l="$sys";; *"-s"*) l="$sys";; *) l="$all $sys";; esac
+   case "$*" in *" -d"*) [ -f "$S.dis" ] && sed 's/^/package:/' "$S.dis"; exit 0;; *"-3"*) l="$all";; *"-s -u"*) l="$sys";; *"-s"*) l="$sys";; *) l="$all $sys";; esac
    for p in $l; do grep -qx "$p" "$S" && [ "$*" != "list packages -s -u" ] && continue; echo "package:$p"; done;;
  uninstall) p=$(eval echo \\$$#); [ "$p" = com.mdm.agent ] && { echo "Failure [DELETE_FAILED_DEVICE_POLICY_MANAGER]"; exit 1; }; echo "$p" >> "$S"; echo Success;;
  install-existing) echo "Package $2 installed for user: 0";;
+ disable-user) p=$(eval echo \\$$#); echo "$p" >> "$S.dis"; echo "Package $p new state: disabled-user";;
+ enable) touch "$S.dis"; grep -vx "$2" "$S.dis" > "$S.dis.n"; mv "$S.dis.n" "$S.dis"; echo "Package $2 new state: enabled";;
  install) echo Success;;
  trim-caches) ;;
 esac`);
 stub("cmd", `[ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3" "$PMSTATE" > "$PMSTATE.n"; mv "$PMSTATE.n" "$PMSTATE"; echo "Package $3 installed for user: 0"; }
+if [ "$2" = query-activities ]; then
+  for p in com.flashexpress.kit jp.naver.line.android com.android.chrome com.android.settings; do grep -qx "$p" "$PMSTATE.dis" 2>/dev/null || echo "$p/.Main"; done
+fi
 if [ "$1" = wifi ]; then
   echo "cmd $*" >> "${join(ROOT, "calls.log")}"
   W="${join(ROOT, "wifi-")}$SERIAL"
@@ -215,6 +220,18 @@ await page.click('#appList .item:has-text("com.oem.bloat") button.red'); await a
 ok((await page.textContent("#hiddenList")).includes("com.oem.bloat"), "system app hidden, shown in restore list");
 await page.click('#hiddenList .item:has-text("com.oem.bloat") button'); await idle();
 ok(!(await page.textContent("#hiddenList")).includes("com.oem.bloat"), "system app restored");
+
+console.log("field lock (โหมดออกงาน)");
+const lockText = await page.textContent("#lockList");
+ok(lockText.includes("LINE") && lockText.includes("Chrome"), "lock plan lists apps with an icon");
+ok(await page.$eval('#lockList label:has-text("แอป Flash") input', (c) => !c.checked && c.disabled), "Flash Kit is never switched off");
+ok(await page.$eval('#lockList label:has-text("Settings") input', (c) => !c.checked), "Settings stays on by default");
+await click("lockApply"); await accept(); await idle();
+const dis = () => (existsSync(join(ROOT, "pm-TESTSERIAL001.dis")) ? readFileSync(join(ROOT, "pm-TESTSERIAL001.dis"), "utf8") : "");
+ok(dis().includes("jp.naver.line.android") && dis().includes("com.android.chrome") && !dis().includes("flash") && !dis().includes("com.android.settings"), "lock: LINE and Chrome off, Flash Kit and Settings untouched");
+ok(await page.isVisible(".sat-tag.lock"), "device circle tagged as locked");
+await click("lockRelease"); await idle();
+ok(dis().trim() === "", "unlock: every app back on");
 
 console.log("settings");
 await page.click("button[data-tab=setup]");

@@ -35,6 +35,7 @@ const HELP = {
   NO_FS: ["เบราว์เซอร์นี้บันทึกลงโฟลเดอร์ไม่ได้", ["ใช้ Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุดบนคอม Windows", "ตอนหน้าต่างเลือกโฟลเดอร์เด้งขึ้น ให้เลือกโฟลเดอร์ แล้วกด อนุญาต/ดูไฟล์ และ บันทึกการเปลี่ยนแปลง"]],
   SETTINGS: ["ตั้งค่าบางข้อไม่สำเร็จ", ["ข้อที่ไม่สำเร็จอาจถูกระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ข้ออื่นที่สำเร็จแล้วใช้งานได้ตามปกติ"]],
   WIFI: ["ต่อ Wi-Fi ไม่สำเร็จ", ["เช็กชื่อ Wi-Fi ให้ตรงตัวพิมพ์เล็ก/ใหญ่ และรหัสผ่านให้ถูก", "เครื่องต้องอยู่ในระยะสัญญาณ (กด ค้นหา ดูว่าเครื่องเห็น Wi-Fi นี้ไหม)", "ถ้าขึ้นว่าไม่อนุญาต / not allowed: ระบบบริษัทล็อกการตั้ง Wi-Fi ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash"]],
+  DROPPED: ["เครื่องหลุดการเชื่อมต่อ", ["ถ้าถอดสายเอง: ไม่ต้องทำอะไร เสียบกลับเมื่อไหร่ เว็บจะต่อให้เอง", "ถ้าไม่ได้ถอดสาย และเครื่องเพิ่งเข้า iLauncher: iLauncher ของบริษัทปิดการเชื่อมต่อ USB ตอนล็อกเครื่อง ให้ใช้เว็บก่อนเข้า iLauncher หรือออกจาก iLauncher (รหัสผู้ดูแล) แล้วเสียบใหม่ ห้ามหาทางเลี่ยง ถ้าต้องใช้ระหว่างอยู่ใน iLauncher ให้ขอไอที Flash", "ถ้าหลุดเองบ่อยๆ: เปลี่ยนสาย หรือเสียบเข้าคอมตรงๆ"]],
   WIFI_MANUAL: ["เครื่องรุ่นนี้ต้องแตะเลือก Wi-Fi เอง 1 ครั้ง", ["Android ของเครื่องนี้ไม่ให้คอมสั่งต่อ Wi-Fi (ใช้ได้กับ Android 12 ขึ้นไป เช่น K3S) ไม่ใช่ระบบบริษัทบล็อก", "เว็บเปิดหน้า Wi-Fi ที่เครื่องให้แล้ว: แตะชื่อ Wi-Fi ที่ต้องการ (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "พอขึ้นช่องใส่รหัส กดปุ่ม พิมพ์รหัส... ด้านล่าง เว็บจะพิมพ์รหัสที่บันทึกไว้และกด Enter ให้", "ไม่อยากจับเครื่อง: ใช้ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกชื่อ Wi-Fi จากคอม"]],
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
@@ -243,7 +244,9 @@ async function addDevice(d) {
   if (!selected || !devices.get(selected) || devices.get(selected).closed) selected = d.serial;
   log("เชื่อมต่อ " + label(d) + " (ใช้ที่เก็บรูปแบบ " + d.info.profile.name + ")");
   d.disconnected.then(() => {
-    log("ถอดสายแล้ว: " + label(d));
+    log("หลุดการเชื่อมต่อ: " + label(d));
+    // The page cannot tell a pulled cable from a device that switched USB debugging off (e.g. entering iLauncher)
+    if (!d.rebooting) showHelp("DROPPED", label(d), true);
     devices.delete(d.serial); group.delete(d.serial);
     if (selected === d.serial) selected = devices.keys().next().value || null;
     if (live.dev === d) stopLive();
@@ -1392,7 +1395,7 @@ const actions = {
   reboot: () => run("รีสตาร์ทเครื่อง", async () => {
     const ts = targets();
     if (!(await confirmBox(`รีสตาร์ท ${ts.length > 1 ? ts.length + " เครื่อง" : label(ts[0])}?\nหลังเปิดเครื่องเสร็จ ให้ปลดล็อกหน้าจอ เว็บจะเชื่อมต่อให้เอง`))) return false;
-    for (const d of ts) await d.reboot().catch(() => {});
+    for (const d of ts) { d.rebooting = true; await d.reboot().catch(() => {}); }
     log("สั่งรีสตาร์ทแล้ว รอเครื่องเปิดเสร็จ (1-2 นาที) แล้วปลดล็อกหน้าจอ เว็บจะเชื่อมต่อให้เอง");
   }),
   logcat: () => run("บันทึก log", async () => {
@@ -1407,6 +1410,7 @@ const actions = {
     const d = cur();
     if (!(await confirmBox(`รีเซ็ต ${label(d)} จะลบข้อมูลทุกอย่างในเครื่อง กู้คืนไม่ได้ และต้องติดตั้ง Flash Kit ใหม่`, "RESET"))) return false;
     if (!(await confirmBox("ยืนยันอีกครั้ง: ลบข้อมูลทั้งเครื่องจริงๆ ใช่ไหม", "YES"))) return false;
+    d.rebooting = true;
     const r = await d.sh("am broadcast -a android.intent.action.FACTORY_RESET -p android");
     log(r.out + r.err);
     if (r.code || /Permission Denial|Exception|not allowed/i.test(r.out + r.err)) throw new Error("RESET");

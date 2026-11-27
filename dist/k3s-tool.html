@@ -269,7 +269,8 @@ table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:ta
 .acts .go:hover{background:linear-gradient(180deg,#f8dba4,var(--gold-hi));box-shadow:0 16px 30px -12px rgba(0,0,0,.9)}
 .acts .go svg{width:26px;height:26px}
 .acts .icon{padding:14px}
-body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4;pointer-events:none}
+/* no device yet: controls look switched off (grey) but their text stays readable */
+body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8;filter:grayscale(1);pointer-events:none}
 
 /* dialog + toast */
 #dlg{position:fixed;inset:0;background:rgba(2,3,8,.66);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}

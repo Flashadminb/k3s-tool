@@ -38,6 +38,7 @@ const HELP = {
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
+  FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกโฟลเดอร์: เลือกโฟลเดอร์ Downloads ที่ Chrome เก็บไฟล์ที่โหลด แล้วกด อนุญาต", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
@@ -141,15 +142,20 @@ async function run(name, fn, helpCode) {
     return;
   }
   const key = "job" + ++jobSeq;
-  devs.forEach((d) => (d.busy = name));
+  devs.forEach((d) => { d.busy = name; if (!d.status || d.status.done) setStatus(d, { title: shortJob(name) }); });
   if (devs.length) renderDevicesSoon();
   $("help").hidden = true;
   busyMsg(name + (devs.length === 1 ? " · " + label(devs[0]) : devs.length > 1 ? ` · ${devs.length} เครื่อง` : "") + " ...", key);
   log(name + " ...");
-  try { const r = await fn(); if (r !== false) log(name + " เสร็จแล้ว"); }
-  catch (e) { console.error(e); log(name + " ล้มเหลว: " + (e && e.message)); showHelp(helpCode && codeOf(e) === "UNKNOWN" ? helpCode : codeOf(e), String((e && e.message) || e)); }
+  let outcome = "ok";
+  try { const r = await fn(); if (r === false) outcome = "cancel"; else log(name + " เสร็จแล้ว"); }
+  catch (e) { outcome = "err"; console.error(e); log(name + " ล้มเหลว: " + (e && e.message)); showHelp(helpCode && codeOf(e) === "UNKNOWN" ? helpCode : codeOf(e), String((e && e.message) || e)); }
   finally {
-    devs.forEach((d) => { if (d.busy === name) d.busy = null; });
+    devs.forEach((d) => {
+      if (d.busy === name) d.busy = null;
+      // a job that set its own finished status keeps it; otherwise show the generic outcome
+      if (d.status && !d.status.done) setStatus(d, outcome === "cancel" ? null : outcome === "err" ? { title: "ไม่สำเร็จ", err: true, done: true } : { title: "เสร็จแล้ว", done: true });
+    });
     busyMsg("", key);
     if (devs.length) renderDevicesSoon();
   }
@@ -433,10 +439,7 @@ function renderOrbit(box) {
       }
     },
       el("span", { class: "sat-ring" }),
-      el("span", { class: "sat-body" },
-        el("b", { class: "sat-pct", text: s ? pct + "%" : "…" }),
-        el("span", { class: "sat-bat" }, batteryIcon(b && b.level), el("span", { text: b && b.level !== "" ? b.level + "%" : "" })),
-        el("span", { class: "sat-id", text: d.serial.slice(-6) })),
+      el("span", { class: "sat-body" }, ...satBody(d)),
       inGroup ? el("span", { class: "sat-check", "aria-hidden": "true" }) : null);
     const tags = [];
     if (off) tags.push(el("button", { class: "sat-tag wake", text: compact ? "จอดับ" : "จอดับ · แตะเพื่อเปิด", title: "แตะเพื่อเปิดหน้าจอ", onclick: () => wakeScreen(d) }));
@@ -445,8 +448,8 @@ function renderOrbit(box) {
     if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
     const drain = draining.has(d.serial);
     const w = el("div", {
-      class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : d.busy ? " working" : ""), "data-serial": d.serial, title: d.busy ? "กำลัง" + d.busy : "",
-      style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s;--dx:${(lay.cx - p.x).toFixed(0)}px;--dy:${(lay.cy - p.y).toFixed(0)}px`
+      class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : d.busy ? " working" : "") + statusClass(d), "data-serial": d.serial, title: d.busy ? "กำลัง" + d.busy : "",
+      style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${ringPct(d)};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s;--dx:${(lay.cx - p.x).toFixed(0)}px;--dy:${(lay.cy - p.y).toFixed(0)}px`
     }, drain ? el("div", { class: "drops", "aria-hidden": "true" }, [0, 1, 2, 3, 4, 5].map((k) => el("i", { style: `--k:${k}` }))) : null,
       sat, tags.length ? el("div", { class: "sat-tags" + (compact ? " compact" : "") }, tags) : null);
     return w;
@@ -459,6 +462,41 @@ function renderOrbit(box) {
   drawLinks(lay, pos);
   renderCard();
 }
+
+/*
+ * What a device is doing right now, shown inside its circle instead of the usual numbers:
+ * { title: "ลบ success", big: "12,340", unit: "ไฟล์ที่เหลือ", ring: 0-100, done, err }. The id stays, small.
+ * A finished status ("เสร็จแล้ว") stays 5 s, then the circle goes back to storage % and battery.
+ */
+function setStatus(d, s) {
+  clearTimeout(d._stTimer);
+  d.status = s || null;
+  if (s && s.done) d._stTimer = setTimeout(() => { if (d.status === s) { d.status = null; paintStatus(d); } }, 5000);
+  paintStatus(d);
+}
+function storagePct(d) { const s = d.info.storage; return s && s.total ? Math.round((s.used / s.total) * 100) : 0; }
+const ringPct = (d) => (d.status && d.status.ring != null ? Math.max(0, Math.min(100, Math.round(d.status.ring))) : storagePct(d));
+const statusClass = (d) => (d.status ? " has-status" + (d.status.err ? " st-err" : d.status.done ? " st-done" : "") : "");
+function satBody(d) {
+  const id = el("span", { class: "sat-id", text: d.serial.slice(-6) });
+  const s0 = d.status;
+  if (s0) return [el("span", { class: "sat-st", text: s0.title }), s0.big != null ? el("b", { class: "sat-big", text: s0.big }) : null,
+    s0.unit ? el("span", { class: "sat-unit", text: s0.unit }) : null, id].filter(Boolean);
+  const s = d.info.storage, b = d.info.battery;
+  return [el("b", { class: "sat-pct", text: s ? storagePct(d) + "%" : "…" }),
+    el("span", { class: "sat-bat" }, batteryIcon(b && b.level), el("span", { text: b && b.level !== "" ? b.level + "%" : "" })), id];
+}
+/** Update one circle in place (cheap enough to call many times a second while deleting) */
+function paintStatus(d) {
+  const w = document.querySelector(`.satw[data-serial="${CSS.escape(d.serial)}"]`);
+  if (!w) return;
+  w.style.setProperty("--p", ringPct(d));
+  w.classList.remove("has-status", "st-done", "st-err");
+  statusClass(d).trim().split(" ").filter(Boolean).forEach((c) => w.classList.add(c));
+  const body = w.querySelector(".sat-body");
+  if (body) body.replaceChildren(...satBody(d));
+}
+const shortJob = (name) => name.replace(/ · .*$/, "").replace(/\.\.\.$/, "").slice(0, 18);
 
 /** Gold lines joining the grouped devices (ordered around the hub) */
 function drawLinks(lay, pos) {
@@ -608,11 +646,14 @@ async function refreshStorage(d) {
   const p = d.info.profile;
   const s = await df(d);
   d.info.storage = { ...s, counting: true };
+  const counting = !d.status || d.status.done;
+  if (counting) setStatus(d, { title: "กำลังนับไฟล์" });
   if (d.serial === selected) renderStorage(d);
   // the three counts run side by side over separate ADB streams
   const num = (r) => { const v = r.out.trim().split(/\s+/).map((x) => parseInt(x, 10) || 0); return [v[0] || 0, v[1] || 0]; };
   const [sc, fc, tc] = await Promise.all([d.sh(statCmd(p.success)), d.sh(statCmd(p.fail)), d.sh(trashStatCmd)]);
   d.info.storage = { ...s, success: num(sc), fail: num(fc), trash: num(tc), at: Date.now() };
+  if (counting && d.status && d.status.title === "กำลังนับไฟล์") setStatus(d, null);
   st.updateRegistry(d.serial, { model: d.info.model, storage: `${human(s.used)} / ${human(s.total)}` });
   renderStorage(devices.get(selected)); renderDevices();
 }
@@ -637,9 +678,9 @@ function renderToday() {
 }
 
 const KIND = {
-  success: { label: "รูป success", cmd: (p) => delCmd(p.success) },
-  fail: { label: "รูป fail", cmd: (p) => delCmd(p.fail) },
-  trash: { label: "ขยะ .trashed", cmd: () => `${PAR_CHECK} ${TRASH_FIND} -print0 2>/dev/null | ${BATCH_DEL}` }
+  success: { label: "รูป success", short: "ลบ success", cmd: (p) => delCmd(p.success) },
+  fail: { label: "รูป fail", short: "ลบ fail", cmd: (p) => delCmd(p.fail) },
+  trash: { label: "ขยะ .trashed", short: "ล้างถังขยะ", cmd: () => `${PAR_CHECK} ${TRASH_FIND} -print0 2>/dev/null | ${BATCH_DEL}` }
 };
 // Files go through find -print0 | xargs (never `rm -rf dir/*`, which fails with "argument list too long").
 // Missing folder (fresh device) means nothing to delete, not an error. Each output line = files removed by one batch.
@@ -743,14 +784,17 @@ async function cleanup(d, kinds, how = "กดเอง") {
       const s = d.info.storage && !d.info.storage.counting ? d.info.storage : null;
       const total = s && s[k] ? s[k][0] : 0, kb = s && s[k] ? s[k][1] : 0;
       let done = 0, lastPaint = 0;
+      const stTitle = KIND[k].short;
+      const showLeft = () => setStatus(d, { title: stTitle, big: Math.max(0, total - done).toLocaleString(), unit: total ? "ไฟล์ที่เหลือ" : "ไฟล์", ring: total ? (done / total) * 100 : 0 });
       progUpdate(d.serial, 0, total, KIND[k].label);
+      showLeft();
       const r = await d.shStream(KIND[k].cmd(d.info.profile), (line) => {
         const n = parseInt(line, 10);
         if (!n) return;
         done += n; files += n;
         // count down the numbers on screen as the files go
         if (s && s[k]) s[k] = [Math.max(0, total - done), total ? Math.round(kb * Math.max(0, total - done) / total) : 0];
-        if (Date.now() - lastPaint > 250) { lastPaint = Date.now(); progUpdate(d.serial, done, Math.max(total, done), KIND[k].label); renderDock(); }
+        if (Date.now() - lastPaint > 250) { lastPaint = Date.now(); progUpdate(d.serial, done, Math.max(total, done), KIND[k].label); renderDock(); showLeft(); }
       });
       progUpdate(d.serial, done, Math.max(total, done), KIND[k].label);
       if (r.code && r.code !== 123) throw new Error(`ลบ${KIND[k].label}ไม่ครบ: ` + (r.err || r.out).trim().slice(-200));
@@ -761,6 +805,7 @@ async function cleanup(d, kinds, how = "กดเอง") {
   const freed = Math.max(0, before - after);
   st.addHistory({ serial: d.serial, model: d.info.model, action: kinds.map((k) => KIND[k].label).join(" + "), how, files, freedKb: freed });
   log(`${label(d)}: ลบ ${files.toLocaleString()} ไฟล์ ได้พื้นที่คืน ${human(freed)}${partial ? " (มีบางไฟล์ลบไม่ได้)" : ""}`);
+  setStatus(d, { title: "ลบเสร็จ", big: "+" + human(freed), unit: files.toLocaleString() + " ไฟล์", ring: 100, done: true });
   // No full recount: what was deleted is now empty, only the free space is read again
   if (partial || !d.info.storage || d.info.storage.counting) await refreshStorage(d);
   else { const s = d.info.storage; kinds.forEach((k) => (s[k] = [0, 0])); s.used = after; renderStorage(devices.get(selected)); renderDevices(); }
@@ -1375,14 +1420,8 @@ const actions = {
   selAll: () => { all().forEach((d) => group.add(d.serial)); renderAll(); },
   selClear: () => { group.clear(); groupPin = null; renderAll(); log("ล้างกลุ่มแล้ว คำสั่งจะทำกับเครื่องที่เลือกเครื่องเดียว"); },
   selDone: () => { selectMode = false; renderAll(); if (group.size) log(`กลุ่ม ${group.size} เครื่อง: ทุกคำสั่งจะทำกับทั้งกลุ่ม จนกว่าจะกด ล้างกลุ่ม`); },
-  flashNeed: async () => {
-    const need = all().filter((d) => ["missing", "old"].includes(flashState(d)));
-    const cfg = st.flashCfg();
-    $("dlgList").replaceChildren(el("a", { href: cfg.url, target: "_blank", rel: "noopener", class: "dl-link", text: "1. กดตรงนี้เพื่อโหลด Flash Kit (เปิดแท็บใหม่)" }));
-    const ok = await confirmBox(`เครื่องที่ยังไม่มี Flash Kit หรือเวอร์ชันเก่ากว่า ${cfg.latest}:\n${need.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ไม่มี)" : " (เก่า)")).join("\n")}\n\n2. โหลดเสร็จแล้ว กด ยืนยัน แล้วเลือกไฟล์ APK ที่โหลดมา เว็บจะติดตั้ง/อัปเดตให้เครื่องเหล่านี้`);
-    $("dlgList").replaceChildren();
-    if (ok) { pendingInstall = { list: need, t: Date.now() }; $("apkFile").click(); }
-  },
+  flashNeed: () => flashInstall(all().filter((d) => ["missing", "old"].includes(flashState(d)))),
+  flashSelected: () => { try { flashInstall(targets()); } catch (e) { showHelp(codeOf(e)); } },
   flashSave: () => {
     const url = $("flUrl").value.trim(), latest = $("flLatest").value.trim();
     if (!/^https?:\/\//.test(url)) { showHelp("UNKNOWN", "ลิงก์ต้องขึ้นต้นด้วย https://"); return; }
@@ -1434,20 +1473,125 @@ const actions = {
   histClear: async () => { if (await confirmBox("ล้างประวัติการลบทั้งหมด?")) { st.clearHistory(); renderHistory(); renderToday(); } }
 };
 
+/* =====================================================================
+   Flash Kit: one button downloads the newest build from the link and installs it
+   ===================================================================== */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// small key/value store in IndexedDB (a folder handle cannot live in localStorage)
+function idb() { return new Promise((res, rej) => { const r = indexedDB.open("idata-tools", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function kvGet(k) { try { const db = await idb(); return await new Promise((res) => { const t = db.transaction("kv").objectStore("kv").get(k); t.onsuccess = () => res(t.result); t.onerror = () => res(undefined); }); } catch (e) { return undefined; } }
+async function kvSet(k, v) { try { const db = await idb(); await new Promise((res) => { const t = db.transaction("kv", "readwrite").objectStore("kv").put(v, k); t.onsuccess = () => res(); t.onerror = () => res(); }); } catch (e) {} }
+
+async function isApk(blob) { const h = new Uint8Array(await blob.slice(0, 2).arrayBuffer()); return blob.size > 500000 && h[0] === 0x50 && h[1] === 0x4b; }
+
+/** Way 1: the page downloads the file itself (works only if the download site allows it) */
+async function flashDirect(url) {
+  const r = await fetch(url, { redirect: "follow" });
+  if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
+  const len = +r.headers.get("content-length") || 0;
+  const reader = r.body.getReader(); const parts = []; let got = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parts.push(value); got += value.length;
+    busyMsg(`กำลังโหลด Flash Kit ${human(got / 1024)}${len ? " / " + human(len / 1024) : ""}`, "flash");
+  }
+  const blob = new Blob(parts);
+  if (!(await isApk(blob))) throw new Error("ไฟล์ที่ได้ไม่ใช่ APK");
+  return new File([blob], "FlashKit.apk", { type: "application/vnd.android.package-archive" });
+}
+
+/** Way 2: Chrome downloads it as usual and the page picks the new .apk up from the Downloads folder */
+async function flashViaDownloads(url) {
+  if (!window.showDirectoryPicker) throw new Error("NO_FS");
+  let dir = await kvGet("dlDir");
+  const askGesture = (text) => confirmBox(text);   // the click on ยืนยัน counts as the user gesture the browser wants
+  if (dir) {
+    let p = await dir.queryPermission({ mode: "read" });
+    if (p !== "granted") { try { p = await dir.requestPermission({ mode: "read" }); } catch (e) { if (await askGesture("กด ยืนยัน เพื่ออนุญาตให้เว็บดูโฟลเดอร์ Downloads")) p = await dir.requestPermission({ mode: "read" }); } }
+    if (p !== "granted") dir = null;
+  }
+  if (!dir) {
+    const pick = () => window.showDirectoryPicker({ id: "downloads", startIn: "downloads", mode: "read" });
+    try { dir = await pick(); }
+    catch (e) {
+      if (e && e.name === "AbortError") throw new Error("ยกเลิกการเลือกโฟลเดอร์");
+      if (!(await askGesture("ครั้งแรกครั้งเดียว: เลือกโฟลเดอร์ Downloads (ที่ Chrome เก็บไฟล์ที่โหลด) แล้วกด อนุญาต\nเว็บจะหยิบไฟล์ Flash Kit ที่โหลดเสร็จไปติดตั้งให้เอง"))) throw new Error("ยกเลิก");
+      dir = await pick();
+    }
+    await kvSet("dlDir", dir);
+  }
+  const snap = new Map();
+  for await (const [n, h] of dir.entries()) if (h.kind === "file" && /\.apk$/i.test(n)) snap.set(n, (await h.getFile()).lastModified);
+  const win = window.open(url, "_blank");
+  if (!win) {
+    $("dlgList").replaceChildren(el("a", { href: url, target: "_blank", rel: "noopener", class: "dl-link", text: "กดตรงนี้เพื่อเริ่มโหลด Flash Kit" }));
+    await confirmBox("เบราว์เซอร์กันหน้าต่างใหม่ไว้: กดลิงก์ด้านบนเพื่อเริ่มโหลด แล้วกด ยืนยัน");
+    $("dlgList").replaceChildren();
+  }
+  const t0 = Date.now(); let cand = null;
+  while (Date.now() - t0 < 300000) {
+    await sleep(1500);
+    busyMsg(`รอ Chrome โหลด Flash Kit ลงโฟลเดอร์ ${dir.name} · เสร็จแล้วจะติดตั้งให้เอง`, "flash");
+    let newest = null;
+    for await (const [n, h] of dir.entries()) {
+      if (h.kind !== "file" || !/\.apk$/i.test(n)) continue;
+      const f = await h.getFile();
+      if (snap.get(n) === f.lastModified) continue;
+      if (!newest || f.lastModified > newest.lastModified) newest = f;
+    }
+    if (newest) { if (cand && cand.name === newest.name && cand.size === newest.size && (await isApk(newest))) return newest; cand = newest; }
+  }
+  throw new Error("รอไฟล์โหลดเกิน 5 นาที");
+}
+
+async function flashInstall(list) {
+  list = list.filter((d) => d && !d.closed);
+  if (!list.length) return;
+  const cfg = st.flashCfg();
+  if (!(await confirmBox(`ติดตั้ง / อัปเดต Flash Kit ให้ ${list.length} เครื่อง:\n${list.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ยังไม่มี)" : flashState(d) === "old" ? " (เก่า)" : "")).join("\n")}\n\nเว็บจะโหลดไฟล์ล่าสุดจากลิงก์ แล้วติดตั้งให้ทุกเครื่องพร้อมกัน`))) return;
+  list.forEach((d) => setStatus(d, { title: "รอไฟล์ Flash Kit", big: "…" }));
+  let file = null;
+  try {
+    try { file = await flashDirect(cfg.url); }
+    catch (e) { log("โหลดตรงจากลิงก์ไม่ได้ (" + e.message + ") ใช้วิธีให้ Chrome โหลดแทน"); file = await flashViaDownloads(cfg.url); }
+  } catch (e) {
+    list.forEach((d) => setStatus(d, null));
+    showHelp(e.message === "NO_FS" ? "NO_FS" : "FLASH_DL", e.message);
+    return;
+  } finally { busyMsg("", "flash"); }
+  log(`ได้ไฟล์ Flash Kit แล้ว (${human(file.size / 1024)}) กำลังติดตั้ง`);
+  pendingInstall = { list, t: Date.now() };
+  await installApk(file);
+}
+
 async function installApk(file) {
   await run("ติดตั้ง " + file.name, async () => {
     const ts = await pickDevices(`ติดตั้ง ${file.name}\n(ถ้ามีแอปเดิมอยู่ จะอัปเดตทับ ข้อมูลในแอปยังอยู่)`);
     if (!ts.length) return false;
     const fails = [];
-    for (const d of ts) {
-      const tmp = "/data/local/tmp/k3s-tool.apk";
-      await d.push(file, tmp, (p) => busyMsg(`ส่งไฟล์ ${Math.round(p * 100)}% · ${label(d)}`));
-      busyMsg("กำลังติดตั้ง · " + label(d));
-      const r = await d.sh(`pm install -r ${tmp}`);
-      await d.sh(`rm -f ${tmp}`);
-      const msg = (r.out + r.err).trim();
-      if (/Success/i.test(r.out)) { log(`${label(d)}: ติดตั้ง ${file.name} สำเร็จ`); await loadInfo(d).catch(() => {}); } else fails.push(`${label(d)}: ${msg || "install failed"}`);
-    }
+    // every device installs at the same time; each circle shows its own step
+    await Promise.all(ts.map(async (d) => {
+      const lock = !d.busy; if (lock) d.busy = "ติดตั้งแอป";
+      try {
+        const tmp = "/data/local/tmp/k3s-tool.apk";
+        let last = -1;
+        setStatus(d, { title: "ส่งไฟล์แอป", big: "0%", ring: 0 });
+        await d.push(file, tmp, (p) => { const v = Math.round(p * 100); if (v !== last) { last = v; setStatus(d, { title: "ส่งไฟล์แอป", big: v + "%", ring: v }); } });
+        setStatus(d, { title: "กำลังติดตั้ง", big: "…", ring: 100 });
+        const r = await d.sh(`pm install -r ${tmp}`);
+        await d.sh(`rm -f ${tmp}`);
+        const msg = (r.out + r.err).trim();
+        if (/Success/i.test(r.out)) {
+          log(`${label(d)}: ติดตั้ง ${file.name} สำเร็จ`);
+          await loadInfo(d).catch(() => {});
+          const m = flashMain(d);
+          setStatus(d, { title: "ติดตั้งแล้ว", big: m && /flash/i.test(file.name + m.pkg) ? m.ver : "สำเร็จ", ring: 100, done: true });
+        } else { fails.push(`${label(d)}: ${msg || "install failed"}`); setStatus(d, { title: "ติดตั้งไม่ได้", err: true, done: true }); }
+      } catch (e) { fails.push(`${label(d)}: ${e.message}`); setStatus(d, { title: "ติดตั้งไม่ได้", err: true, done: true }); }
+      finally { if (lock && d.busy === "ติดตั้งแอป") d.busy = null; }
+    }));
+    renderDevices();
     if (fails.length) throw new Error(fails.join("\n"));
   }, "INSTALL");
 }

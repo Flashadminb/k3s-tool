@@ -160,8 +160,19 @@ body.grouped #dcDetail .facts{grid-template-columns:1fr 1fr;font-size:15px}
 .stagenote .part{font:700 20px/1.3 var(--body);margin-bottom:6px}
 #authWait{border:2px solid var(--gold)}
 /* A device is already on the stage: the "tap Allow" card floats over the right panel instead of covering the devices */
+/* status shown inside the circle while a device is working */
+.sat-st{font:700 max(11px,calc(var(--s)*.105))/1.15 var(--body);color:var(--gold-hi);text-align:center;max-width:calc(var(--s) - 26px);text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.sat-big{font:700 max(13px,calc(var(--s)*.17))/1.05 var(--display);text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.sat-unit{font:500 max(9px,calc(var(--s)*.075))/1.1 var(--body);color:rgba(238,241,247,.85)}
+.satw.has-status .sat-body{background:radial-gradient(circle at 50% 35%,rgba(40,52,84,.98),rgba(10,14,26,.98) 75%)}
+.satw.has-status .sat-ring{transition:background .25s}
+.satw.st-done .sat-ring{background:conic-gradient(var(--ok) calc(var(--p)*1%),rgba(170,190,230,.16) 0)}
+.satw.st-done .sat-st{color:var(--ok)}
+.satw.st-err .sat-ring{background:conic-gradient(var(--bad) 100%,transparent 0)}
+.satw.st-err .sat-st{color:#ffb2a8}
 /* files flowing from a device into the hub while it is being cleaned */
-.drops{position:absolute;left:50%;top:50%;width:0;height:0;z-index:1;pointer-events:none}
+.drops{position:absolute;left:50%;top:50%;width:0;height:0;z-index:0;pointer-events:none}
+.satw .sat{z-index:1}
 .drops i{position:absolute;left:-6px;top:-7px;width:12px;height:14px;border-radius:2px;background:var(--gold-hi);opacity:0;
   box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);animation:flow 1.2s cubic-bezier(.5,0,.75,0) infinite;animation-delay:calc(var(--k) * .2s)}
 .drops i:nth-child(even){background:#dfe6f5}
@@ -260,7 +271,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
 #dlgText{white-space:pre-line;margin-bottom:10px}
 .dlgbox input{width:100%;margin:8px 0}
 #dlgList label{padding:10px 0;border-bottom:1px solid var(--line)}
-#busy{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:15;padding:12px 22px;border-radius:22px;white-space:pre-line;text-align:center;max-width:92vw;font:600 17px/1.3 var(--body);background:rgba(10,14,26,.92);border:1px solid var(--line-2);box-shadow:0 12px 30px -10px rgba(0,0,0,.8)}
+#busy{position:fixed;left:50%;top:86px;transform:translateX(-50%);z-index:15;padding:12px 22px;border-radius:22px;white-space:pre-line;text-align:center;max-width:92vw;font:600 17px/1.3 var(--body);background:rgba(10,14,26,.92);border:1px solid var(--line-2);box-shadow:0 12px 30px -10px rgba(0,0,0,.8)}
 
 /* ---------- smaller screens: one column, page scrolls ---------- */
 @media (max-width:1500px){.stat svg{display:none}.stat{padding:6px 12px}}
@@ -282,7 +293,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
   .dock{position:sticky;bottom:12px;grid-template-columns:1fr;z-index:10}
   .stats{display:none}
   .acts{flex-wrap:wrap}.acts .go{flex:1 1 100%;justify-content:center}.acts button{flex:1 1 0;justify-content:center;font-size:16px;padding:12px 10px;white-space:nowrap}.acts .icon{flex:0 0 56px}
-  #busy{bottom:170px}
+  #busy{top:auto;bottom:170px}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
@@ -367,7 +378,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
         <div class="hubtools" id="hubTools" hidden>
           <button class="tool" id="selTool" data-act="selTool" aria-pressed="false" title="เลือกหลายเครื่องให้ทำคำสั่งพร้อมกัน"><svg class="i"><use href="#i-link"/></svg>เลือกเครื่อง</button>        </div>
       </div>
-      <button class="tool need flashcorner" id="flashNeed" data-act="flashNeed" hidden title="มีเครื่องที่ยังไม่มี Flash Kit หรือเวอร์ชันเก่า"><svg class="i"><use href="#i-download"/></svg>โหลด / อัปเดต Flash Kit <span class="n" id="flashNeedN">0</span></button>
+      <button class="tool need flashcorner" id="flashNeed" data-act="flashNeed" hidden title="โหลดไฟล์ล่าสุดแล้วติดตั้งให้เครื่องที่ยังไม่มีหรือเวอร์ชันเก่าเอง"><svg class="i"><use href="#i-download"/></svg>อัปเดต Flash Kit อัตโนมัติ <span class="n" id="flashNeedN">0</span></button>
       <div class="selbar" id="selBar" hidden>
         <b id="selInfo"></b>
         <button data-act="selAll" id="selAll">เลือกทั้งหมด</button>
@@ -567,7 +578,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
         <label>เวอร์ชันขั้นต่ำ <input type="text" id="flLatest" style="width:140px"></label>
         <div class="mut" id="flSeen"></div>
       </div>
-      <div class="row end" style="margin-top:10px"><a class="tool flash-link" href="https://fle.pub/ay9kj5" target="_blank" rel="noopener"><svg class="i"><use href="#i-download"/></svg>โหลด Flash Kit</a><button class="blue" data-act="flashSave">บันทึก</button></div>
+      <div class="row end" style="margin-top:10px"><a class="tool flash-link" href="https://fle.pub/ay9kj5" target="_blank" rel="noopener"><svg class="i"><use href="#i-download"/></svg>โหลดไฟล์เอง</a><button class="need-dev" data-act="flashSelected">ติดตั้ง/อัปเดตให้เครื่องที่เลือก</button><button class="blue" data-act="flashSave">บันทึก</button></div>
     </div>
     <div class="card">
       <h2>พื้นหลัง</h2>

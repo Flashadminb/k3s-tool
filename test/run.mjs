@@ -116,10 +116,19 @@ ok((await page.textContent("#log")).includes("เปิดจอแล้ว"), 
 
 console.log("Flash Kit check");
 ok(await page.isVisible("#flashNeed"), "old Flash Kit version flagged at the hub");
+// the download site is replaced by a fake APK so the one-click flow can be checked end to end
+await page.evaluate(() => { const b = new Uint8Array(600000); b[0] = 0x50; b[1] = 0x4b; window.fetch = async () => new Response(new Blob([b])); });
+await click("flashNeed"); await accept();
+await page.waitForFunction(() => /ติดตั้ง FlashKit\.apk (สำเร็จ|ล้มเหลว)|ใช้วิธีให้ Chrome/.test(document.getElementById("log").textContent), null, { timeout: 20000 }).catch(() => {});
+await idle();
+const flLog = await page.textContent("#log");
+ok(flLog.includes("ติดตั้ง FlashKit.apk สำเร็จ"), "one click: Flash Kit downloaded and installed" + (flLog.includes("สำเร็จ") ? "" : "\n" + flLog.slice(0, 600)));
+ok((await page.textContent(".satw")).includes("ติดตั้งแล้ว"), "circle shows the install finished");
 
 console.log("delete success");
 await click("success"); await accept(); await idle();
 ok(count("imagePath/success") === "0", "success folder emptied");
+ok((await page.textContent(".satw")).includes("ลบเสร็จ"), "circle shows the delete finished");
 ok(existsSync(join(SD, "imagePath/success")), "success folder itself kept");
 ok(count("imagePath/fail") === "5", "fail untouched");
 

@@ -284,6 +284,11 @@ await click("stdApply"); await accept(); await idle();
 const calls = readFileSync(join(ROOT, "calls.log"), "utf8");
 ok(calls.includes("put system screen_off_timeout 300000") && calls.includes("window_animation_scale 0"), "standard settings sent");
 
+console.log("add Google account screen");
+await page.click("button[data-tab=device]");
+await click("addGoogle"); await idle();
+ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("ADD_ACCOUNT_SETTINGS"), "add-account screen opened on the device");
+
 console.log("type text into the device (iLauncher password etc.)");
 await page.click("button[data-tab=device]");
 await page.fill("#typeText", "ab cd"); await click("typeSend"); await idle();

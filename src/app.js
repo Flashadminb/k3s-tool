@@ -1704,6 +1704,21 @@ const actions = {
     if (fails.length) log("บางแอปปิดไม่ได้ (ระบบบริษัทหรือระบบเครื่องกันไว้): " + fails.join(" / "));
   }),
   setupAll: () => setupAll(),
+  // Opens Android's "add Google account" screen on every selected device; the sign-in itself is done on the device
+  // (or typed with "พิมพ์ข้อความเข้าเครื่อง"). With the account on the device, a reset from the buttons asks for it (FRP).
+  addGoogle: () => run("เปิดหน้าเพิ่มบัญชี Google", async () => {
+    const ts = targets();
+    if (!(await kioskOk(ts, "การเปิดหน้าเพิ่มบัญชี"))) return false;
+    const locked = ts.filter((d) => (d.info.locked || []).length || d.info.settingsLocked);
+    if (locked.length && !(await confirmBox(`${locked.map(label).join(", ")} ล็อกออกงานอยู่ หน้าเพิ่มบัญชีอาจเปิดไม่ได้\nแนะนำ: กด ปลดล็อก ก่อน เพิ่มบัญชีเสร็จแล้วค่อยล็อกใหม่\n\nเปิดต่อเลยไหม?`))) return false;
+    const fails = [];
+    await Promise.all(ts.map(async (d) => {
+      const r = await d.sh("input keyevent 224; am start -a android.settings.ADD_ACCOUNT_SETTINGS --esa account_types com.google 2>&1");
+      if (/Error|not found|Exception/i.test(r.out + r.err)) fails.push(label(d));
+      else setStatus(d, { title: "ล็อกอิน Google ที่เครื่อง", big: "@", done: true });
+    }));
+    log(`เปิดหน้าเพิ่มบัญชี Google ${ts.length - fails.length} เครื่อง · ใส่อีเมลและรหัสที่เครื่อง หรือใช้ เครื่อง > พิมพ์ข้อความเข้าเครื่อง${fails.length ? " · เปิดไม่ได้: " + fails.join(", ") + " (เครื่องอาจไม่มีบริการ Google)" : ""}`);
+  }),
   tgSave: () => run("ตั้งบอท Telegram", async () => { const r = await auth.apiPost("/api/telegram", { token: $("tgToken").value }); $("tgToken").value = ""; log("ตั้งบอท @" + r.bot + " แล้ว"); await renderUsers(); }, null, { free: true }),
   staffAdd: () => run("เพิ่มพนักงาน", async () => {
     const name = $("sfName").value.trim();

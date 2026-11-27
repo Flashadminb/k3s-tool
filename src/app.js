@@ -141,6 +141,8 @@ async function addDevice(d) {
     renderAll();
   });
   try { st.save("everConnected", true); } catch (e) {}
+  // First visit opens the guide; once a device is connected, jump to the main delete tab
+  if (document.querySelector(".tabs .on").dataset.tab === "guide") showTab("data");
   renderAll();
   // Fill in numbers in the background-ish order: storage first (main feature), then info, then banned check
   await refreshStorage(d);

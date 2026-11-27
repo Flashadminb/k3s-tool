@@ -1073,6 +1073,9 @@ async function loadInfo(d) {
     : ((await d.sh("pm list packages 2>/dev/null | grep -iE 'ilauncher|kiosk'")).out.match(/package:([\w.]+)/) || ["", ""])[1] + "/";
   i.home = (home.match(/^([\w.]+)\//) || [])[1] || "";
   i.kiosk = /ilauncher|kiosk/i.test(i.home);
+  // every app that can be the home screen: never switched off by the field lock (no home app = stuck on the logo)
+  i.homes = await homeApps(d).catch(() => new Set());
+  if (i.home) i.homes.add(i.home);
   i.flash = [];
   for (const p of await flashPackages(d)) {
     const v = (await d.sh(`dumpsys package ${q(p)} | grep -m1 versionName`)).out.split("=")[1];
@@ -1172,6 +1175,13 @@ async function loadApps(d) {
  * resolver table in `dumpsys package` is read instead (component lines followed by their LAUNCHER category).
  * If both come back empty, every user app plus Settings and the known Google apps count as having an icon.
  */
+async function homeApps(d) {
+  const pk = (txt) => new Set([...txt.matchAll(/([a-zA-Z][\w.]*)\/[\w.$]+/g)].map((m) => m[1]));
+  let s = new Set();
+  if (hasCap(d, "cmd")) s = pk((await d.sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null")).out);
+  if (!s.size && hasCap(d, "awk")) s = pk((await d.sh("dumpsys package r 2>/dev/null | awk '/^Activity Resolver Table:/{a=1;next} /Resolver Table:/{a=0} a && / filter /{c=$2} a && /category.HOME/ && c {print c; c=\"\"}' | sort -u")).out);
+  return s;
+}
 async function launcherApps(d, user) {
   const pk = (txt) => new Set([...txt.matchAll(/([a-zA-Z][\w.]*)\/[\w.$]+/g)].map((m) => m[1]));
   if (hasCap(d, "cmd")) {
@@ -1201,7 +1211,7 @@ async function checkBanned(d) {
    Apps are disabled (pm disable-user), not removed: unlocking brings them back with their data.
    ===================================================================== */
 // never switched off: Flash Kit, scanning, the home screen, keyboard and the services Flash Kit relies on
-const FORCE_KEEP = /flash|scan|barcode|wedge|inputmethod|keyboard|launcher|\.gms$|webview|packageinstaller|permissioncontroller|systemui/i;
+const FORCE_KEEP = /flash|scan|barcode|wedge|inputmethod|keyboard|launcher|home|provision|setupwizard|\.gms$|webview|packageinstaller|permissioncontroller|systemui/i;
 // kept by default (Flash Kit may open the camera; calls), can be ticked off
 const DEFAULT_KEEP = /dialer|telecom|\.phone$|camera/i;
 const SETTINGS_PKG = "com.android.settings";
@@ -1212,7 +1222,7 @@ function lockPlan(d) {
   const cfg = lockCfg();
   return a.list.filter((x) => x.icon || (d.info.locked || []).includes(x.pkg)).map((x) => {
     const isSettings = x.pkg === SETTINGS_PKG;
-    const forced = !isSettings && (x.prot || CRITICAL.includes(x.pkg) || x.pkg === d.info.home || FORCE_KEEP.test(x.pkg));
+    const forced = !isSettings && (x.prot || CRITICAL.includes(x.pkg) || x.pkg === d.info.home || (d.info.homes && d.info.homes.has(x.pkg)) || FORCE_KEEP.test(x.pkg));
     let keep;
     if (forced) keep = true;
     else if (isSettings) keep = !cfg.settings || !!d.info.kiosk;

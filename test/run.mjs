@@ -54,6 +54,7 @@ esac`);
 stub("cmd", `[ "$SERIAL" = TESTSERIAL003 ] && { echo "sh: cmd: not found" >&2; exit 127; }
 [ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3" "$PMSTATE" > "$PMSTATE.n"; mv "$PMSTATE.n" "$PMSTATE"; echo "Package $3 installed for user: 0"; }
 if [ "$2" = query-activities ]; then
+  case "$*" in *category.HOME*) echo "com.oem.home/.Home"; exit 0;; esac
   for p in com.flashexpress.kit jp.naver.line.android com.android.chrome com.android.settings; do grep -qx "$p" "$PMSTATE.dis" 2>/dev/null || echo "$p/.Main"; done
 fi
 if [ "$1" = wifi ]; then

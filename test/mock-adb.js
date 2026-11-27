@@ -4,10 +4,11 @@ export const q = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
 export const hasWebUsb = () => true;
 export class Device {
   constructor(serial) { this.serial = serial; this.info = {}; this.closed = false; this.disconnected = new Promise((r) => (this._bye = r)).then(() => { this.closed = true; }); }
-  async sh(cmd) { return await window.__sh(this.serial, cmd); }
+  async sh(cmd) { if (this.stopped) throw new Error("STOPPED"); return await window.__sh(this.serial, cmd); }
+  async stop() { this.stopped = true; window.__stops = (window.__stops || 0) + 1; }
   async shStream(cmd, onLine) {
     const r = await this.sh(cmd);
-    for (const l of r.out.split("\n")) { if (!l) continue; if (window.__lineDelay) await new Promise((res) => setTimeout(res, window.__lineDelay)); onLine(l); }
+    for (const l of r.out.split("\n")) { if (!l) continue; if (window.__lineDelay) await new Promise((res) => setTimeout(res, window.__lineDelay)); if (this.stopped) throw new Error("STOPPED"); onLine(l); }
     return r;
   }
   async shOk(cmd) { const r = await this.sh(cmd); if (r.code) throw new Error((r.err || r.out).trim()); return r.out; }

@@ -18,23 +18,34 @@ export class Device {
     this.serial = serial;
     this.info = {};       // filled by app: model, profile, storage...
     this.closed = false;
+    this.stopped = false;   // set by stop(): every further command of the current job fails at once
+    this._procs = new Set();
     this.disconnected = adb.disconnected.then(() => { this.closed = true; });
   }
 
   /** Run a shell command. Returns { out, err, code } */
   async sh(cmd) {
     if (this.closed) throw new Error("UNPLUGGED");
+    if (this.stopped) throw new Error("STOPPED");
     try { return await this._sh(cmd); }
-    catch (e) { if (this.closed || /disconnect|closed|transfer|NetworkError|NotFoundError/i.test(String(e && (e.name + " " + e.message)))) throw new Error("UNPLUGGED"); throw e; }
+    catch (e) { if (this.stopped) throw new Error("STOPPED"); if (this.closed || /disconnect|closed|transfer|NetworkError|NotFoundError/i.test(String(e && (e.name + " " + e.message)))) throw new Error("UNPLUGGED"); throw e; }
   }
   async _sh(cmd) {
     const p = this.adb.subprocess.shellProtocol;
+    const text = (s) => s.pipeThrough(new TextDecoderStream()).pipeThrough(new ConcatStringStream());
     if (p) {
-      const r = await p.spawnWaitText(cmd);
-      return { out: r.stdout, err: r.stderr, code: r.exitCode };
+      const proc = await p.spawn(cmd);
+      this._procs.add(proc);   // kept so stop() can end it on the device
+      try {
+        const [out, err, code] = await Promise.all([text(proc.stdout), text(proc.stderr), proc.exited]);
+        return { out, err, code };
+      } finally { this._procs.delete(proc); }
     }
     // Old devices without shell v2: stdout/stderr are mixed and there is no exit code, so echo it ourselves
-    const raw = await this.adb.subprocess.noneProtocol.spawnWaitText(`sh -c ${q(cmd)}; echo __EXIT:$?`);
+    const proc = await this.adb.subprocess.noneProtocol.spawn(`sh -c ${q(cmd)}; echo __EXIT:$?`);
+    this._procs.add(proc);
+    let raw;
+    try { raw = await text(proc.output); } finally { this._procs.delete(proc); }
     const m = raw.match(/__EXIT:(\d+)\s*$/);
     return { out: m ? raw.slice(0, m.index) : raw, err: "", code: m ? +m[1] : 0 };
   }
@@ -42,10 +53,13 @@ export class Device {
   /** Like sh(), but hands each output line to onLine as soon as the device prints it (for live progress) */
   async shStream(cmd, onLine) {
     if (this.closed) throw new Error("UNPLUGGED");
+    if (this.stopped) throw new Error("STOPPED");
     const p = this.adb.subprocess.shellProtocol;
     if (!p) { const r = await this.sh(cmd); r.out.split("\n").forEach((l) => l && onLine(l)); return r; }
     try {
       const proc = await p.spawn(cmd);
+      this._procs.add(proc);
+      proc.exited.finally(() => this._procs.delete(proc)).catch(() => {});
       const errText = proc.stderr.pipeThrough(new TextDecoderStream()).pipeThrough(new ConcatStringStream());
       const reader = proc.stdout.getReader();
       const dec = new TextDecoder();
@@ -62,9 +76,22 @@ export class Device {
       const [err, code] = await Promise.all([errText, proc.exited]);
       return { out, err, code };
     } catch (e) {
+      if (this.stopped) throw new Error("STOPPED");
       if (this.closed || /disconnect|closed|transfer|NetworkError|NotFoundError/i.test(String(e && (e.name + " " + e.message)))) throw new Error("UNPLUGGED");
       throw e;
     }
+  }
+
+  /**
+   * Stop whatever this device is doing: end the running shell commands (closing the stream ends the process on
+   * the device) and make the job's next commands fail with STOPPED. The page clears the flag when the job ends.
+   */
+  async stop() {
+    this.stopped = true;
+    const procs = [...this._procs]; this._procs.clear();
+    await Promise.all(procs.map((p) => Promise.resolve(p.kill()).catch(() => {})));
+    // belt and braces: anything our shell user still has running from a delete or a scan
+    await this._sh("pkill -x find; pkill -x xargs; pkill -x uiautomator; pkill -x screenrecord; true").catch(() => {});
   }
 
   /** Shell command, throws if exit code != 0 */
@@ -75,6 +102,7 @@ export class Device {
   }
 
   async push(blobOrBytes, remotePath, onProgress) {
+    if (this.stopped) throw new Error("STOPPED");
     const buf = blobOrBytes instanceof Uint8Array ? blobOrBytes : new Uint8Array(await blobOrBytes.arrayBuffer());
     const sync = await this.adb.sync();
     try {

@@ -143,6 +143,14 @@ await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
 await page.fill("#dlgInput", "Hub-07"); await page.click("#dlgOk");
 ok((await page.textContent(".satw")).includes("Hub-07") && (await page.textContent("#model")).includes("Hub-07"), "name shown in the circle and the card");
 ok(await page.evaluate(() => JSON.parse(localStorage.getItem("k3s-tool:names"))["TESTSERIAL001"] === "Hub-07"), "name remembered for this serial");
+ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("screen_brightness 255"), "naming flashes the device being named");
+await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
+await page.fill("#dlgInput", "สำรองคลังสินค้า 12"); await page.click("#dlgOk");
+const fits = await page.$eval(".sat-id.named", (e) => { const c = e.closest(".sat").getBoundingClientRect(), r = e.getBoundingClientRect(); return e.scrollHeight <= e.clientHeight + 1 && r.left >= c.left && r.right <= c.right; });
+ok(fits, "a long name shrinks to fit inside the circle");
+await page.screenshot({ path: join(ROOT, "longname.png"), clip: await page.$eval(".satw", (e) => { const r = e.getBoundingClientRect(); return { x: r.x - 10, y: r.y - 10, width: r.width + 20, height: r.height + 20 }; }) });
+await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
+await page.fill("#dlgInput", "Hub-07"); await page.click("#dlgOk");
 
 console.log("find this device");
 await click("findDev"); await idle();
@@ -175,6 +183,19 @@ ok(count("imagePath/success") === "0", "success folder emptied");
 ok((await page.textContent(".satw")).includes("ลบเสร็จ"), "circle shows the delete finished");
 ok(existsSync(join(SD, "imagePath/success")), "success folder itself kept");
 ok(count("imagePath/fail") === "5", "fail untouched");
+
+console.log("stop a running job");
+for (let i = 0; i < 6; i++) put(join(SD, "imagePath/success", `stop${i}.jpg`), 10);
+await page.evaluate(() => { window.__lineDelay = 400; });
+await click("refresh").catch(() => {}); await idle();
+await click("success"); await accept();
+await page.waitForSelector("#busy .busy-stop", { timeout: 10000 });
+await page.click("#busy .busy-stop"); await idle();
+await page.evaluate(() => { window.__lineDelay = 0; });
+ok((await page.textContent("#log")).includes("หยุดลบรูป") || (await page.textContent("#log")).includes("หยุด"), "Stop ends the job: " + (await page.textContent("#log")).split("\n")[0]);
+ok(await page.evaluate(() => window.__stops >= 1) && (await page.textContent(".satw")).includes("หยุดแล้ว"), "device told to stop, circle shows it stopped");
+await click("findDev"); await idle();
+ok((await page.textContent("#log")).includes("เปิดจอแล้ว") || (await page.textContent("#log")).includes("ส่งสัญญาณ"), "device works normally after a stop");
 
 console.log("cancel does nothing");
 await click("trash"); await page.waitForSelector("#dlg:not([hidden])"); await page.click("#dlgNo"); await idle();

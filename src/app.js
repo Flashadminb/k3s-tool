@@ -75,10 +75,19 @@ function busyMsg(t, key) {
 function paintBusy() {
   const b = $("busy");
   if (toast.lines.size) {
-    b.textContent = [...toast.lines.values()].map((j) => {
+    // one row per line, kept between repaints so its Stop button stays clickable while the seconds tick
+    for (const r of [...b.children]) if (!toast.lines.has(r.dataset.k)) r.remove();
+    for (const [k, j] of toast.lines) {
+      let row = b.querySelector(`[data-k="${k}"]`);
+      if (!row) {
+        row = el("div", { class: "busy-row", "data-k": k }, el("span"));
+        const job = jobs.get(k);
+        if (job && job.devs.length) row.append(el("button", { class: "busy-stop", text: "หยุด", title: "หยุดคำสั่งนี้ (ส่วนที่ทำไปแล้วจะไม่ย้อนกลับ)", onclick: () => stopJob(k) }));
+        b.append(row);
+      }
       const sec = Math.round((Date.now() - j.start) / 1000);
-      return j.text + (sec >= 3 ? ` · ${sec} วิ` : "");
-    }).join("\n");
+      row.firstChild.textContent = j.text + (sec >= 3 ? ` · ${sec} วิ` : "");
+    }
     b.hidden = false; document.title = `⏳ ${TITLE}`;
     if (!toast.timer) toast.timer = setInterval(paintBusy, 1000);
   } else {
@@ -136,6 +145,15 @@ function codeOf(e) {
  * stay usable; a second job on a device that is already busy is refused with a clear message.
  */
 let jobSeq = 0;
+const jobs = new Map();   // running jobs by toast key, for the Stop buttons
+/** Stop button: end the commands running on the job's devices; the job then ends as "หยุดแล้ว" */
+async function stopJob(key) {
+  const job = jobs.get(key);
+  if (!job || job.stopped) return;
+  job.stopped = true;
+  busyMsg("กำลังหยุด " + job.name + " ...", key);
+  await Promise.all(job.devs.map((d) => (d.stop ? d.stop() : null)).filter(Boolean).map((p) => p.catch(() => {})));
+}
 const anyBusy = () => toast.lines.size > 0;
 async function run(name, fn, helpCode, opts = {}) {
   let devs = [];
@@ -147,20 +165,30 @@ async function run(name, fn, helpCode, opts = {}) {
     return;
   }
   const key = "job" + ++jobSeq;
-  devs.forEach((d) => { d.busy = name; if (!d.status || d.status.done) setStatus(d, { title: shortJob(name) }); });
+  // the job record lets the Stop button reach every device it touches (fn may add more with job.devs.push)
+  const job = { name, devs: [...devs], stopped: false };
+  jobs.set(key, job);
+  devs.forEach((d) => { d.stopped = false; d.busy = name; if (!d.status || d.status.done) setStatus(d, { title: shortJob(name) }); });
   if (devs.length) renderDevicesSoon();
   $("help").hidden = true;
   busyMsg(name + (devs.length === 1 ? " · " + label(devs[0]) : devs.length > 1 ? ` · ${devs.length} เครื่อง` : "") + " ...", key);
   log(name + " ...");
   let outcome = "ok";
-  try { const r = await fn(); if (r === false) outcome = "cancel"; else log(name + " เสร็จแล้ว"); }
-  catch (e) { outcome = "err"; console.error(e); log(name + " ล้มเหลว: " + (e && e.message)); showHelp(helpCode && codeOf(e) === "UNKNOWN" ? helpCode : codeOf(e), String((e && e.message) || e)); }
+  try { const r = await fn(job); if (job.stopped) outcome = "stopped"; else if (r === false) outcome = "cancel"; else log(name + " เสร็จแล้ว"); }
+  catch (e) {
+    if (job.stopped) outcome = "stopped";
+    else { outcome = "err"; console.error(e); log(name + " ล้มเหลว: " + (e && e.message)); showHelp(helpCode && codeOf(e) === "UNKNOWN" ? helpCode : codeOf(e), String((e && e.message) || e)); }
+  }
   finally {
-    devs.forEach((d) => {
+    if (outcome === "stopped") log(`หยุด${name}แล้ว (ส่วนที่ทำไปแล้วยังอยู่ ไม่ย้อนกลับ)`);
+    new Set(job.devs).forEach((d) => {
       if (d.busy === name) d.busy = null;
+      d.stopped = false;
+      if (outcome === "stopped") { setStatus(d, { title: "หยุดแล้ว", done: true }); return; }
       // a job that set its own finished status keeps it; otherwise show the generic outcome
       if (d.status && !d.status.done) setStatus(d, outcome === "cancel" ? null : outcome === "err" ? { title: "ไม่สำเร็จ", err: true, done: true } : { title: "เสร็จแล้ว", done: true });
     });
+    jobs.delete(key);
     busyMsg("", key);
     if (devs.length) renderDevicesSoon();
   }
@@ -188,8 +216,22 @@ function promptBox(text, value, placeholder) {
     inp.onkeydown = (e) => { if (e.key === "Enter") done(inp.value.trim()); };
   });
 }
+/** Make a device easy to spot on the desk: screen flashes bright/dark 5 times and it vibrates, brightness restored */
+async function signalDevice(d) {
+  await d.sh("input keyevent 224");
+  setStatus(d, { title: "ส่งสัญญาณ", big: "📳" });
+  await d.sh(["m=$(settings get system screen_brightness_mode); b=$(settings get system screen_brightness)",
+    "settings put system screen_brightness_mode 0",
+    "for i in 1 2 3 4 5; do settings put system screen_brightness 255; sleep 0.35 2>/dev/null || sleep 1; settings put system screen_brightness 3; sleep 0.35 2>/dev/null || sleep 1; done",
+    "settings put system screen_brightness $b; settings put system screen_brightness_mode $m",
+    "(cmd vibrator vibrate 1500 idata 2>/dev/null || cmd vibrator_manager synced oneshot 1500 2>/dev/null) >/dev/null 2>&1; true"].join("; "));
+  d.info.screenOn = true;
+  setStatus(d, { title: "เครื่องนี้", big: "👋", done: true });
+}
 async function nameDevice(d) {
-  const v = await promptBox(`ตั้งชื่อเครื่อง ${d.info.model || ""} รหัส ${d.serial}\nชื่อจะผูกกับรหัสเครื่องนี้ จำไว้ตลอด เสียบครั้งหน้าขึ้นชื่อเอง (เว้นว่าง = ลบชื่อ)`, st.nameOf(d.serial), "เช่น 07 หรือ K3S-07 หรือ ชื่อคนถือ");
+  // flash + vibrate the device being named, so it is clear which one on the desk gets the name
+  signalDevice(d).catch(() => {});
+  const v = await promptBox(`ตั้งชื่อเครื่อง ${d.info.model || ""} รหัส ${d.serial}\n(เครื่องที่จอกะพริบและสั่นอยู่ตอนนี้)\nชื่อจะผูกกับรหัสเครื่องนี้ จำไว้ตลอด เสียบครั้งหน้าขึ้นชื่อเอง (เว้นว่าง = ลบชื่อ)`, st.nameOf(d.serial), "เช่น 07 หรือ K3S-07 หรือ ชื่อคนถือ");
   if (v === null) return;
   const taken = Object.entries(st.names()).find(([s, n]) => s !== d.serial && v && n.toLowerCase() === v.toLowerCase());
   if (taken && !(await confirmBox(`ชื่อ "${v}" ใช้กับเครื่อง ${taken[0]} อยู่แล้ว ใช้ซ้ำไหม?`))) return;
@@ -591,7 +633,9 @@ const ringPct = (d) => (d.status && d.status.ring != null ? Math.max(0, Math.min
 const statusClass = (d) => (d.status ? " has-status" + (d.status.err ? " st-err" : d.status.done ? " st-done" : "") : "");
 function satBody(d) {
   const nm = st.nameOf(d.serial);
-  const id = el("span", { class: "sat-id" + (nm ? " named" : ""), text: nm || d.serial.slice(-6), title: d.serial });
+  // longer names get smaller letters (up to 2 lines) so the whole name fits inside the circle
+  const fit = !nm ? "" : nm.length <= 5 ? "" : nm.length <= 8 ? " n2" : nm.length <= 12 ? " n3" : " n4";
+  const id = el("span", { class: "sat-id" + (nm ? " named" + fit : ""), text: nm || d.serial.slice(-6), title: nm ? nm + " · " + d.serial : d.serial });
   const s0 = d.status;
   if (s0) return [el("span", { class: "sat-st", text: s0.title }), s0.big != null ? el("b", { class: "sat-big", text: s0.big }) : null,
     s0.unit ? el("span", { class: "sat-unit", text: s0.unit }) : null, id].filter(Boolean);
@@ -1878,10 +1922,12 @@ const actions = {
     const d = cardDev && !cardDev.closed ? cardDev : cur();
     const id = d.serial.slice(-6);
     await d.sh("input keyevent 224");
+    await signalDevice(d);
     // A notification with the id on the device's own screen: easy to spot which one on the desk it is
     const r = await d.sh(`cmd notification post -S bigtext -t ${q("IDATA TOOLS")} idata-find ${q((st.nameOf(d.serial) ? "เครื่องนี้คือ " + st.nameOf(d.serial) + " · " : "เครื่องนี้คือ") + "รหัส " + id + " (" + d.serial + ")")}`);
     d.info.screenOn = true; renderDevices();
-    log(`${label(d)}: เปิดจอแล้ว${r.code ? "" : " และขึ้นแจ้งเตือนรหัส " + id + " ที่เครื่อง"}`);
+    setStatus(d, { title: "เครื่องนี้", big: "👋", done: true });
+    log(`${label(d)}: ส่งสัญญาณแล้ว (จอกะพริบ + สั่น) เปิดจอแล้ว${r.code ? "" : " และขึ้นแจ้งเตือนรหัส " + id + " ที่เครื่อง"}`);
   }),
   fbOpen: () => run("เปิดไฟล์ในเครื่อง", () => fbList(cur(), FB_ROOT)),
   fbUp: () => run("ย้อนกลับ", () => fbList(cur(), fbPath.replace(/\/[^/]+$/, "") || FB_ROOT)),
@@ -2226,9 +2272,10 @@ async function flashInstall(list, quiet) {
 }
 
 async function installApk(file) {
-  await run("ติดตั้ง " + file.name, async () => {
+  await run("ติดตั้ง " + file.name, async (job) => {
     const ts = await pickDevices(`ติดตั้ง ${file.name}\n(ถ้ามีแอปเดิมอยู่ จะอัปเดตทับ ข้อมูลในแอปยังอยู่)`);
     if (!ts.length) return false;
+    ts.forEach((d) => { if (!job.devs.includes(d)) { d.stopped = false; job.devs.push(d); } });
     const fails = [];
     // every device installs at the same time; each circle shows its own step
     await Promise.all(ts.map(async (d) => {

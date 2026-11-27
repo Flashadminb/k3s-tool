@@ -238,7 +238,8 @@ async function autoConnect() {
 
 function renderDevices() {
   const box = $("devices");
-  box.replaceChildren(...all().map((d) => {
+  if (box.classList.contains("orbit")) renderOrbit(box);
+  else box.replaceChildren(...all().map((d) => {
     const s = d.info.storage;
     const pct = s && s.total ? Math.round((s.used / s.total) * 100) + "%" : "";
     const ban = d.info.bannedFound && d.info.bannedFound.length ? " · 🚫" + d.info.bannedFound.length : "";
@@ -246,13 +247,60 @@ function renderDevices() {
       el("b", { text: d.info.model || "เครื่อง" }), el("small", { text: "รหัส " + d.serial.slice(-6) + (pct ? " · ใช้ " + pct : "") + ban }));
   }));
   const n = all().length;
+  document.body.classList.toggle("has-dev", !!n);
   $("status").textContent = n ? `เชื่อมต่อ ${n} เครื่อง` : "ยังไม่เชื่อมต่อ";
   $("status").className = n ? "pill ok" : "pill";
   $("allDevWrap").hidden = n < 2; $("devCount").textContent = n;
   $("stdAll").parentElement.hidden = n < 2;
   document.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !n));
   const tab = document.querySelector(".tabs .on").dataset.tab;
-  $("nodev").hidden = !!n || !["data", "device", "apps", "setup"].includes(tab);
+  // In the space layout the empty-state note lives on the stage, so it shows on every tab
+  $("nodev").hidden = !!n || (!box.classList.contains("orbit") && !["data", "device", "apps", "setup"].includes(tab));
+}
+
+/* ---------- Space layout: devices float on orbits around the connect hub ---------- */
+const TINTS = ["#5b8cff", "#3cc6b4", "#c98bff", "#ff9d6b", "#6fd49a", "#ffd36b"];
+function tintOf(serial) { let h = 0; for (const c of serial) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TINTS[h % TINTS.length]; }
+function renderOrbit(box) {
+  const ds = all();
+  const w = box.clientWidth || 800, h = box.clientHeight || 500;
+  // two elliptical lanes so neighbours never sit in a row; skip the top-left arc where the device card sits
+  const lanes = [[0.27, 0.32], [0.36, 0.40]];
+  const from = -75, span = 200;
+  box.replaceChildren(...ds.map((d, i) => {
+    const s = d.info.storage;
+    const pct = s && s.total ? Math.round((s.used / s.total) * 100) : 0;
+    const ang = from + (ds.length === 1 ? span * 0.35 : (i * span) / (ds.length - 1 || 1));
+    const [rx, ry] = lanes[i % 2];
+    const x = Math.cos((ang * Math.PI) / 180) * rx * w, y = Math.sin((ang * Math.PI) / 180) * ry * h;
+    const ban = d.info.bannedFound && d.info.bannedFound.length;
+    const b = el("button", {
+      class: "sat" + (d.serial === selected ? " sel" : "") + (pct > 85 ? " full" : ""),
+      style: `--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.7).toFixed(1)}s`,
+      title: label(d), "aria-pressed": d.serial === selected ? "true" : "false",
+      onclick: () => { selected = d.serial; renderAll(); }
+    },
+      el("span", { class: "sat-ring" }),
+      el("span", { class: "sat-body" },
+        el("b", { class: "sat-pct", text: s ? pct + "%" : "…" }),
+        el("span", { class: "sat-name", text: d.info.model || "เครื่อง" }),
+        el("span", { class: "sat-id", text: d.serial.slice(-6) })),
+      ban ? el("span", { class: "sat-ban", text: "แอปต้องห้าม " + ban }) : null);
+    return b;
+  }));
+  renderDevCard(devices.get(selected));
+}
+function renderDevCard(d) {
+  const c = $("devCard");
+  if (!c) return;
+  c.hidden = !d;
+  if (!d) return;
+  const i = d.info, b = i.battery;
+  $("dcBattery").textContent = b ? `${b.level}%${b.status ? " · " + b.status : ""}` : "-";
+  $("dcHealth").textContent = b ? b.health + (b.temp ? ` · ${b.temp}°C` : "") : "-";
+  $("dcAndroid").textContent = i.android ? "Android " + i.android : "-";
+  $("dcFlash").textContent = i.flash && i.flash.length ? i.flash.map((f) => f.ver || f.pkg).join(", ") : "-";
+  $("dcSerial").textContent = d.serial;
 }
 
 function renderAll() {
@@ -465,6 +513,7 @@ async function loadInfo(d) {
 }
 
 function renderInfo(d) {
+  renderDevCard(devices.get(selected));
   const g = $("infoGrid");
   if (!d || !d.info.battery) { g.replaceChildren(el("div", { class: "mut", text: d ? "กด อัปเดต เพื่ออ่านข้อมูล" : "-" })); return; }
   const i = d.info, b = i.battery;
@@ -902,6 +951,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadStdForm(); loadBannedText(); renderProfTable(); renderRegistry(); renderHistory(); renderAll();
   if (!st.load("everConnected", false)) showTab("guide");
 
+  window.addEventListener("resize", () => { if ($("devices").classList.contains("orbit")) renderDevices(); });
   if (!adb.hasWebUsb()) { showHelp("NO_WEBUSB"); return; }
   navigator.usb.addEventListener("connect", () => setTimeout(autoConnect, 800));
   autoConnect();

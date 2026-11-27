@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K3S Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#05070d; --deep:#0a0f1c;
+  --glass:rgba(13,18,32,.74); --glass-2:rgba(22,29,48,.82); --line:rgba(170,190,230,.16); --line-2:rgba(227,180,106,.38);
+  --tx:#eef1f7; --mut:#aab3c5; --dim:#7f8aa3;
+  --gold:#e3b46a; --gold-hi:#f3cd8c; --gold-ink:#1b1306;
+  --ok:#6fd49a; --warn:#f2c14e; --bad:#ff7a6b; --badbg:rgba(255,122,107,.12); --okbg:rgba(111,212,154,.12); --warnbg:rgba(242,193,78,.12);
+  --ac:#e3b46a;
+  --display:"Chakra Petch","Anuphan",system-ui,sans-serif;
+  --body:"Anuphan","Leelawadee UI","Noto Sans Thai",system-ui,sans-serif;
+  --r:18px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--void);color:var(--tx);font:18px/1.65 var(--body);-webkit-font-smoothing:antialiased}
+::selection{background:rgba(227,180,106,.35);color:#fff}
+*{scrollbar-width:thin;scrollbar-color:rgba(227,180,106,.35) transparent}
+::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:rgba(227,180,106,.3);border-radius:10px;border:3px solid transparent;background-clip:padding-box}
+:focus-visible{outline:2px solid var(--gold-hi);outline-offset:3px}
+a{color:var(--gold-hi);text-underline-offset:3px}
+svg.i{width:1.15em;height:1.15em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+
+.app{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100vh;gap:16px;padding:0 28px 20px}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:center;gap:28px;padding:18px 0 0}
+.brand{display:flex;align-items:center;gap:12px;font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.brand svg{width:34px;height:34px;color:var(--gold)}
+.brand small{display:block;font:500 12px/1.2 var(--body);letter-spacing:.12em;color:var(--mut)}
+.tabs{display:flex;gap:4px;flex:1;justify-content:center;flex-wrap:wrap}
+.tabs button{display:flex;align-items:center;gap:8px;background:none;border:0;border-radius:999px;color:var(--mut);font:600 17px/1 var(--body);padding:12px 16px;cursor:pointer;transition:color .2s,background .2s}
+.tabs button:hover{color:var(--tx);background:rgba(255,255,255,.05)}
+.tabs button.on{color:var(--gold-ink);background:var(--gold)}
+#status{font:600 15px/1 var(--body);padding:10px 16px;border-radius:999px;border:1px solid var(--line);color:var(--mut);white-space:nowrap;background:var(--glass)}
+#status.ok{color:var(--ok);border-color:rgba(111,212,154,.4)}
+
+/* ---------- main ---------- */
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(400px,32vw);gap:20px;min-height:0}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);box-shadow:0 18px 50px -18px rgba(0,0,0,.7)}
+
+.stage{position:relative;min-height:0;border-radius:var(--r);--cx:50%;--cy:40%}
+body.has-dev .stage{--cx:61%;--cy:55%}
+.orbitzone{position:absolute;inset:0}
+.rings{position:absolute;inset:0;pointer-events:none}
+.rings i{position:absolute;left:var(--cx);top:var(--cy);transition:left .6s,top .6s;border:1px dashed rgba(170,190,230,.16);border-radius:50%;transform:translate(-50%,-50%)}
+.rings i:nth-child(1){width:54%;height:64%}
+.rings i:nth-child(2){width:72%;height:80%;border-style:solid;border-color:rgba(227,180,106,.1)}
+.rings i:nth-child(3){width:30%;height:38%;border-color:rgba(170,190,230,.1)}
+
+/* hub */
+.hubwrap{position:absolute;left:var(--cx);top:var(--cy);transition:left .6s,top .6s;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:14px;z-index:2}
+.hub{position:relative;width:clamp(170px,15vw,224px);aspect-ratio:1;border-radius:50%;border:0;cursor:pointer;color:var(--tx);
+  background:radial-gradient(circle at 50% 38%,rgba(40,52,84,.95),rgba(10,14,26,.96) 70%);
+  border:1px solid var(--line-2);box-shadow:0 22px 60px -10px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.08);
+  display:grid;place-content:center;justify-items:center;gap:8px;font:700 19px/1.25 var(--body);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.hub:hover{transform:scale(1.04)}
+.hub::before{content:"";position:absolute;inset:-14px;border-radius:50%;border:2px solid transparent;border-top-color:var(--gold);border-right-color:rgba(227,180,106,.35);animation:spin 6s linear infinite}
+.hub::after{content:"";position:absolute;inset:-34px;border-radius:50%;border:1px solid rgba(227,180,106,.22);animation:pulse 3.2s ease-out infinite}
+.hub svg{width:46px;height:46px;color:var(--gold)}
+.hub .more-lbl{display:none}
+body.has-dev .hub .first-lbl{display:none}body.has-dev .hub .more-lbl{display:block}
+body.has-dev .hub{width:clamp(130px,10vw,160px);font-size:16px}
+body.has-dev .hub svg{width:34px;height:34px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%{transform:scale(.86);opacity:.9}100%{transform:scale(1.18);opacity:0}}
+
+/* satellites */
+#devices.orbit{position:absolute;inset:0;pointer-events:none;z-index:3}
+.sat{pointer-events:auto;position:absolute;left:calc(var(--cx) + var(--x));top:calc(var(--cy) + var(--y));transform:translate(-50%,-50%);
+  width:132px;height:132px;border-radius:50%;border:0;padding:0;background:none;cursor:pointer;color:var(--tx);animation:float 11s ease-in-out infinite;animation-delay:var(--delay)}
+.sat-ring{position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(var(--gold) calc(var(--p)*1%),rgba(170,190,230,.16) 0);
+  -webkit-mask:radial-gradient(circle,transparent 58px,#000 59px);mask:radial-gradient(circle,transparent 58px,#000 59px)}
+.sat.full .sat-ring{background:conic-gradient(var(--bad) calc(var(--p)*1%),rgba(170,190,230,.16) 0)}
+.sat-body{position:absolute;inset:9px;border-radius:50%;display:grid;place-content:center;justify-items:center;line-height:1.15;
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--tint) 55%,#fff 0%),color-mix(in srgb,var(--tint) 30%,#070a14) 55%,#070a14 100%);
+  box-shadow:inset -10px -14px 24px rgba(0,0,0,.55),0 10px 30px -8px rgba(0,0,0,.8)}
+.sat-pct{font:700 26px/1 var(--display)}
+.sat-name{font-size:14px;font-weight:600;margin-top:4px;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.sat-id{font:500 12px/1.2 var(--display);color:rgba(238,241,247,.8);letter-spacing:.06em}
+.sat.sel::after{content:"";position:absolute;inset:-10px;border-radius:50%;border:2px solid var(--gold-hi)}
+.sat.sel::before{content:"";position:absolute;inset:-18px;border-radius:50%;border:1px solid rgba(227,180,106,.3)}
+.sat:hover .sat-body{filter:brightness(1.15)}
+.sat-ban{position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);white-space:nowrap;font:600 12px/1 var(--body);padding:5px 9px;border-radius:999px;background:var(--bad);color:#2a0905}
+@keyframes float{0%,100%{translate:0 0}25%{translate:6px -9px}50%{translate:-4px -14px}75%{translate:-8px -4px}}
+
+/* device dossier (top-left) */
+#devCard{position:absolute;top:0;left:0;width:min(390px,36%);padding:20px 22px;z-index:4}
+#devCard h2{margin:0;font:700 30px/1.1 var(--display);letter-spacing:.02em}
+#devCard .sub{color:var(--mut);font-size:15px}
+.used{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:14px;flex-wrap:wrap}
+.used b{font:700 32px/1 var(--display);color:var(--gold-hi)}
+.used span{color:var(--mut);font-size:15px}
+.barbox{height:10px;background:rgba(170,190,230,.14);border-radius:6px;overflow:hidden;margin:10px 0 14px}
+.bar{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--gold-hi));border-radius:6px;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.bar.warn{background:var(--warn)}.bar.bad{background:var(--bad)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:0}
+.facts div{min-width:0}.facts dt{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:13px;letter-spacing:.04em}.facts dd{margin:2px 0 0;font-weight:600;font-size:17px;overflow-wrap:anywhere}
+
+/* waiting / empty states on stage */
+.stagenote{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:min(620px,92%);padding:18px 22px;z-index:5}
+.stagenote .part{font:700 20px/1.3 var(--body);margin-bottom:6px}
+#authWait{border:2px solid var(--gold)}
+.step{display:flex;gap:14px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}.step:last-child{border-bottom:0}
+.step .n{flex:0 0 34px;height:34px;border-radius:50%;border:1.5px solid var(--gold);color:var(--gold-hi);font:700 17px/1 var(--display);display:flex;align-items:center;justify-content:center}
+.step .t{flex:1}.step .t small{display:block;color:var(--mut);font-size:15px}
+
+/* right panel */
+.panel{min-height:0;overflow:auto;padding:22px 24px;overscroll-behavior:contain}
+.panel .card{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.panel h2{font:700 21px/1.3 var(--display);margin:0 0 8px;letter-spacing:.01em}
+.panel h3,.panel h2.sub{font:700 18px/1.3 var(--body);margin:16px 0 8px}
+.panel .part{font:700 20px/1.3 var(--display);margin:0 0 4px}
+.mut{color:var(--mut);font-size:16px}
+.ptitle{display:flex;align-items:center;gap:10px;font:700 24px/1.2 var(--display);margin:0 0 14px}
+.ptitle svg{color:var(--gold)}
+
+button{font:inherit;color:inherit}
+.panel button,.dlgbox button,#help button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:var(--glass-2);color:var(--tx);font:600 17px/1.25 var(--body);cursor:pointer;transition:border-color .2s,background .2s,transform .15s}
+.panel button:hover,.dlgbox button:hover{border-color:var(--line-2);background:rgba(227,180,106,.1)}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.45;cursor:wait}
+.panel .red,.dlgbox .red{color:#ffb2a8;border-color:rgba(255,122,107,.45)}
+.panel .red:hover,.dlgbox .red:hover{background:var(--badbg)}
+.panel .blue,.panel .big{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.grid3{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row.end{justify-content:flex-end}
+label{display:flex;gap:8px;align-items:center}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold)}
+input[type=range]{accent-color:var(--gold)}
+select,input[type=text],input[type=number],textarea{font:inherit;color:var(--tx);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(5,7,13,.6)}
+textarea{width:100%;min-height:120px;font:15px/1.5 ui-monospace,Consolas,monospace}
+code{background:rgba(227,180,106,.12);color:var(--gold-hi);padding:2px 8px;border-radius:6px;font-size:15px}
+.kbd{display:inline-block;background:#1f2638;border:1px solid var(--line);color:#fff;padding:2px 8px;border-radius:6px;font-size:14px}
+details{border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:14px;background:rgba(255,255,255,.02)}
+summary{font-weight:700;cursor:pointer;font-size:18px}
+ol,ul{padding-left:22px;margin:8px 0}li{margin:4px 0}
+.warnbox{background:var(--warnbg);border:1px solid rgba(242,193,78,.35);border-radius:12px;padding:12px 16px;margin:10px 0;color:#f7dc9c}
+.list{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}.item:last-child{border-bottom:0}
+.item .nm{min-width:0;overflow-wrap:anywhere}.item .nm small{display:block;color:var(--mut);font-size:14px}
+.item button{min-height:38px;padding:6px 12px;font-size:15px}
+.tag{font-size:13px;padding:2px 8px;border-radius:6px;background:var(--badbg);color:#ffb2a8;margin-left:6px;white-space:nowrap}.tag.sys{background:rgba(170,190,230,.12);color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:600}
+.tblwrap{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:12px}
+#screenImg{max-width:100%;max-height:60vh;border:1px solid var(--line);border-radius:12px;display:block;margin:10px auto;cursor:crosshair;user-select:none;-webkit-user-drag:none}
+
+#help{border-radius:14px;padding:14px 18px;margin-bottom:14px;background:var(--badbg);border:1px solid rgba(255,122,107,.45)}
+#help.info{background:var(--okbg);border-color:rgba(111,212,154,.45)}
+.help-title{font-weight:700;color:#ffb2a8;font-size:19px}#help.info .help-title{color:var(--ok)}
+#help ol{padding-left:22px;margin:6px 0}.help-detail{font-size:14px;color:var(--mut);word-break:break-all}
+.btn-link{display:inline-block;margin-top:6px}
+#allDevWrap{padding:14px 18px;border:1px solid var(--line-2);border-radius:14px;margin-bottom:14px;background:rgba(227,180,106,.06)}
+#log{white-space:pre-wrap;font:13px/1.6 ui-monospace,Consolas,monospace;color:var(--mut);max-height:220px;overflow:auto;margin:8px 0 0}
+
+/* ---------- bottom dock: the important actions ---------- */
+.dock{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px 18px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat{display:flex;gap:12px;align-items:center;padding:6px 14px;border-left:1px solid var(--line);min-width:0}
+.stat:first-child{border-left:0}
+.stat svg{width:30px;height:30px;color:var(--gold);flex:0 0 auto}
+.stat .k{display:block;color:var(--mut);font-size:14px;line-height:1.3}
+.stat b{display:block;font:700 22px/1.25 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{display:flex;gap:10px;align-items:stretch}
+.acts button{display:inline-flex;align-items:center;gap:10px;border-radius:14px;cursor:pointer;font:700 17px/1.2 var(--body);padding:14px 18px;min-height:60px;border:1px solid var(--line);background:var(--glass-2);color:var(--tx);transition:transform .15s,background .2s,border-color .2s,box-shadow .2s}
+.acts button:hover{border-color:var(--line-2);background:rgba(227,180,106,.1)}
+.acts .go{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--gold-ink);border-color:transparent;font-size:19px;padding:14px 26px;box-shadow:0 12px 26px -12px rgba(0,0,0,.85)}
+.acts .go:hover{background:linear-gradient(180deg,#f8dba4,var(--gold-hi));box-shadow:0 16px 30px -12px rgba(0,0,0,.9)}
+.acts .go svg{width:26px;height:26px}
+.acts .icon{padding:14px}
+body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4;pointer-events:none}
+
+/* dialog + toast */
+#dlg{position:fixed;inset:0;background:rgba(2,3,8,.66);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.dlgbox{width:100%;max-width:560px;padding:24px;font-size:19px}
+#dlgText{white-space:pre-line;margin-bottom:10px}
+.dlgbox input{width:100%;margin:8px 0}
+#dlgList label{padding:10px 0;border-bottom:1px solid var(--line)}
+#busy{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:15;padding:12px 22px;border-radius:999px;font:600 17px/1.3 var(--body);background:rgba(10,14,26,.92);border:1px solid var(--line-2);box-shadow:0 12px 30px -10px rgba(0,0,0,.8)}
+
+/* ---------- smaller screens: one column, page scrolls ---------- */
+@media (max-width:1500px){.stat svg{display:none}.stat{padding:6px 12px}}
+@media (max-width:1180px){
+  main{grid-template-columns:minmax(0,1fr) 380px}
+  .stat b{font-size:19px}
+  .acts .lbl-s{display:none}
+}
+@media (max-width:980px){
+  html,body{height:auto}
+  .app{height:auto;min-height:100vh;padding:0 16px 16px}
+  .top{flex-wrap:wrap;gap:12px;justify-content:space-between}.tabs{order:3;flex:1 1 100%;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.tabs button{flex:0 0 auto}
+  main{grid-template-columns:1fr}
+  .stage,body.has-dev .stage{--cx:50%;--cy:50%}
+  .stagenote{position:relative;left:auto;bottom:auto;transform:none;width:100%;margin-top:12px}
+  .orbitzone{position:relative;height:500px}
+  #devCard{position:relative;width:100%;margin-bottom:12px}
+  .sat{width:104px;height:104px}.sat-ring{-webkit-mask:radial-gradient(circle,transparent 45px,#000 46px);mask:radial-gradient(circle,transparent 45px,#000 46px)}.sat-pct{font-size:21px}
+  .panel{overflow:visible}
+  .dock{position:sticky;bottom:12px;grid-template-columns:1fr;z-index:10}
+  .stats{display:none}
+  .acts{flex-wrap:wrap}.acts .go{flex:1 1 100%;justify-content:center}.acts button{flex:1 1 0;justify-content:center;font-size:16px;padding:12px 10px;white-space:nowrap}.acts .icon{flex:0 0 56px}
+  #busy{bottom:170px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 40 40"><circle cx="20" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="2"/><ellipse cx="20" cy="20" rx="18" ry="6.5" transform="rotate(-24 20 20)" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="34" cy="12.5" r="2.2" fill="currentColor"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></symbol>
+  <symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16.5h.01"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z"/></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="m13 11 8-8"/><path d="M7.5 12.5 11.5 16.5"/><path d="M3 21c1.5-1 3-1.5 4-3l4.5-4.5-3-3L4 15c-1.5 1-2 2.5-3 4z"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></symbol>
+  <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V10a7 7 0 0 1 14 0v6z"/><path d="M5 12h14"/><path d="m7 4 1.5 2"/><path d="m17 4-1.5 2"/><path d="M9 8.5h.01"/><path d="M15 8.5h.01"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><svg><use href="#i-logo"/></svg><div>K3S TOOL<small>BPL HUB · FLASH KIT</small></div></div>
+    <nav class="tabs" id="tabs" aria-label="เมนูหลัก">
+      <button data-tab="data" class="on"><svg class="i"><use href="#i-broom"/></svg>ลบข้อมูล</button>
+      <button data-tab="device"><svg class="i"><use href="#i-phone"/></svg>เครื่อง</button>
+      <button data-tab="apps"><svg class="i"><use href="#i-apps"/></svg>แอป</button>
+      <button data-tab="setup"><svg class="i"><use href="#i-sliders"/></svg>ตั้งค่า</button>
+      <button data-tab="records"><svg class="i"><use href="#i-clock"/></svg>ประวัติ</button>
+      <button data-tab="guide"><svg class="i"><use href="#i-book"/></svg>คู่มือ</button>
+    </nav>
+    <span id="status">ยังไม่เชื่อมต่อ</span>
+  </header>
+
+  <main>
+    <section class="stage" aria-label="เครื่องที่เชื่อมต่อ">
+
+      <div id="devCard" class="glass" hidden>
+        <div class="sub">เครื่องที่เลือก</div>
+        <h2 id="model">-</h2>
+        <div class="used"><b id="used">-</b><span id="total"></span></div>
+        <div class="barbox"><div id="bar" class="bar"></div></div>
+        <dl class="facts">
+          <div><dt><svg class="i"><use href="#i-battery"/></svg>แบตเตอรี่</dt><dd id="dcBattery">-</dd></div>
+          <div><dt><svg class="i"><use href="#i-heart"/></svg>สุขภาพแบต</dt><dd id="dcHealth">-</dd></div>
+          <div><dt><svg class="i"><use href="#i-android"/></svg>ระบบ</dt><dd id="dcAndroid">-</dd></div>
+          <div><dt><svg class="i"><use href="#i-box"/></svg>Flash Kit</dt><dd id="dcFlash">-</dd></div>
+          <div style="grid-column:1/-1"><dt>รหัสเครื่อง</dt><dd id="dcSerial">-</dd></div>
+        </dl>
+      </div>
+
+      <div class="orbitzone">
+      <div class="rings" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="hubwrap">
+        <button class="hub" data-act="connect" aria-label="เชื่อมต่อเครื่อง">
+          <svg class="i"><use href="#i-plug"/></svg>
+          <span class="first-lbl">เชื่อมต่อเครื่อง</span>
+          <span class="more-lbl">+ เพิ่มเครื่อง</span>
+        </button>
+      </div>
+      <div id="devices" class="orbit"></div>
+      </div>
+
+      <div id="nodev" class="stagenote glass">
+        <div class="part">เสียบสาย USB แล้วกดวงกลมตรงกลาง</div>
+        <div class="step"><div class="n">1</div><div class="t">เสียบสายระหว่างเครื่องกับคอม<small>เครื่องที่เคยเชื่อมแล้ว เว็บจะต่อให้เอง</small></div></div>
+        <div class="step"><div class="n">2</div><div class="t">เครื่องใหม่ / เพิ่งรีเซ็ต ต้องเปิด USB debugging ก่อน<small><a href="#" data-goto="guide">ดูวิธีในเมนู คู่มือ</a></small></div></div>
+      </div>
+
+      <div id="authWait" class="stagenote glass" hidden>
+        <div class="part">ดูที่หน้าจอเครื่อง</div>
+        <div class="step"><div class="n">1</div><div class="t">ปลดล็อกหน้าจอเครื่อง</div></div>
+        <div class="step"><div class="n">2</div><div class="t">ติ๊ก <b>อนุญาตจากคอมพิวเตอร์นี้เสมอ</b> แล้วกด <b>อนุญาต</b></div></div>
+        <div id="authMore" class="warnbox" hidden>ยังไม่เห็นหน้าต่างที่เครื่อง? ถอดสาย รอ 3 วินาที เสียบใหม่ แล้วกดวงกลมอีกครั้ง</div>
+      </div>
+    </section>
+
+    <aside class="panel glass" aria-label="รายละเอียดเมนู">
+      <div id="help" hidden></div>
+
+      <section class="tab" id="tab-data">
+        <div class="ptitle"><svg class="i"><use href="#i-broom"/></svg>ลบข้อมูล</div>
+        <div class="need-dev">
+          <label id="allDevWrap" hidden><input type="checkbox" id="allDev"> ทำกับ <b>ทุกเครื่อง</b> ที่เสียบอยู่ (<span id="devCount">0</span> เครื่อง)</label>
+          <p class="mut" style="margin-top:0">ปุ่มลบหลักอยู่แถบล่างสุดของจอ<br><span id="todayFreed"></span></p>
+          <div class="card">
+            <h2>รูปที่ยังไม่ส่ง (fail)</h2>
+            <div class="mut" style="margin-bottom:10px">อาจยังไม่อัปโหลด เก็บไว้ในคอมก่อนลบ</div>
+            <div class="grid"><button data-act="backupFail">เก็บไว้ในคอมก่อน</button><button class="red" data-act="fail">ลบรูป fail</button></div>
+          </div>
+          <div class="card">
+            <h2>ลบอัตโนมัติ</h2>
+            <div class="mut">ลบรูปที่ส่งแล้ว + ถังขยะ ให้เองตามเวลา (ไม่ลบ fail) ต้องเปิดหน้านี้ค้างไว้</div>
+            <div class="row" style="margin-top:10px">
+              <label>ทุก <select id="autoEvery"><option value="0">ปิด</option><option value="15">15 นาที</option><option value="30">30 นาที</option><option value="60">1 ชั่วโมง</option><option value="120">2 ชั่วโมง</option></select></label>
+              <label>เมื่อเกิน <select id="autoPct"><option value="0">ทุกครั้ง</option><option value="50">50%</option><option value="70">70%</option><option value="85">85%</option></select></label>
+            </div>
+            <div class="mut" id="autoStatus" style="margin-top:8px">ปิดอยู่</div>
+          </div>
+          <div class="card">
+            <h2>อื่นๆ</h2>
+            <div class="grid"><button data-act="cache">ล้างแคชแอป</button><button data-act="bigFiles">หาไฟล์ใหญ่ที่สุด</button></div>
+          </div>
+          <div class="card" id="bigCard" hidden>
+            <h2>ไฟล์ใหญ่ที่สุดในเครื่อง</h2>
+            <h3>โฟลเดอร์ใหญ่สุด</h3><div class="list" id="bigDirs"></div>
+            <h3>ไฟล์ใหญ่สุด 30 อันดับ (เกิน 1 MB)</h3><div class="list" id="bigList"></div>
+          </div>
+        </div>
+      </section>
+
+<section class="tab" id="tab-device" hidden>
+    <div class="need-dev">
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">ข้อมูลเครื่อง</h2><button data-act="info">อัปเดต</button></div>
+        <div class="grid" style="margin-top:8px" id="infoGrid"></div>
+      </div>
+
+      <div class="card">
+        <h2>เครื่องมือ</h2>
+        <div class="grid3">
+          <button data-act="screenshot">ภาพหน้าจอ</button>
+          <button data-act="record">อัดวิดีโอหน้าจอ</button>
+          <button data-act="live">ดู/คุมหน้าจอสด</button>
+          <button data-act="restartFlash">รีสตาร์ทแอป Flash</button>
+          <button data-act="reboot">รีสตาร์ทเครื่อง</button>
+          <button data-act="logcat">บันทึก log ส่งไอที</button>
+          <button data-act="apk">ติดตั้ง / อัปเดต APK</button>
+          <button data-act="wall">ส่งรูปหน้าจอ</button>
+        </div>
+        <div class="row" style="margin-top:8px"><label>ความยาววิดีโอ <select id="recSec"><option value="10">10 วินาที</option><option value="30" selected>30 วินาที</option><option value="60">1 นาที</option><option value="180">3 นาที (สูงสุด)</option></select></label></div>
+        <input type="file" id="apkFile" accept=".apk" hidden>
+        <input type="file" id="wallFile" accept="image/*" hidden>
+      </div>
+
+      <div class="card" id="liveCard" hidden>
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">หน้าจอสด</h2><button data-act="liveStop">ปิด</button></div>
+        <div class="mut">คลิกที่ภาพ = แตะ · ลากเมาส์ = ปัด · ภาพอัปเดตประมาณวินาทีละครั้ง</div>
+        <img id="screenImg" alt="หน้าจอเครื่อง" draggable="false">
+        <div class="grid3">
+          <button data-key="4">ย้อนกลับ</button><button data-key="3">หน้าหลัก</button><button data-key="187">แอปล่าสุด</button>
+        </div>
+        <div class="row" style="margin-top:8px"><input type="text" id="liveText" placeholder="พิมพ์ข้อความส่งเข้าเครื่อง (ภาษาอังกฤษ/ตัวเลข)" style="flex:1"><button data-act="liveType">ส่ง</button></div>
+      </div>
+
+      <div class="card" style="border-color:#e8b4ae">
+        <h2 style="color:var(--bad)">โซนอันตราย</h2>
+        <button class="red" data-act="reset">รีเซ็ตเครื่อง (ลบทุกอย่าง)</button>
+      </div>
+    </div>
+  </section>
+<section class="tab" id="tab-apps" hidden>
+    <div class="need-dev">
+      <div class="card" id="bannedCard">
+        <h2>แอปต้องห้ามที่เจอในเครื่อง</h2>
+        <div id="bannedFound" class="mut">กด โหลดรายชื่อแอป ด้านล่างเพื่อตรวจ</div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">แอปในเครื่อง</h2><button data-act="apps">โหลดรายชื่อแอป</button></div>
+        <div class="row" style="margin:8px 0"><input type="text" id="appSearch" placeholder="ค้นหา เช่น tiktok, line, flash" style="flex:1"><label><input type="checkbox" id="showSys"> แสดงแอประบบ</label></div>
+        <div class="mut" style="margin-bottom:6px">แอปที่ไม่มีชื่อภาษาคน แสดงเป็นชื่อเทคนิค ถ้าไม่แน่ใจ ให้เปิดดูในเครื่องก่อนกดถอน</div>
+        <div class="list" id="appList"><div class="item mut">ยังไม่ได้โหลด</div></div>
+        <h3>แอประบบที่เคยถอน (กดคืนได้)</h3>
+        <div class="list" id="hiddenList"><div class="item mut">-</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>รายการแอปต้องห้าม</h2>
+      <div class="mut">ใส่ชื่อเทคนิคบรรทัดละ 1 แอป ระบบจะเตือนเมื่อเจอในเครื่อง กดปุ่ม ข้างแอปในรายการด้านบนเพื่อเพิ่มได้เลย</div>
+      <textarea id="bannedText"></textarea>
+      <div class="row end"><button data-act="bannedReset">คืนค่าเริ่มต้น</button><button class="blue" data-act="bannedSave">บันทึกรายการ</button></div>
+    </div>
+  </section>
+<section class="tab" id="tab-setup" hidden>
+    <div class="card">
+      <h2>ตั้งค่าชุดมาตรฐานฮับ</h2>
+      <div class="mut">ตั้งค่าแบบเดียวกันทุกเครื่องในคลิกเดียว เหมาะกับเครื่องที่เพิ่งรีเซ็ต</div>
+      <div style="display:grid;gap:8px;margin-top:10px">
+        <label>ปิดหน้าจอเองเมื่อไม่ใช้ <select id="stdTimeout"><option value="1">1 นาที</option><option value="2">2 นาที</option><option value="5">5 นาที</option><option value="10">10 นาที</option><option value="30">30 นาที</option></select></label>
+        <label><input type="checkbox" id="stdAutoBright"> ปรับความสว่างอัตโนมัติ</label>
+        <label>ความสว่าง <input type="range" id="stdBright" min="10" max="100" step="5"> <span id="stdBrightV"></span>%</label>
+        <label><input type="checkbox" id="stdAutoTime"> ตั้งวันเวลาอัตโนมัติ (จากเครือข่าย)</label>
+        <label><input type="checkbox" id="stdNoAnim"> ปิดแอนิเมชัน (เครื่องลื่นขึ้น)</label>
+        <label><input type="checkbox" id="stdAwake"> หน้าจอไม่ดับตอนเสียบชาร์จ</label>
+      </div>
+      <div class="row end need-dev" style="margin-top:10px"><label><input type="checkbox" id="stdAll"> ทุกเครื่องที่เสียบ</label><button class="blue" data-act="stdApply">ตั้งค่าให้เครื่อง</button></div>
+    </div>
+    <div class="card">
+      <h2>รุ่นเครื่อง (ที่เก็บรูป)</h2>
+      <div class="mut">ถ้ามีรุ่นใหม่ที่เก็บรูปคนละที่ เพิ่มได้ที่นี่ ระบบจะเลือกตามชื่อรุ่นของเครื่องเอง ถ้าไม่ตรงรุ่นไหนจะใช้แบบ K3S</div>
+      <div class="mut need-dev" style="margin-top:6px">เครื่องที่เลือกอยู่: <b id="curModel">-</b> · ใช้ค่า: <b id="curProfile">-</b></div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>ชื่อ</th><th>ชื่อรุ่นมีคำว่า</th><th>โฟลเดอร์ success</th><th>โฟลเดอร์ fail</th><th></th></tr></thead><tbody id="profTable"></tbody></table></div>
+      <div class="row end" style="margin-top:8px"><button data-act="profAdd">+ เพิ่มรุ่น</button><button class="blue" data-act="profSave">บันทึก</button></div>
+    </div>
+  </section>
+<section class="tab" id="tab-records" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">ทะเบียนเครื่อง</h2><button data-act="regCsv">โหลดเป็น Excel (CSV)</button></div>
+      <div class="mut">ทุกเครื่องที่เคยเสียบกับคอมเครื่องนี้ บันทึกอัตโนมัติ</div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>Android</th><th>แบต</th><th>พื้นที่</th><th>แอป Flash</th><th>เห็นล่าสุด</th><th></th></tr></thead><tbody id="regTable"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">ประวัติการลบ</h2><div class="row"><button data-act="histCsv">CSV</button><button class="red" data-act="histClear">ล้างประวัติ</button></div></div>
+      <div class="mut" id="histSum"></div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>เวลา</th><th>เครื่อง</th><th>ทำอะไร</th><th>ไฟล์</th><th>ได้พื้นที่คืน</th></tr></thead><tbody id="histTable"></tbody></table></div>
+    </div>
+  </section>
+<section class="tab" id="tab-guide" hidden>
+<div class="warnbox">ทำครั้งเดียวต่อเครื่อง · ถ้ารีเซ็ตเครื่อง ต้องทำใหม่</div>
+<div class="card"><div class="part">ส่วน A · ที่เครื่อง: เปิดโหมดนักพัฒนา</div><div class="step"><div class="n">1</div><div class="t">เปิด <b>การตั้งค่า</b> (Settings)</div></div>
+<div class="step"><div class="n">2</div><div class="t">แตะ <b>เกี่ยวกับโทรศัพท์</b> (About phone)<small>อยู่ล่างสุด</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">แตะ <b>หมายเลขบิวด์</b> (Build number) <b>7 ครั้ง</b> ติดกัน<small>หาไม่เจอ: พิมพ์ "บิวด์" ในช่องค้นหาของการตั้งค่า</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ขึ้น <b>"คุณเป็นนักพัฒนาแล้ว"</b> = สำเร็จ </div></div></div>
+<div class="card"><div class="part">ส่วน B · ที่เครื่อง: เปิด USB debugging</div><div class="step"><div class="n">1</div><div class="t">การตั้งค่า &gt; <b>ระบบ</b> &gt; <b>ตัวเลือกสำหรับนักพัฒนา</b><small>หาไม่เจอ: พิมพ์ "นักพัฒนา" ในช่องค้นหา</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">เปิดสวิตช์ <b>การแก้ไขข้อบกพร่อง USB</b> (USB debugging) แล้วกด <b>ตกลง</b></div></div><div class="warnbox">ไม่มีเมนูนี้ หรือสวิตช์เป็นสีเทา = บริษัทล็อกไว้ ให้แจ้งไอที Flash</div></div>
+<div class="card"><div class="part">ส่วน C · ที่คอม: เชื่อมต่อ</div><div class="step"><div class="n">1</div><div class="t">เสียบสาย USB · ปลดล็อกหน้าจอเครื่อง</div></div>
+<div class="step"><div class="n">2</div><div class="t">กดปุ่มสีฟ้า <b>+ เชื่อมต่อเครื่อง</b> ด้านบน</div></div>
+<div class="step"><div class="n">3</div><div class="t">คลิกชื่อเครื่อง แล้วกด <b>เชื่อมต่อ</b></div></div>
+<div class="step"><div class="n">4</div><div class="t">ที่เครื่อง: ติ๊ก <b>อนุญาตเสมอ</b> แล้วกด <b>อนุญาต</b> </div></div><div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง</div></div>
+<details><summary>ติดปัญหา? กดดูวิธีแก้</summary>
+    <h3>ไม่เห็นชื่อเครื่องในหน้าต่าง</h3>
+    <ol><li>เช็กว่าเปิด USB debugging แล้ว (ส่วน B)</li><li>เปลี่ยนสาย หรือเปลี่ยนช่อง USB</li><li>ถอดสาย รอ 3 วินาที เสียบใหม่</li></ol>
+    <h3>ขึ้นว่า "เครื่องถูกใช้อยู่"</h3>
+    <ol><li>กดปุ่ม <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>
+    <li>พิมพ์ <code>cd C:\Users\Flash\Desktop\Best\platform-tools</code> กด <span class="kbd">Enter</span></li>
+    <li>พิมพ์ <code>adb kill-server</code> กด <span class="kbd">Enter</span></li>
+    <li>ปิดแท็บเว็บนี้ที่เปิดซ้ำ แล้วเสียบสายใหม่</li></ol>
+    <a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">โหลด Platform-Tools</a>
+    <h3>ไม่มีหน้าต่าง "อนุญาต" ที่เครื่อง</h3>
+    <ol><li>ปลดล็อกหน้าจอเครื่อง แล้วถอดสายเสียบใหม่</li><li>ถ้าเคยกดปฏิเสธ: ตัวเลือกสำหรับนักพัฒนา &gt; <b>เพิกถอนการให้สิทธิ์การแก้ไขข้อบกพร่อง USB</b></li></ol>
+    <h3>ไม่อยากกดอนุญาตใหม่ทุก 7 วัน</h3>
+    <div>ตัวเลือกสำหรับนักพัฒนา &gt; เปิด <b>ปิดการหมดเวลาการให้สิทธิ์ adb</b> (ถ้ามี)</div>
+  </details>
+</section>
+
+      <details><summary>บันทึกการทำงาน (Log)</summary><pre id="log"></pre></details>
+    </aside>
+  </main>
+
+  <footer class="dock glass" aria-label="คำสั่งสำคัญ">
+    <div class="stats">
+      <div class="stat"><svg class="i"><use href="#i-photos"/></svg><div><span class="k">รูปที่ส่งแล้ว (success)</span><b id="cSuccess">-</b></div></div>
+      <div class="stat"><svg class="i"><use href="#i-trash"/></svg><div><span class="k">ถังขยะ</span><b id="cTrash">-</b></div></div>
+      <div class="stat"><svg class="i"><use href="#i-alert"/></svg><div><span class="k">ยังไม่ส่ง (fail)</span><b id="cFail">-</b></div></div>
+    </div>
+    <div class="acts">
+      <button class="go" data-act="success"><svg class="i"><use href="#i-broom"/></svg>ลบรูปที่ส่งแล้ว</button>
+      <button data-act="trash"><svg class="i"><use href="#i-trash"/></svg><span>ล้างถังขยะ</span></button>
+      <button data-act="all"><svg class="i"><use href="#i-layers"/></svg><span>ลบทั้งหมด</span></button>
+      <button class="icon" data-act="refresh" title="นับใหม่" aria-label="นับใหม่"><svg class="i"><use href="#i-refresh"/></svg></button>
+    </div>
+  </footer>
+</div>
+
+<div id="busy" hidden></div>
+<div id="dlg" hidden><div class="dlgbox glass"><div id="dlgText"></div><div id="dlgList"></div><input id="dlgInput" hidden><div class="row end"><button id="dlgNo">ยกเลิก</button><button id="dlgOk" class="red">ยืนยัน</button></div></div></div>
+
+<script>
+/* Animated galaxy: parallax starfield, slow nebula, planet limb, rare shooting star. Decorative only. */
+(() => {
+  const c = document.getElementById("sky"), x = c.getContext("2d");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W, H, dpr, stars = [], neb, t0 = performance.now(), shoot = null, nextShoot = 4000;
+  function nebula() {
+    const o = document.createElement("canvas"); o.width = W; o.height = H; const g = o.getContext("2d");
+    const blob = (cx, cy, r, col) => { const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, col); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, W, H); };
+    g.globalCompositeOperation = "lighter";
+    blob(W * .22, H * .28, W * .42, "rgba(58,64,160,.20)");
+    blob(W * .55, H * .12, W * .30, "rgba(120,60,170,.13)");
+    blob(W * .80, H * .70, W * .45, "rgba(20,110,140,.12)");
+    blob(W * .35, H * .85, W * .30, "rgba(190,120,50,.07)");
+    // dust lane
+    for (let i = 0; i < 260; i++) { const a = Math.random(); g.fillStyle = `rgba(200,210,255,${a * .03})`; const px = Math.random() * W, py = H * .25 + (px / W) * H * .4 + (Math.random() - .5) * H * .18; g.beginPath(); g.arc(px, py, Math.random() * 40 + 10, 0, 7); g.fill(); }
+    return o;
+  }
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+    c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.min(900, Math.round(W * H / 2200));
+    stars = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, z: Math.random() ** 2 * .9 + .1, p: Math.random() * 6.3, hue: Math.random() < .12 ? 38 : Math.random() < .2 ? 210 : 0 }));
+    neb = nebula();
+  }
+  function planet(t) {
+    const r = Math.max(W, H) * .62, cx = W * 1.02, cy = H * 1.28;
+    const g = x.createRadialGradient(cx - r * .35, cy - r * .5, r * .2, cx, cy, r);
+    g.addColorStop(0, "#1d3a66"); g.addColorStop(.55, "#0c1830"); g.addColorStop(1, "#04070f");
+    x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+    const glow = .55 + Math.sin(t / 5000) * .08;
+    x.lineWidth = 2.2; x.strokeStyle = `rgba(140,190,255,${glow})`; x.beginPath(); x.arc(cx, cy, r, Math.PI * 1.02, Math.PI * 1.62); x.stroke();
+    const halo = x.createRadialGradient(cx, cy, r * .96, cx, cy, r * 1.12);
+    halo.addColorStop(0, "rgba(90,150,255,.22)"); halo.addColorStop(1, "rgba(90,150,255,0)");
+    x.fillStyle = halo; x.beginPath(); x.arc(cx, cy, r * 1.12, 0, 7); x.fill();
+  }
+  function frame(now) {
+    const t = now - t0;
+    x.fillStyle = "#05070d"; x.fillRect(0, 0, W, H);
+    x.save(); x.translate(W / 2, H / 2); x.rotate(Math.sin(t / 60000) * .05); x.drawImage(neb, -W / 2, -H / 2); x.restore();
+    for (const s of stars) {
+      if (!still) { s.x -= s.z * .06; if (s.x < -2) { s.x = W + 2; s.y = Math.random() * H; } }
+      const a = (.35 + .65 * s.z) * (.75 + .25 * Math.sin(s.p + t / (900 + s.z * 1400)));
+      x.fillStyle = s.hue ? `hsla(${s.hue},80%,80%,${a})` : `rgba(235,240,255,${a})`;
+      const r = s.z * 1.5 + .2;
+      x.beginPath(); x.arc(s.x, s.y, r, 0, 7); x.fill();
+      if (s.z > .85) { x.fillStyle = `rgba(235,240,255,${a * .12})`; x.beginPath(); x.arc(s.x, s.y, r * 4, 0, 7); x.fill(); }
+    }
+    planet(t);
+    if (!still) {
+      if (!shoot && t > nextShoot) { shoot = { x: Math.random() * W * .7 + W * .2, y: Math.random() * H * .35, l: 0 }; }
+      if (shoot) {
+        shoot.l += 16; const len = Math.min(shoot.l, 160), hx = shoot.x - shoot.l * 1.2, hy = shoot.y + shoot.l * .5;
+        const g = x.createLinearGradient(hx, hy, hx + len * 1.2, hy - len * .5); g.addColorStop(0, "rgba(255,240,210,.9)"); g.addColorStop(1, "rgba(255,240,210,0)");
+        x.strokeStyle = g; x.lineWidth = 1.6; x.beginPath(); x.moveTo(hx, hy); x.lineTo(hx + len * 1.2, hy - len * .5); x.stroke();
+        if (shoot.l > 520) { shoot = null; nextShoot = t + 6000 + Math.random() * 9000; }
+      }
+      requestAnimationFrame(frame);
+    }
+  }
+  addEventListener("resize", () => { size(); if (still) frame(performance.now()); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !still) t0 = performance.now() - 1; });
+  size(); requestAnimationFrame(frame);
+})();
+</script>
+<script>/*__BUNDLE__*/</script>
+</body>
+</html>

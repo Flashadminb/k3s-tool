@@ -24,7 +24,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: mkdir -p site && cp dist/k3s-tool.html site/index.html
+      - run: node test/build-preview.mjs
+      - run: mkdir -p site && cp dist/k3s-tool.html site/index.html && cp dist/preview.html site/preview.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

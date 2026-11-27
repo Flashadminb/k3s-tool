@@ -216,6 +216,19 @@ function promptBox(text, value, placeholder) {
     inp.onkeydown = (e) => { if (e.key === "Enter") done(inp.value.trim()); };
   });
 }
+/*
+ * The device's name is also kept on the device itself, so any computer or phone shows it as soon as it is plugged in.
+ * The device's copy wins (it is the latest one set anywhere); a name known only here is written to the device.
+ */
+const NAME_FILE = "/data/local/tmp/idata-tools-name.txt";
+async function syncName(d) {
+  const onDev = (await d.sh(`cat ${NAME_FILE} 2>/dev/null`)).out.trim().slice(0, 24);
+  const here = st.nameOf(d.serial);
+  if (onDev && onDev !== here) { st.setName(d.serial, onDev); st.updateRegistry(d.serial, { name: onDev }); }
+  else if (!onDev && here) await writeName(d, here);
+}
+const writeName = (d, name) => d.sh(name ? `printf '%s\n' ${q(name)} > ${NAME_FILE}` : `rm -f ${NAME_FILE}`);
+
 /** Make a device easy to spot on the desk: screen flashes bright/dark 5 times and it vibrates, brightness restored */
 // It stops by itself after a few seconds; Stop (or an error) part way still puts the brightness back
 async function signalDevice(d) {
@@ -245,6 +258,7 @@ async function nameDevice(d) {
   if (taken && !(await confirmBox(`ชื่อ "${v}" ใช้กับเครื่อง ${taken[0]} อยู่แล้ว ใช้ซ้ำไหม?`))) return;
   st.setName(d.serial, v);
   st.updateRegistry(d.serial, { name: v });
+  await writeName(d, v).catch(() => log("บันทึกชื่อลงเครื่องไม่ได้ (ชื่อยังจำไว้ในคอมนี้)"));
   log(v ? `ตั้งชื่อ ${d.serial} ว่า "${v}"` : `ลบชื่อของ ${d.serial}`);
   renderAll(); renderRegistry();
 }
@@ -328,6 +342,7 @@ async function addDevice(d) {
   if (old && !old.closed) { await d.close(); return old; }
   d.info.model = (await d.sh("getprop ro.product.model")).out.trim();
   await probeCaps(d).catch(() => {});
+  await syncName(d).catch(() => {});
   d.info.profile = st.profileFor(d.info.model);
   await learnProfile(d).catch(() => {});
   devices.set(d.serial, d);

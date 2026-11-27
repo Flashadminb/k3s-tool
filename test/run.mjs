@@ -144,6 +144,9 @@ await page.fill("#dlgInput", "Hub-07"); await page.click("#dlgOk");
 ok((await page.textContent(".satw")).includes("Hub-07") && (await page.textContent("#model")).includes("Hub-07"), "name shown in the circle and the card");
 ok(await page.evaluate(() => JSON.parse(localStorage.getItem("k3s-tool:names"))["TESTSERIAL001"] === "Hub-07"), "name remembered for this serial");
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("screen_brightness 255"), "naming flashes the device being named");
+ok(readFileSync(join(TMP, "idata-tools-name.txt"), "utf8").trim() === "Hub-07", "name also written on the device (other computers read it)");
+// the fake devices share one /data/local/tmp: drop the file so other test devices are not named Hub-07
+rmSync(join(TMP, "idata-tools-name.txt"), { force: true });
 await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
 await page.fill("#dlgInput", "สำรองคลังสินค้า 12"); await page.click("#dlgOk");
 await page.waitForTimeout(200);
@@ -350,7 +353,10 @@ ok(calls0.includes("input text ab%scd") && calls0.includes("input keyevent 66"),
 
 console.log("second device + group");
 await page.click("button[data-tab=data]");
+writeFileSync(join(TMP, "idata-tools-name.txt"), "Desk-2\n");   // named earlier on another computer
 await click("connect"); await idle();
+rmSync(join(TMP, "idata-tools-name.txt"), { force: true });
+ok(await page.evaluate(() => JSON.parse(localStorage.getItem("k3s-tool:names") || "{}")["TESTSERIAL002"] === "Desk-2"), "name kept on the device shows up on a computer that never named it");
 ok((await page.$$("#devices .satw")).length === 2, "2 satellites");
 // picking a device that is already connected in the browser popup: no second "Allow", it just gets selected
 await page.evaluate(() => { window.__pick = "TESTSERIAL001"; window.__authDelay = 3000; });
@@ -410,6 +416,7 @@ ok(await page.isVisible(".sat-tag.lock"), "setup: device field-locked");
 await page.click("button[data-tab=apps]"); await click("lockRelease"); await idle();
 
 console.log("old Android 6 device (95W Series)");
+rmSync(join(TMP, "idata-tools-name.txt"), { force: true });
 for (let i = 0; i < 7; i++) put(join(SD, "imagePath/success", `old${i}.jpg`), 40);
 put(join(SD, "imagePath/success/sub/old-in-folder.jpg"), 40);
 await page.click("button[data-tab=data]");

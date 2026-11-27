@@ -330,6 +330,17 @@ ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("android.settings.WIFI
 await page.click('#help button:has-text("พิมพ์รหัส")'); await idle();
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("input text abcdefgh"), "saved password typed into the device");
 
+console.log("one-click setup after a reset");
+await page.evaluate(() => { document.getElementById("help").hidden = true; });
+await page.click("button[data-tab=device]");
+await click("setupAll"); await accept();
+await page.waitForFunction(() => document.getElementById("log").textContent.includes("ตั้งเครื่องใหม่เสร็จ"), null, { timeout: 30000 }).catch(() => {}); await idle();
+const su = readFileSync(join(ROOT, "calls.log"), "utf8");
+ok((await page.textContent("#log")).includes("ตั้งเครื่องใหม่เสร็จ"), "one-click setup finished");
+ok(su.split("screen_off_timeout").length > 2 && su.includes("connect-network OldAndroid"), "setup: standard settings + first saved Wi-Fi");
+ok(await page.isVisible(".sat-tag.lock"), "setup: device field-locked");
+await page.click("button[data-tab=apps]"); await click("lockRelease"); await idle();
+
 console.log("old Android 6 device (95W Series)");
 for (let i = 0; i < 7; i++) put(join(SD, "imagePath/success", `old${i}.jpg`), 40);
 put(join(SD, "imagePath/success/sub/old-in-folder.jpg"), 40);

@@ -42,7 +42,7 @@ const HELP = {
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
-  LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ถ้า Flash Kit หายไปด้วย: กดอัปเดต Flash Kit ที่วงกลางเพื่อลงใหม่", "ล็อกใหม่: แท็บ แอป > โหมดออกงาน > ล็อกออกงาน"]],
+  LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ตั้งกลับให้ครบในคลิกเดียว: แท็บ เครื่อง > ตั้งเครื่องใหม่ทั้งหมด (Flash Kit, ตั้งค่า, Wi-Fi, ล็อก)"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
 
@@ -1495,6 +1495,54 @@ function wifiConnect(w) {
     if (fails.length) throw new Error("WIFI: " + fails.join(" / "));
   }, "WIFI");
 }
+/*
+ * One click for a device that was reset (or is new): Flash Kit, standard settings, the first saved Wi-Fi, field lock.
+ * Flash Kit goes first on its own (it needs the download); the rest runs on every device side by side.
+ */
+async function setupAll() {
+  const ts = targets();
+  const w = st.wifiList()[0];
+  const need = ts.filter((d) => ["missing", "old"].includes(flashState(d)));
+  const steps = [
+    need.length ? `1. ลง/อัปเดต Flash Kit (${need.length} เครื่อง)` : "1. Flash Kit ล่าสุดแล้ว ข้าม",
+    "2. ตั้งค่ามาตรฐาน (ตามแท็บ ตั้งค่า)",
+    w ? `3. ต่อ Wi-Fi ${w.ssid}` : "3. ข้าม Wi-Fi (ยังไม่ได้บันทึก Wi-Fi ในแท็บ Wi-Fi)",
+    "4. ล็อกออกงาน (ตามที่ติ๊กไว้ในแท็บ แอป)"
+  ];
+  if (!(await confirmBox(`ตั้งเครื่องใหม่ ${ts.length > 1 ? ts.length + " เครื่อง" : label(ts[0])}:\n${steps.join("\n")}`))) return;
+  if (need.length) await flashInstall(need, true);
+  await run("ตั้งเครื่องใหม่", async () => {
+    const s = readStdForm(), fails = [], manual = [];
+    await Promise.all(ts.map(async (d) => {
+      try {
+        setStatus(d, { title: "ตั้งค่ามาตรฐาน", big: "2/4", ring: 50 });
+        const f = await applyStd(d, s);
+        if (f.length) fails.push(`${label(d)} ตั้งค่า: ${f.join(", ")}`);
+        if (w) {
+          setStatus(d, { title: "ต่อ Wi-Fi", big: "3/4", ring: 75 });
+          await d.sh("svc wifi enable");
+          const r = hasCap(d, "cmd") ? await d.sh(`cmd wifi connect-network ${q(w.ssid)} ${w.sec}${w.sec === "open" ? "" : " " + q(w.pass)}`) : { out: "", err: "no cmd", code: 1 };
+          const t = (r.out + r.err).trim();
+          if (!hasCap(d, "cmd") || /does not have access to wifi commands|checkRootPermission|not found|can't find service/i.test(t)) manual.push(d);
+          else if (r.code || /exception|denied|not allowed|error|unknown command/i.test(t)) fails.push(`${label(d)} Wi-Fi: ${t.split("\n")[0].slice(0, 120)}`);
+        }
+        setStatus(d, { title: "ล็อกออกงาน", big: "4/4", ring: 90 });
+        const lf = await lockDevice(d);
+        if (lf.length) fails.push(`${label(d)} ล็อก: ${lf.join(", ")}`);
+        setStatus(d, { title: "ตั้งเครื่องเสร็จ", big: "✓", ring: 100, done: true });
+      } catch (e) { fails.push(`${label(d)}: ${e.message}`); setStatus(d, { title: "ตั้งไม่ครบ", err: true, done: true }); }
+    }));
+    renderAll();
+    if (manual.length) {
+      // older Android: Wi-Fi only from the device screen; open it there and offer to type the password
+      for (const d of manual) await d.sh("input keyevent 224; am start -a android.settings.WIFI_SETTINGS");
+      showWifiManual(manual, w);
+    }
+    log(`ตั้งเครื่องใหม่เสร็จ ${ts.length} เครื่อง${manual.length ? " · " + manual.length + " เครื่องต้องแตะ Wi-Fi เองที่เครื่อง" : ""}`);
+    if (fails.length) log("บางขั้นไม่สำเร็จ: " + fails.join(" / "));
+  });
+}
+
 /** Semi-automatic Wi-Fi for older Android: the Wi-Fi screen is open on the device; one button types the password */
 function showWifiManual(ds, w) {
   showHelp("WIFI_MANUAL", ds.map((d) => label(d) + (d.info.android ? " · Android " + d.info.android : "")).join(", "), true);
@@ -1643,6 +1691,7 @@ const actions = {
     renderAll();
     if (fails.length) log("บางแอปปิดไม่ได้ (ระบบบริษัทหรือระบบเครื่องกันไว้): " + fails.join(" / "));
   }),
+  setupAll: () => setupAll(),
   lockRelease: () => run("ปลดล็อก", async () => {
     const ts = targets();
     await Promise.all(ts.map((d) => unlockDevice(d)));
@@ -1939,11 +1988,11 @@ async function flashViaDownloads(url) {
   throw new Error("รอไฟล์โหลดเกิน 5 นาที");
 }
 
-async function flashInstall(list) {
+async function flashInstall(list, quiet) {
   list = list.filter((d) => d && !d.closed);
   if (!list.length) return;
   const cfg = st.flashCfg();
-  if (!(await confirmBox(`ติดตั้ง / อัปเดต Flash Kit ให้ ${list.length} เครื่อง:\n${list.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ยังไม่มี)" : flashState(d) === "old" ? " (เก่า)" : "")).join("\n")}\n\nเว็บจะโหลดไฟล์ล่าสุดจากลิงก์ แล้วติดตั้งให้ทุกเครื่องพร้อมกัน`))) return;
+  if (!quiet && !(await confirmBox(`ติดตั้ง / อัปเดต Flash Kit ให้ ${list.length} เครื่อง:\n${list.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ยังไม่มี)" : flashState(d) === "old" ? " (เก่า)" : "")).join("\n")}\n\nเว็บจะโหลดไฟล์ล่าสุดจากลิงก์ แล้วติดตั้งให้ทุกเครื่องพร้อมกัน`))) return;
   list.forEach((d) => setStatus(d, { title: "รอไฟล์ Flash Kit", big: "…" }));
   let file = null;
   try {

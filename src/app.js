@@ -217,14 +217,22 @@ function promptBox(text, value, placeholder) {
   });
 }
 /** Make a device easy to spot on the desk: screen flashes bright/dark 5 times and it vibrates, brightness restored */
+// It stops by itself after a few seconds; Stop (or an error) part way still puts the brightness back
 async function signalDevice(d) {
   await d.sh("input keyevent 224");
   setStatus(d, { title: "ส่งสัญญาณ", big: "📳" });
-  await d.sh(["m=$(settings get system screen_brightness_mode); b=$(settings get system screen_brightness)",
-    "settings put system screen_brightness_mode 0",
-    "for i in 1 2 3 4 5; do settings put system screen_brightness 255; sleep 0.35 2>/dev/null || sleep 1; settings put system screen_brightness 3; sleep 0.35 2>/dev/null || sleep 1; done",
-    "settings put system screen_brightness $b; settings put system screen_brightness_mode $m",
-    "(cmd vibrator vibrate 1500 idata 2>/dev/null || cmd vibrator_manager synced oneshot 1500 2>/dev/null) >/dev/null 2>&1; true"].join("; "));
+  const was = (await d.sh("settings get system screen_brightness_mode; settings get system screen_brightness")).out.trim().split(/\s+/);
+  const mode = /^\d+$/.test(was[0] || "") ? was[0] : "1", bright = /^\d+$/.test(was[1] || "") ? was[1] : "150";
+  const restore = `settings put system screen_brightness ${bright}; settings put system screen_brightness_mode ${mode}`;
+  try {
+    await d.sh(["(cmd vibrator vibrate 1500 idata 2>/dev/null || cmd vibrator_manager synced oneshot 1500 2>/dev/null) >/dev/null 2>&1",
+      "settings put system screen_brightness_mode 0",
+      "for i in 1 2 3 4 5; do settings put system screen_brightness 255; sleep 0.35 2>/dev/null || sleep 1; settings put system screen_brightness 3; sleep 0.35 2>/dev/null || sleep 1; done",
+      restore].join("; "));
+  } finally {
+    const st0 = d.stopped; d.stopped = false;
+    try { await d.sh(restore); } catch (e) {} finally { d.stopped = st0; }
+  }
   d.info.screenOn = true;
   setStatus(d, { title: "เครื่องนี้", big: "👋", done: true });
 }
@@ -1918,8 +1926,9 @@ const actions = {
     renderAll();
   }),
   nameDev: () => { const d = cardDev && !cardDev.closed ? cardDev : devices.get(selected); if (d) nameDevice(d); },
-  findDev: () => run("หาเครื่อง", async () => {
+  findDev: () => run("หาเครื่อง", async (job) => {
     const d = cardDev && !cardDev.closed ? cardDev : cur();
+    if (!job.devs.includes(d)) { d.stopped = false; job.devs.push(d); }
     const id = d.serial.slice(-6);
     await d.sh("input keyevent 224");
     await signalDevice(d);

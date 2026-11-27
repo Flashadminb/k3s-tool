@@ -1733,6 +1733,14 @@ const actions = {
     for (const d of ts) { d.rebooting = true; await d.reboot().catch(() => {}); }
     log("สั่งรีสตาร์ทแล้ว รอเครื่องเปิดเสร็จ (1-2 นาที) แล้วปลดล็อกหน้าจอ เว็บจะเชื่อมต่อให้เอง");
   }),
+  // One device at a time, on purpose: the Recovery menu is where a device can be wiped
+  recovery: () => run("เข้าเมนู Recovery", async () => {
+    const d = cur();
+    if (!(await confirmBox(`เปิดเมนู Recovery ที่ ${label(d)}?\n\nเครื่องจะดับแล้วขึ้นเมนูตัวหนังสือ เว็บจะหลุดการเชื่อมต่อ (ปกติ)\nในเมนู: ปุ่มเสียง ขึ้น/ลง = เลื่อน · ปุ่ม Power = เลือก\n• Reboot system now = เปิดเครื่องตามปกติ ไม่มีอะไรหาย\n• Wipe data/factory reset = ล้างเครื่อง ทุกอย่างหาย (รูป แอป Flash Kit บัญชี การล็อก)\n\nถ้าจะล้างจริง: สำรองรูป fail ก่อน และต้องรู้บัญชี Google ของเครื่อง`))) return false;
+    d.rebooting = true;
+    await d.rebootRecovery().catch(() => {});
+    log(`${label(d)}: สั่งเข้าเมนู Recovery แล้ว ใช้ปุ่มเสียงเลื่อน ปุ่ม Power เลือก`);
+  }),
   logcat: () => run("บันทึก log", async () => {
     const d = cur();
     const r = await d.sh("logcat -d -v time -t 20000");

@@ -15,6 +15,7 @@ export class Device {
   async pull(path) { return new Uint8Array(await window.__pull(this.serial, path)); }
   async pullMany(paths, cb) { for (let i = 0; i < paths.length; i++) await cb(paths[i], await this.pull(paths[i]), i); }
   async reboot() { this._bye(); }
+  async rebootRecovery() { window.__recovery = this.serial; this._bye(); }
   async close() { this._bye(); }
 }
 let n = 0;

@@ -108,6 +108,7 @@ export class Device {
   }
 
   async reboot() { await this.adb.power.reboot(); }
+  async rebootRecovery() { await this.adb.power.recovery(); }
   async close() { try { await this.adb.close(); } catch (e) {} this.closed = true; }
 }
 

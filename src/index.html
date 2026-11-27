@@ -358,13 +358,13 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
       <div id="nodev" class="stagenote glass">
         <div class="part">เสียบสาย USB แล้วกดวงกลมตรงกลาง</div>
         <div class="step"><div class="n">1</div><div class="t">เสียบสายระหว่างเครื่องกับคอม<small>เครื่องที่เคยเชื่อมแล้ว เว็บจะต่อให้เอง</small></div></div>
-        <div class="step"><div class="n">2</div><div class="t">เครื่องใหม่ / เพิ่งรีเซ็ต ต้องเปิด USB debugging ก่อน<small><a href="#" data-goto="guide">ดูวิธีในเมนู คู่มือ</a></small></div></div>
+        <div class="step"><div class="n">2</div><div class="t">เครื่องใหม่ / เพิ่งรีเซ็ต ต้องเปิด USB debugging ก่อน<small><a href="#" data-goto="guide">ดูวิธีในเมนู คู่มือ</a> · กดแล้วไม่เห็นชื่อเครื่อง ดูหัวข้อ "ไม่เห็นชื่อเครื่อง" ในคู่มือ</small></div></div>
       </div>
 
       <div id="authWait" class="stagenote glass" hidden>
         <div class="part">ดูที่หน้าจอเครื่อง</div>
         <div class="step"><div class="n">1</div><div class="t">ปลดล็อกหน้าจอเครื่อง</div></div>
-        <div class="step"><div class="n">2</div><div class="t">ติ๊ก <b>อนุญาตจากคอมพิวเตอร์นี้เสมอ</b> แล้วกด <b>อนุญาต</b></div></div>
+        <div class="step"><div class="n">2</div><div class="t">ติ๊ก <b>Always allow from this computer</b> (อนุญาตเสมอ) แล้วกด <b>Allow</b> (อนุญาต)</div></div>
         <div id="authMore" class="warnbox" hidden>ยังไม่เห็นหน้าต่างที่เครื่อง? ถอดสาย รอ 3 วินาที เสียบใหม่ แล้วกดวงกลมอีกครั้ง</div>
       </div>
     </section>
@@ -549,19 +549,33 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
   </section>
 <section class="tab" id="tab-guide" hidden>
 <div class="warnbox">ทำครั้งเดียวต่อเครื่อง · ถ้ารีเซ็ตเครื่อง ต้องทำใหม่</div>
-<div class="card"><div class="part">ส่วน A · ที่เครื่อง: เปิดโหมดนักพัฒนา</div><div class="step"><div class="n">1</div><div class="t">เปิด <b>การตั้งค่า</b> (Settings)</div></div>
-<div class="step"><div class="n">2</div><div class="t">แตะ <b>เกี่ยวกับโทรศัพท์</b> (About phone)<small>อยู่ล่างสุด</small></div></div>
-<div class="step"><div class="n">3</div><div class="t">แตะ <b>หมายเลขบิวด์</b> (Build number) <b>7 ครั้ง</b> ติดกัน<small>หาไม่เจอ: พิมพ์ "บิวด์" ในช่องค้นหาของการตั้งค่า</small></div></div>
-<div class="step"><div class="n">4</div><div class="t">ขึ้น <b>"คุณเป็นนักพัฒนาแล้ว"</b> = สำเร็จ </div></div></div>
-<div class="card"><div class="part">ส่วน B · ที่เครื่อง: เปิด USB debugging</div><div class="step"><div class="n">1</div><div class="t">การตั้งค่า &gt; <b>ระบบ</b> &gt; <b>ตัวเลือกสำหรับนักพัฒนา</b><small>หาไม่เจอ: พิมพ์ "นักพัฒนา" ในช่องค้นหา</small></div></div>
-<div class="step"><div class="n">2</div><div class="t">เปิดสวิตช์ <b>การแก้ไขข้อบกพร่อง USB</b> (USB debugging) แล้วกด <b>ตกลง</b></div></div><div class="warnbox">ไม่มีเมนูนี้ หรือสวิตช์เป็นสีเทา = บริษัทล็อกไว้ ให้แจ้งไอที Flash</div></div>
+<div class="mut" style="margin-bottom:10px">ชื่อเมนูเขียนเป็น <b>ภาษาอังกฤษ</b> ตามที่เห็นในเครื่อง (ภาษาไทยในวงเล็บคือความหมาย)</div>
+<div class="card"><div class="part">ส่วน A · ที่เครื่อง: เปิด Developer options (โหมดนักพัฒนา)</div><div class="step"><div class="n">1</div><div class="t">เปิด <b>Settings</b> (การตั้งค่า)</div></div>
+<div class="step"><div class="n">2</div><div class="t">แตะ <b>About phone</b> (เกี่ยวกับโทรศัพท์)<small>อยู่ล่างสุดของ Settings · บางรุ่นอยู่ใน System &gt; About phone</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">แตะ <b>Build number</b> (หมายเลขบิวด์) <b>7 ครั้ง</b> ติดกัน<small>หาไม่เจอ: พิมพ์ "build" ในช่อง Search (ค้นหา) บนสุดของ Settings · ถ้าถามรหัส ให้ใส่รหัสปลดล็อกจอ</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ขึ้น <b>"You are now a developer!"</b> (คุณเป็นนักพัฒนาแล้ว) = สำเร็จ</div></div></div>
+<div class="card"><div class="part">ส่วน B · ที่เครื่อง: เปิด USB debugging</div><div class="step"><div class="n">1</div><div class="t"><b>Settings</b> &gt; <b>System</b> (ระบบ) &gt; <b>Developer options</b> (ตัวเลือกสำหรับนักพัฒนา)<small>หาไม่เจอ: พิมพ์ "developer" ในช่อง Search</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">เปิดสวิตช์ <b>USB debugging</b> (การแก้ไขข้อบกพร่อง USB) แล้วกด <b>OK</b> (ตกลง)</div></div>
+<div class="step"><div class="n">3</div><div class="t">(แนะนำ) เปิด <b>Disable adb authorization timeout</b> (ไม่ต้องอนุญาตใหม่ทุก 7 วัน)<small>อยู่หน้าเดียวกัน ถ้าไม่มีก็ข้ามได้</small></div></div>
+<div class="warnbox">ไม่มีเมนูนี้ หรือสวิตช์เป็นสีเทา = บริษัทล็อกไว้ ให้แจ้งไอที Flash</div></div>
 <div class="card"><div class="part">ส่วน C · ที่คอม: เชื่อมต่อ</div><div class="step"><div class="n">1</div><div class="t">เสียบสาย USB · ปลดล็อกหน้าจอเครื่อง</div></div>
-<div class="step"><div class="n">2</div><div class="t">กดปุ่มสีฟ้า <b>+ เชื่อมต่อเครื่อง</b> ด้านบน</div></div>
-<div class="step"><div class="n">3</div><div class="t">คลิกชื่อเครื่อง แล้วกด <b>เชื่อมต่อ</b></div></div>
-<div class="step"><div class="n">4</div><div class="t">ที่เครื่อง: ติ๊ก <b>อนุญาตเสมอ</b> แล้วกด <b>อนุญาต</b> </div></div><div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง</div></div>
-<details><summary>ติดปัญหา? กดดูวิธีแก้</summary>
-    <h3>ไม่เห็นชื่อเครื่องในหน้าต่าง</h3>
-    <ol><li>เช็กว่าเปิด USB debugging แล้ว (ส่วน B)</li><li>เปลี่ยนสาย หรือเปลี่ยนช่อง USB</li><li>ถอดสาย รอ 3 วินาที เสียบใหม่</li></ol>
+<div class="step"><div class="n">2</div><div class="t">กดวงกลม <b>เชื่อมต่อเครื่อง</b> กลางจอ</div></div>
+<div class="step"><div class="n">3</div><div class="t">หน้าต่างเล็กของ Chrome เด้งขึ้น: คลิกชื่อเครื่อง แล้วกด <b>Connect</b> (เชื่อมต่อ)</div></div>
+<div class="step"><div class="n">4</div><div class="t">ที่เครื่องขึ้น <b>Allow USB debugging?</b> (อนุญาตไหม): ติ๊ก <b>Always allow from this computer</b> (อนุญาตจากคอมนี้เสมอ) แล้วกด <b>Allow</b> (อนุญาต)</div></div><div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง</div></div>
+<div class="card" id="notFound"><div class="part">กดเชื่อมต่อแล้ว ไม่เห็นชื่อเครื่องในหน้าต่าง</div>
+<div class="step"><div class="n">1</div><div class="t">ดูที่ดาวกลางจอก่อน<small>ถ้าเครื่องขึ้นเป็นดาวอยู่แล้ว แปลว่าต่ออยู่แล้ว ไม่ต้องกดซ้ำ (Chrome จะไม่แสดงเครื่องที่เว็บนี้ใช้อยู่)</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">รูดแถบแจ้งเตือนที่เครื่องลงมา ต้องเห็น <b>USB debugging connected</b> (เชื่อมต่อการแก้ไขข้อบกพร่อง USB แล้ว)<small>ถ้าไม่เห็น: USB debugging ปิดอยู่ (เช่นเพิ่งรีเซ็ต) ให้ทำส่วน B ใหม่ หรือสายเสีย/เป็นสายชาร์จอย่างเดียว ให้เปลี่ยนสาย</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">ในแถบแจ้งเตือน แตะข้อความ USB แล้วเลือก <b>File transfer</b> (โอนไฟล์)<small>บางเครื่องโหมด Charging only (ชาร์จอย่างเดียว) จะไม่ให้คอมเห็นเครื่อง</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ปิดแท็บอื่นที่เปิดเว็บนี้ซ้ำ และปิดโปรแกรมอื่นที่ใช้มือถือ แล้วถอดสาย รอ 3 วินาที เสียบใหม่</div></div>
+<div class="step"><div class="n">5</div><div class="t">ยังไม่เจอ: เช็กด้วย adb ตามหัวข้อ <b>เช็กด้วย adb</b> ด้านล่าง</div></div></div>
+<details><summary>ติดปัญหาอื่น? กดดูวิธีแก้</summary>
+    <h3>เช็กด้วย adb (ใช้บอกว่าปัญหาอยู่ที่เครื่อง หรือที่เบราว์เซอร์)</h3>
+    <ol><li>กดปุ่ม <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>
+    <li>พิมพ์ <code>cd C:\Users\Flash\Desktop\Best\platform-tools</code> กด <span class="kbd">Enter</span></li>
+    <li>พิมพ์ <code>adb devices</code> กด <span class="kbd">Enter</span></li>
+    <li>ขึ้นรหัสเครื่องตามด้วย <code>device</code> = เครื่องปกติ ให้พิมพ์ <code>adb kill-server</code> กด <span class="kbd">Enter</span> แล้วกลับมากดเชื่อมต่อในเว็บ</li>
+    <li>ขึ้น <code>unauthorized</code> = ยังไม่ได้กด Allow ที่เครื่อง</li>
+    <li>ไม่ขึ้นอะไรเลย = ปัญหาที่สาย, ช่อง USB หรือ USB debugging ปิดอยู่</li></ol>
     <h3>ขึ้นว่า "เครื่องถูกใช้อยู่"</h3>
     <ol><li>กดปุ่ม <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>
     <li>พิมพ์ <code>cd C:\Users\Flash\Desktop\Best\platform-tools</code> กด <span class="kbd">Enter</span></li>
@@ -569,9 +583,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
     <li>ปิดแท็บเว็บนี้ที่เปิดซ้ำ แล้วเสียบสายใหม่</li></ol>
     <a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">โหลด Platform-Tools</a>
     <h3>ไม่มีหน้าต่าง "อนุญาต" ที่เครื่อง</h3>
-    <ol><li>ปลดล็อกหน้าจอเครื่อง แล้วถอดสายเสียบใหม่</li><li>ถ้าเคยกดปฏิเสธ: ตัวเลือกสำหรับนักพัฒนา &gt; <b>เพิกถอนการให้สิทธิ์การแก้ไขข้อบกพร่อง USB</b></li></ol>
-    <h3>ไม่อยากกดอนุญาตใหม่ทุก 7 วัน</h3>
-    <div>ตัวเลือกสำหรับนักพัฒนา &gt; เปิด <b>ปิดการหมดเวลาการให้สิทธิ์ adb</b> (ถ้ามี)</div>
+    <ol><li>ปลดล็อกหน้าจอเครื่อง แล้วถอดสายเสียบใหม่</li><li>ถ้าเคยกด Deny (ปฏิเสธ): <b>Developer options</b> &gt; <b>Revoke USB debugging authorizations</b> (ยกเลิกการอนุญาตทั้งหมด) แล้วลองใหม่</li></ol>
   </details>
 </section>
 

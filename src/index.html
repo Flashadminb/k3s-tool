@@ -662,7 +662,7 @@ body:not(.role-admin) .owner-only{display:none!important}
     <div class="card">
       <h2>พื้นหลัง</h2>
       <div class="mut">ถ้าคอมช้าหรือกระตุก ให้เลือก ประหยัด หรือ ภาพนิ่ง</div>
-      <label style="margin-top:10px">ภาพพื้นหลัง <select id="fxMode"><option value="auto">อัตโนมัติ (แนะนำ)</option><option value="full">เคลื่อนไหวเต็มที่</option><option value="eco">ประหยัด</option><option value="off">ภาพนิ่ง</option></select></label>
+      <label style="margin-top:10px">ภาพพื้นหลัง <select id="fxMode"><option value="full">เคลื่อนไหวเต็มที่ (เริ่มต้น)</option><option value="auto">อัตโนมัติ (ลดเองถ้าคอมช้า)</option><option value="eco">ประหยัด</option><option value="off">ภาพนิ่ง</option></select></label>
     </div>
     <div class="card">
       <h2>รุ่นเครื่อง (ที่เก็บรูป)</h2>
@@ -848,7 +848,7 @@ body:not(.role-admin) .owner-only{display:none!important}
     x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(bg, 0, 0);
   }
   function setMode(m, auto) {
-    mode = still ? "off" : m; fpsCap = mode === "eco" ? 15 : 30; frames = slow = 0;
+    mode = still && window.__fxAuto ? "off" : m; fpsCap = mode === "eco" ? 15 : 30; frames = slow = 0;
     document.body.classList.toggle("eco", mode !== "full");
     build();
     if (mode !== "off" && !raf) raf = requestAnimationFrame(frame);
@@ -861,7 +861,12 @@ body:not(.role-admin) .owner-only{display:none!important}
   };
   let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(build, 200); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && mode !== "off" && !raf) raf = requestAnimationFrame(frame); });
-  let pref = "auto"; try { pref = JSON.parse(localStorage.getItem("k3s-tool:fx") || '"auto"'); } catch (e) {}
+  // Moving galaxy is the default. A page that had the old default ("auto") saved moves to "full" once.
+  let pref = "full"; try {
+    pref = JSON.parse(localStorage.getItem("k3s-tool:fx") || '"full"');
+    if (pref === "auto" && !localStorage.getItem("k3s-tool:fxV2")) { pref = "full"; localStorage.setItem("k3s-tool:fx", '"full"'); }
+    localStorage.setItem("k3s-tool:fxV2", "1");
+  } catch (e) {}
   window.__fx(pref);
 })();
 </script>

@@ -103,6 +103,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, acc
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+// floating circles never hold still for the click checks: tests run with the still background
+await page.addInitScript(() => { try { localStorage.setItem("k3s-tool:fx", '"eco"'); localStorage.setItem("k3s-tool:fxV2", "1"); } catch (e) {} });
 await page.exposeFunction("__sh", shell);
 await page.exposeFunction("__push", (s, p, bytes) => { writeFileSync(map(p), Buffer.from(bytes)); });
 await page.exposeFunction("__pull", (s, p) => Array.from(readFileSync(map(p))));

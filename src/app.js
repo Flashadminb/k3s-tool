@@ -2353,7 +2353,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   [["typeShow", "typeText"], ["wfShow", "wfPass"], ["gShow", "gPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
   if ($("typeText")) $("typeText").addEventListener("keydown", (e) => { if (e.key === "Enter") actions.typeSend(); });
   if ($("fxMode")) {
-    $("fxMode").value = st.load("fx", "auto");
+    $("fxMode").value = st.load("fx", "full");
     $("fxMode").addEventListener("change", (e) => { st.save("fx", e.target.value); if (window.__fx) window.__fx(e.target.value); });
   } renderProfTable(); renderRegistry(); renderHistory(); renderAll();
   if (!st.load("everConnected", false)) showTab("guide");

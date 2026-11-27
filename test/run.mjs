@@ -34,6 +34,7 @@ stub("df", `if [ "$SERIAL" = TESTSERIAL003 ]; then [ "$1" = -k ] && { echo "df: 
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
  package) if [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
+ account) [ "$(cat "${join(ROOT, "g-")}$SERIAL" 2>/dev/null)" = done ] && echo "  Account {name=hub@example.com, type=com.google}";;
  device_policy) echo "  Device Owner: admin=ComponentInfo{com.mdm.agent/com.mdm.agent.Admin} package=com.mdm.agent";;
  power) [ -f "${join(ROOT, "awake-")}$SERIAL" ] && echo "  mWakefulness=Awake" || echo "  mWakefulness=Asleep";;
 esac`);
@@ -69,7 +70,18 @@ fi`);
 stub("screencap", `cp "${join(ROOT, "shot.png")}" "$2"`);
 stub("screenrecord", `echo fake > "$3"`);
 for (const c of ["am", "monkey", "settings"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
-stub("input", `echo "input $*" >> "${join(ROOT, "calls.log")}"; [ "$2" = 224 ] && touch "${join(ROOT, "awake-")}$SERIAL"; true`);
+stub("input", `echo "input $*" >> "${join(ROOT, "calls.log")}"; [ "$2" = 224 ] && touch "${join(ROOT, "awake-")}$SERIAL"
+G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null)
+case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G";; esac; true`);
+// Google sign-in screens as uiautomator sees them: email field, then password field, then "I agree"
+stub("uiautomator", `G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null || echo email)
+case "$gs" in
+ email) n='<node text="" resource-id="identifierId" class="android.widget.EditText" password="false" bounds="[40,300][680,380]" />';;
+ pass) n='<node text="" resource-id="password" class="android.widget.EditText" password="true" bounds="[40,300][680,380]" />';;
+ agree) n='<node text="Google Terms" class="android.view.View" bounds="[0,100][720,200]" /><node text="I agree" class="android.widget.Button" clickable="true" bounds="[100,800][300,900]" />';;
+ *) n='<node text="Accounts" class="android.widget.TextView" bounds="[0,0][720,100]" />';;
+esac
+printf '<?xml version="1.0"?><hierarchy rotation="0">%s</hierarchy>' "$n" > "$2"`);
 stub("content", `echo "Row: 0 _id=42"`);
 stub("logcat", `echo "11-27 10:00:00.000 I/Test: hello"`);
 // 1x1 png
@@ -288,6 +300,17 @@ console.log("add Google account screen");
 await page.click("button[data-tab=device]");
 await click("addGoogle"); await idle();
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("ADD_ACCOUNT_SETTINGS"), "add-account screen opened on the device");
+
+console.log("Google account typed in automatically, then field lock");
+await page.fill("#gEmail", "hub@example.com"); await page.fill("#gPass", "Secret pass1");
+await click("googleSetup"); await accept();
+await page.waitForFunction(() => /บัญชี Google ใส่สำเร็จ|ใส่บัญชี Google ล้มเหลว/.test(document.getElementById("log").textContent), null, { timeout: 60000 }).catch(() => {}); await idle();
+const gl = readFileSync(join(ROOT, "calls.log"), "utf8");
+ok((await page.textContent("#log")).includes("บัญชี Google ใส่สำเร็จ"), "Google account added through the sign-in screens");
+ok(gl.includes("input text hub@example.com") && gl.includes("input text Secret%spass1") && gl.includes("input tap 200 850"), "email, password typed and I agree tapped");
+ok(await page.isVisible(".sat-tag.lock"), "device locked after the account was added");
+await page.click("button[data-tab=apps]"); await click("lockRelease"); await idle();
+await page.click("button[data-tab=device]");
 
 console.log("type text into the device (iLauncher password etc.)");
 await page.click("button[data-tab=device]");

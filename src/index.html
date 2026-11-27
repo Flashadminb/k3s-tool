@@ -508,6 +508,16 @@ body:not(.role-admin) .owner-only{display:none!important}
       </div>
 
       <div class="card">
+        <h2>บัญชี Google กันรีเซ็ต (ใส่ให้อัตโนมัติ)</h2>
+        <div class="mut">เว็บเปิดหน้าล็อกอิน Google ที่เครื่อง แล้วพิมพ์อีเมล รหัส และกดปุ่มให้เอง (ทุกเครื่องที่เลือกพร้อมกัน) จากนั้นล็อกออกงานต่อ · เครื่องต้องต่อ Wi-Fi อยู่ · รหัสไม่ถูกบันทึกไว้ที่ไหน</div>
+        <div style="display:grid;gap:8px;margin-top:10px">
+          <input type="email" id="gEmail" placeholder="อีเมล Google ของ hub" autocomplete="off">
+          <div class="row"><input type="password" id="gPass" placeholder="รหัสอีเมล" autocomplete="off" style="flex:1;min-width:160px"><label><input type="checkbox" id="gShow"> แสดง</label></div>
+        </div>
+        <div class="row" style="margin-top:8px;justify-content:space-between"><label><input type="checkbox" id="gLock" checked> ล็อกออกงานต่อเลย</label><button class="blue" data-act="googleSetup">ใส่บัญชี Google</button></div>
+      </div>
+
+      <div class="card">
         <h2>พิมพ์รหัส / ข้อความเข้าเครื่อง</h2>
         <div class="mut">พิมพ์ลงช่องที่เปิดอยู่บนหน้าจอเครื่อง ทีละหลายเครื่อง: เปิดช่องให้ขึ้นก่อน แล้วพิมพ์ที่นี่ (ภาษาอังกฤษ/ตัวเลข) · รหัสไม่ถูกบันทึกไว้ที่ไหน · ใช้กับหน้า iLauncher ไม่ได้ ถ้า iLauncher ตัดการเชื่อมต่อ USB ตอนล็อกเครื่อง</div>
         <div class="row" style="margin-top:10px"><input type="password" id="typeText" autocomplete="off" placeholder="รหัส หรือข้อความ" style="flex:1;min-width:180px"><label><input type="checkbox" id="typeShow"> แสดง</label></div>

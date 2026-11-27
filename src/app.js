@@ -44,6 +44,7 @@ const HELP = {
   FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ตั้งกลับให้ครบในคลิกเดียว: แท็บ เครื่อง > ตั้งเครื่องใหม่ทั้งหมด (Flash Kit, ตั้งค่า, Wi-Fi, ล็อก)"]],
+  GOOGLE: ["ใส่บัญชี Google ไม่สำเร็จ", ["ดูหน้าจอเครื่อง: ถ้าค้างที่หน้าล็อกอิน ทำต่อเองที่เครื่องได้เลย", "เช็กว่าเครื่องต่อ Wi-Fi อยู่ และอีเมล/รหัสถูก", "ถ้าบัญชีเปิดยืนยัน 2 ขั้นตอน: กดยืนยันที่มือถือ hub แล้วลองใหม่", "เครื่องที่ไม่มีบริการ Google จะเปิดหน้าล็อกอินไม่ได้"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
 
@@ -1554,6 +1555,97 @@ async function setupAll() {
   });
 }
 
+/*
+ * Google account on the device (for FRP: a reset from the buttons then asks for this account).
+ * Android only adds a Google account through its own sign-in screens, so the page drives them: it reads the
+ * screen with `uiautomator dump`, types the email and password into the fields, and taps Next / I agree.
+ * Anything unexpected (2-step check, a new screen) is left for a person and shown in the circle.
+ */
+const G_NEXT = /^(next|ถัดไป|i agree|ยอมรับ|accept|ตกลง|ok|agree|more|เพิ่มเติม|skip|ข้าม|not now|ไม่ใช่ตอนนี้|no thanks|ไม่เป็นไร|continue|ต่อไป|turn on|done|เสร็จ)$/i;
+const G_ERR = /couldn.t find your google account|wrong password|รหัสผ่านไม่ถูกต้อง|ไม่พบบัญชี google|enter a valid email|couldn.t sign you in|ไม่สามารถลงชื่อเข้าใช้/i;
+const G_2SV = /2-step verification|ยืนยันแบบ 2 ขั้นตอน|check your phone|ตรวจสอบโทรศัพท์|verify it.s you|ยืนยันว่าเป็นคุณ/i;
+async function hasGoogle(d, email) {
+  const t = (await d.sh("dumpsys account 2>/dev/null | grep -i 'type=com.google'")).out;
+  return email ? t.toLowerCase().includes(email.toLowerCase()) : /com\.google/.test(t);
+}
+async function readScreen(d) {
+  const r = await d.sh("uiautomator dump /data/local/tmp/idt-ui.xml >/dev/null 2>&1; cat /data/local/tmp/idt-ui.xml 2>/dev/null; rm -f /data/local/tmp/idt-ui.xml");
+  const doc = new DOMParser().parseFromString(r.out.slice(r.out.indexOf("<")), "text/xml");
+  return [...doc.querySelectorAll("node")].map((n) => {
+    const b = (n.getAttribute("bounds") || "").match(/\d+/g) || [0, 0, 0, 0];
+    return { text: (n.getAttribute("text") || "").trim(), desc: (n.getAttribute("content-desc") || "").trim(), id: n.getAttribute("resource-id") || "", cls: n.getAttribute("class") || "",
+      pass: n.getAttribute("password") === "true", click: n.getAttribute("clickable") === "true", x: Math.round((+b[0] + +b[2]) / 2), y: Math.round((+b[1] + +b[3]) / 2), w: b[2] - b[0] };
+  });
+}
+const typeable = (s) => s.replace(/ /g, "%s");
+async function googleSignIn(d, email, pass) {
+  if (await hasGoogle(d, email)) return "มีอยู่แล้ว";
+  await d.sh("input keyevent 224; am start -a android.settings.ADD_ACCOUNT_SETTINGS --esa account_types com.google");
+  let typedEmail = false, typedPass = false, idle = 0;
+  const until = Date.now() + 240000;
+  while (Date.now() < until) {
+    await sleep(2500);
+    if (await hasGoogle(d, email)) return "ok";
+    const nodes = await readScreen(d);
+    if (!nodes.length) { idle++; continue; }
+    const all = nodes.map((n) => n.text + " " + n.desc).join("\n");
+    const err = all.match(G_ERR);
+    if (err) throw new Error("Google: " + err[0]);
+    if (G_2SV.test(all)) { setStatus(d, { title: "ยืนยันที่มือถือ hub", big: "2FA" }); continue; }
+    const edits = nodes.filter((n) => /EditText/.test(n.cls) && n.w > 0);
+    const pw = edits.find((n) => n.pass);
+    if (pw && !typedPass) {
+      setStatus(d, { title: "ใส่รหัส Google", big: "2/3", ring: 66 });
+      await d.sh(`input tap ${pw.x} ${pw.y}`); await sleep(400);
+      await d.shOk(`input text ${q(typeable(pass))}`); await d.sh("input keyevent 66");
+      typedPass = true; continue;
+    }
+    const em = edits.find((n) => !n.pass && (/identifier|email|username/i.test(n.id + n.text + n.desc) || /email|อีเมล/i.test(all)));
+    if (em && !typedEmail) {
+      setStatus(d, { title: "ใส่อีเมล Google", big: "1/3", ring: 33 });
+      await d.sh(`input tap ${em.x} ${em.y}`); await sleep(400);
+      await d.shOk(`input text ${q(typeable(email))}`); await d.sh("input keyevent 66");
+      typedEmail = true; continue;
+    }
+    // buttons on the later screens (I agree, More, Accept, Skip backup ...): the lowest matching one is the main action
+    const btn = nodes.filter((n) => G_NEXT.test(n.text || n.desc) && n.w > 0).sort((a, b) => b.y - a.y)[0];
+    if (btn) { setStatus(d, { title: "กด " + (btn.text || btn.desc), big: "3/3", ring: 85 }); await d.sh(`input tap ${btn.x} ${btn.y}`); idle = 0; continue; }
+    if (++idle > 12) break;
+  }
+  throw new Error("ไปต่อเองไม่ได้ ดูหน้าจอเครื่องแล้วกดต่อเอง");
+}
+async function googleSetup() {
+  const email = $("gEmail").value.trim(), pass = $("gPass").value;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !pass) { showHelp("UNKNOWN", "ใส่อีเมลและรหัสให้ครบ"); return; }
+  if (/[^\x20-\x7e]/.test(pass)) { showHelp("TYPE"); return; }
+  st.save("gEmail", email);
+  await run("ใส่บัญชี Google", async () => {
+    const ts = targets();
+    const doLock = $("gLock").checked;
+    if (!(await kioskOk(ts, "การเปิดหน้าล็อกอิน Google"))) return false;
+    if (!(await confirmBox(`ใส่บัญชี ${email} ให้ ${ts.length > 1 ? ts.length + " เครื่อง" : label(ts[0])}${doLock ? " แล้วล็อกออกงาน" : ""}?\nเครื่องต้องต่อ Wi-Fi อยู่ ระหว่างนี้อย่าแตะหน้าจอเครื่อง (ประมาณ 1-3 นาที)`))) return false;
+    const fails = [];
+    await Promise.all(ts.map(async (d) => {
+      try {
+        // a locked device may have Settings/Google screens switched off: open it first, lock again at the end
+        if ((d.info.locked || []).length || d.info.settingsLocked) { setStatus(d, { title: "ปลดล็อกชั่วคราว", big: "…" }); await unlockDevice(d); }
+        await d.sh("svc power stayon usb");
+        setStatus(d, { title: "เปิดหน้าล็อกอิน Google", big: "…", ring: 10 });
+        const r = await googleSignIn(d, email, pass);
+        log(`${label(d)}: บัญชี Google ${r === "มีอยู่แล้ว" ? "มีอยู่แล้ว" : "ใส่สำเร็จ"} (${email})`);
+        await d.sh("input keyevent 3");
+        if (doLock) { await lockDevice(d); }
+        setStatus(d, { title: doLock ? "ใส่บัญชี + ล็อกแล้ว" : "ใส่บัญชีแล้ว", big: "✓", ring: 100, done: true });
+      } catch (e) {
+        fails.push(`${label(d)}: ${e.message}`);
+        setStatus(d, { title: "ใส่บัญชีไม่สำเร็จ", err: true, done: true });
+      }
+    }));
+    renderAll();
+    if (fails.length) throw new Error(fails.join("\n") + (doLock ? "\n(เครื่องที่ไม่สำเร็จยังไม่ถูกล็อก)" : ""));
+  }, "GOOGLE");
+}
+
 /** Semi-automatic Wi-Fi for older Android: the Wi-Fi screen is open on the device; one button types the password */
 function showWifiManual(ds, w) {
   showHelp("WIFI_MANUAL", ds.map((d) => label(d) + (d.info.android ? " · Android " + d.info.android : "")).join(", "), true);
@@ -1704,6 +1796,7 @@ const actions = {
     if (fails.length) log("บางแอปปิดไม่ได้ (ระบบบริษัทหรือระบบเครื่องกันไว้): " + fails.join(" / "));
   }),
   setupAll: () => setupAll(),
+  googleSetup: () => googleSetup(),
   // Opens Android's "add Google account" screen on every selected device; the sign-in itself is done on the device
   // (or typed with "พิมพ์ข้อความเข้าเครื่อง"). With the account on the device, a reset from the buttons asks for it (FRP).
   addGoogle: () => run("เปิดหน้าเพิ่มบัญชี Google", async () => {
@@ -2241,7 +2334,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   // full Settings off and "Settings off except Wi-Fi" are alternatives: ticking one clears the other
   if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked, settingsWifi: e.target.checked ? false : lockCfg().settingsWifi }); renderLock(devices.get(selected)); });
   if ($("lockSettingsWifi")) $("lockSettingsWifi").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settingsWifi: e.target.checked, settings: e.target.checked ? false : lockCfg().settings }); renderLock(devices.get(selected)); });
-  [["typeShow", "typeText"], ["wfShow", "wfPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
+  if ($("gEmail")) $("gEmail").value = st.load("gEmail", "");
+  [["typeShow", "typeText"], ["wfShow", "wfPass"], ["gShow", "gPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
   if ($("typeText")) $("typeText").addEventListener("keydown", (e) => { if (e.key === "Enter") actions.typeSend(); });
   if ($("fxMode")) {
     $("fxMode").value = st.load("fx", "auto");

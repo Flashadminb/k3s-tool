@@ -29,7 +29,8 @@ npm run serve        # หรือเปิดผ่าน http://localhost:808
 | อัปเดตตัวเลข | `df -k /sdcard`, `find ... \| wc -l`, `du -sk` | นับไฟล์เป็นหมื่นอาจช้า ควรแสดงสถานะกำลังนับ |
 | ลบ success | `find /sdcard/imagePath/success -type f -delete` | ใช้ find -delete เพราะ `rm -rf dir/*` อาจเจอ "argument list too long" เมื่อไฟล์เยอะมาก |
 | ลบขยะ | `find /sdcard -type f -name '.trashed-*' -delete` | ข้ามถังขยะ ลบถาวร |
-| ลบ fail | `find /sdcard/imagePath/fail -type f -delete` | รูปที่อาจยังไม่อัปโหลด ต้องพิมพ์ DELETE ยืนยัน |
+| ลบทั้งหมด | ลบ success + fail + `.trashed-*` | มีคำเตือนเรื่อง fail แล้วกดยืนยัน |
+| ลบ fail | `find /sdcard/imagePath/fail -type f -delete` | รูปที่อาจยังไม่อัปโหลด ขึ้นคำเตือนแล้วกดยืนยัน (ผู้ใช้ตัดสินใจไม่ต้องพิมพ์ DELETE) |
 | ล้างแคช | `pm trim-caches 999G` | อาจต้องสิทธิ์สูงกว่า shell ในบางรุ่น |
 | ติดตั้ง APK | push ไป `/data/local/tmp/` แล้ว `pm install -r` | ระบบบริษัทอาจบล็อก |
 | ตั้งรูปหน้าจอ | push ไป `/sdcard/Download/` แล้ว `am start -a ATTACH_DATA` | ยังไม่แน่ใจว่าตั้งอัตโนมัติได้ทุกรุ่น ตอนนี้เปิดหน้าตั้งค่าบนเครื่อง ผู้ใช้อาจต้องแตะเอง |

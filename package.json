@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.mjs",
     "serve": "npx http-server dist -p 8080",
-    "test": "node test/build-test.mjs && NODE_PATH=$(npm root -g) node test/run.mjs"
+    "test": "node test/build-test.mjs && NODE_PATH=$(npm root -g) node test/run.mjs",
+    "test:worker": "node test/worker-test.mjs"
   },
   "dependencies": {
     "@yume-chan/adb": "^2.6.4",
@@ -15,6 +16,7 @@
     "@yume-chan/stream-extra": "^2.6.1"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.169.0"
   }
 }

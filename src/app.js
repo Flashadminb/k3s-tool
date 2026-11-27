@@ -1,5 +1,6 @@
 import * as adb from "./adb.js";
 import * as st from "./store.js";
+import * as auth from "./auth.js";
 import { appName, CRITICAL, APP_NAMES } from "./appnames.js";
 
 const q = adb.q;
@@ -1470,7 +1471,7 @@ function renderWifiSaved() {
     el("div", { class: "nm" }, w.ssid, el("small", { text: w.sec === "open" ? "ไม่มีรหัส" : w.sec.toUpperCase() + " · มีรหัสบันทึกไว้" })),
     el("div", { class: "row" },
       el("button", { class: "blue need-dev", text: "เชื่อมต่อ", onclick: () => wifiConnect(w) }),
-      el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบ Wi-Fi "${w.ssid}" ออกจากรายการ?`)) { const l = st.wifiList(); l.splice(i, 1); st.saveWifiList(l); renderWifiSaved(); } } }))
+      el("button", { class: "red admin-only", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบ Wi-Fi "${w.ssid}" ออกจากรายการ?`)) { const l = st.wifiList(); l.splice(i, 1); st.saveWifiList(l); renderWifiSaved(); } } }))
   )) : [el("div", { class: "item mut", text: "ยังไม่มี เพิ่มได้ด้านล่าง" })]));
   box.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !all().length));
 }
@@ -1703,6 +1704,20 @@ const actions = {
     if (fails.length) log("บางแอปปิดไม่ได้ (ระบบบริษัทหรือระบบเครื่องกันไว้): " + fails.join(" / "));
   }),
   setupAll: () => setupAll(),
+  tgSave: () => run("ตั้งบอท Telegram", async () => { const r = await auth.apiPost("/api/telegram", { token: $("tgToken").value }); $("tgToken").value = ""; log("ตั้งบอท @" + r.bot + " แล้ว"); await renderUsers(); }, null, { free: true }),
+  staffAdd: () => run("เพิ่มพนักงาน", async () => {
+    const name = $("sfName").value.trim();
+    if (!name) throw new Error("ใส่ชื่อพนักงาน");
+    const s = await auth.apiPost("/api/staff", { name, chatId: $("sfChat").value, times: parseHours($("sfTimes").value) });
+    ["sfName", "sfChat", "sfTimes"].forEach((k) => ($(k).value = ""));
+    await renderUsers();
+    if (await confirmBox(`เพิ่ม ${s.name} แล้ว\nส่งรหัสแรกให้เลยไหม? (ไม่งั้นจะได้รหัสตามเวลาที่ตั้ง)`)) {
+      const r = await auth.apiPost("/api/staff/rotate", { id: s.id });
+      await confirmBox(`รหัสของ ${s.name}: ${r.password}\n${r.sent ? "ส่งเข้า Telegram แล้ว" : "ส่ง Telegram ไม่ได้ (" + (r.error || "?") + ") ให้บอกรหัสนี้เอง"}`);
+      await renderUsers();
+    }
+  }, null, { free: true }),
+  adminPw: () => run("เปลี่ยนรหัสเจ้าของ", async () => { await auth.apiPost("/api/admin/password", { old: $("adOld").value, password: $("adNew").value }); $("adOld").value = $("adNew").value = ""; log("เปลี่ยนรหัสเจ้าของแล้ว"); }, null, { free: true }),
   lockRelease: () => run("ปลดล็อก", async () => {
     const ts = targets();
     await Promise.all(ts.map((d) => unlockDevice(d)));
@@ -2136,7 +2151,47 @@ function showTab(name) {
   if (name === "files") openFilesTab();
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+/* ---------- Login roles and the owner's user management (only when served by the login server) ---------- */
+function applyRole(me) {
+  document.body.classList.add("role-" + me.role);
+  if (me.role === "local") return;
+  const w = $("who");
+  if (!w) return;
+  w.hidden = false;
+  w.replaceChildren(el("span", { text: (me.role === "admin" ? "เจ้าของ · " : "พนักงาน · ") + me.name }), el("button", { text: "ออกจากระบบ", onclick: () => auth.logout() }));
+  if ($("wifiNote")) $("wifiNote").textContent = "รายการ Wi-Fi (และค่าหลังบ้านอื่นๆ) เก็บไว้ที่ระบบล็อกอิน: บันทึกครั้งเดียว ทุกคอมและมือถือที่ล็อกอินได้รายการนี้ · พนักงานเห็นแต่ใช้ต่อ Wi-Fi ได้ แก้ไม่ได้";
+  if (me.role === "admin") renderUsers();
+}
+const hoursText = (t) => (t && t.length ? t.map((h) => String(h).padStart(2, "0") + ":00").join(", ") : "ไม่ได้ตั้ง (เปลี่ยนเองเท่านั้น)");
+const parseHours = (s) => String(s || "").split(/[\s,]+/).map((x) => parseInt(x, 10)).filter((h) => h >= 0 && h <= 23);
+async function renderUsers() {
+  if (auth.me.role !== "admin" || !$("staffList")) return;
+  try {
+    const tg = await auth.apiGet("/api/telegram");
+    $("tgState").textContent = tg.set ? `ตั้งบอทแล้ว: @${tg.bot} · พนักงานทัก @${tg.bot} ใน Telegram แล้วบอทจะตอบ Chat ID ให้` : "ยังไม่ได้ตั้งบอท: สร้างบอทที่ @BotFather ใน Telegram (คำสั่ง /newbot) แล้ววาง Token ที่ได้ลงช่องนี้";
+    const list = await auth.apiGet("/api/staff");
+    $("staffList").replaceChildren(...(list.length ? list.map((s) => {
+      const chat = el("input", { type: "text", value: s.chatId, placeholder: "Chat ID", inputmode: "numeric" });
+      const times = el("input", { type: "text", value: s.times.join(","), placeholder: "เวลา เช่น 7,19" });
+      const save = (extra) => run("บันทึกพนักงาน", async () => { await auth.apiPost("/api/staff", { id: s.id, name: s.name, chatId: chat.value, times: parseHours(times.value), enabled: s.enabled, ...extra }); await renderUsers(); }, null, { free: true });
+      return el("div", { class: "item staff-row" },
+        el("div", { class: "nm" }, s.name + (s.enabled ? "" : " (ปิดอยู่)"),
+          el("small", { text: `เปลี่ยนรหัส ${hoursText(s.times)}${s.next ? " · รอบถัดไป " + s.next : ""} · ${s.sentAt ? "ส่งรหัสล่าสุด " + new Date(s.sentAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "ยังไม่เคยส่งรหัส"}${s.sendError ? " · ⚠️ " + s.sendError : ""}` })),
+        el("div", { class: "row" }, chat, times, el("button", { text: "บันทึก", onclick: () => save({}) })),
+        el("div", { class: "row" },
+          el("button", { class: "blue", text: "ส่งรหัสใหม่ตอนนี้", onclick: () => run("ส่งรหัสใหม่", async () => {
+            const r = await auth.apiPost("/api/staff/rotate", { id: s.id });
+            await confirmBox(`รหัสใหม่ของ ${s.name}: ${r.password}\n\n${r.sent ? "ส่งเข้า Telegram แล้ว" : "ส่ง Telegram ไม่ได้ (" + (r.error || "?") + ") ให้บอกรหัสนี้เอง"}\nรหัสเก่าใช้เข้าไม่ได้แล้ว`);
+            await renderUsers();
+          }, null, { free: true }) }),
+          el("button", { text: s.enabled ? "ปิดการเข้า" : "เปิดการเข้า", onclick: () => save({ enabled: !s.enabled }) }),
+          el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบ ${s.name}? เข้าเว็บไม่ได้ทันที`)) run("ลบพนักงาน", async () => { await auth.apiDel("/api/staff?id=" + encodeURIComponent(s.id)); await renderUsers(); }, null, { free: true }); } })));
+    }) : [el("div", { class: "item mut", text: "ยังไม่มีพนักงาน" })]));
+  } catch (e) { $("staffList").replaceChildren(el("div", { class: "item mut", text: "โหลดรายชื่อไม่ได้: " + e.message })); }
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  applyRole(await auth.initAuth());
   document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => actions[b.dataset.act]()));
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
   document.querySelectorAll("[data-goto]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.goto); }));

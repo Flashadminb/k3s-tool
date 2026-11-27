@@ -278,6 +278,12 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
 #dlgText{white-space:pre-line;margin-bottom:10px}
 .dlgbox input{width:100%;margin:8px 0}
 #dlgList label{padding:10px 0;border-bottom:1px solid var(--line)}
+.role-staff .admin-only{display:none!important}
+body:not(.role-admin) .owner-only{display:none!important}
+.who{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--mut);white-space:nowrap}
+.who button{padding:4px 10px;font-size:13px}
+.staff-row{display:grid;gap:6px}
+.staff-row .row input{flex:1;min-width:110px}
 .choice-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .choice-list button{width:100%;justify-content:center}
 .flcache{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px}
@@ -354,6 +360,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
     </nav>
     <a class="tool flash-link" href="https://fle.pub/ay9kj5" target="_blank" rel="noopener" title="โหลดไฟล์ติดตั้ง Flash Kit"><svg class="i"><use href="#i-download"/></svg>Flash Kit</a>
     <span id="status">ยังไม่เชื่อมต่อ</span>
+    <span id="who" class="who" hidden></span>
   </header>
 
   <main>
@@ -542,7 +549,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
       <h2>รายการแอปต้องห้าม</h2>
       <div class="mut">ใส่ชื่อเทคนิคบรรทัดละ 1 แอป ระบบจะเตือนเมื่อเจอในเครื่อง กดปุ่ม ข้างแอปในรายการด้านบนเพื่อเพิ่มได้เลย</div>
       <textarea id="bannedText"></textarea>
-      <div class="row end"><button data-act="bannedReset">คืนค่าเริ่มต้น</button><button class="blue" data-act="bannedSave">บันทึกรายการ</button></div>
+      <div class="row end admin-only"><button data-act="bannedReset">คืนค่าเริ่มต้น</button><button class="blue" data-act="bannedSave">บันทึกรายการ</button></div>
     </div>
   </section>
 <section class="tab" id="tab-files" hidden>
@@ -583,14 +590,14 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
       <h2>Wi-Fi ที่ใช้บ่อย</h2>
       <div class="mut">กด เชื่อมต่อ แล้วเครื่องจะต่อ Wi-Fi นั้นให้ (เครื่องที่เลือก หรือทั้งกลุ่ม)</div>
       <div class="list" id="wifiSaved" style="margin-top:10px"></div>
-      <h3>เพิ่ม Wi-Fi</h3>
-      <div style="display:grid;gap:8px">
+      <h3 class="admin-only">เพิ่ม Wi-Fi</h3>
+      <div class="admin-only" style="display:grid;gap:8px">
         <input type="text" id="wfSsid" placeholder="ชื่อ Wi-Fi (ตรงตัวพิมพ์เล็กใหญ่)">
         <div class="row"><input type="password" id="wfPass" autocomplete="new-password" placeholder="รหัสผ่าน" style="flex:1;min-width:160px"><label><input type="checkbox" id="wfShow"> แสดง</label></div>
         <label>ประเภท <select id="wfSec"><option value="wpa2">WPA2 / WPA (ทั่วไป)</option><option value="wpa3">WPA3</option><option value="open">ไม่มีรหัส</option></select></label>
       </div>
-      <div class="row end" style="margin-top:10px"><button class="blue" data-act="wifiAdd">บันทึก</button></div>
-      <div class="warnbox">รหัสเก็บไว้ในเบราว์เซอร์ของคอมเครื่องนี้เท่านั้น ไม่ได้ส่งไปที่ไหน แต่ไม่ได้เข้ารหัส อย่าบันทึกบนคอมที่คนอื่นใช้ร่วม</div>
+      <div class="row end" style="margin-top:10px"><button class="admin-only blue" data-act="wifiAdd">บันทึก</button></div>
+      <div class="warnbox admin-only" id="wifiNote">รหัสเก็บไว้ในเบราว์เซอร์ของคอมเครื่องนี้เท่านั้น ไม่ได้ส่งไปที่ไหน แต่ไม่ได้เข้ารหัส อย่าบันทึกบนคอมที่คนอื่นใช้ร่วม</div>
     </div>
     <div class="card need-dev">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">Wi-Fi ที่เครื่องเห็น</h2><button data-act="wifiScan">ค้นหา</button></div>
@@ -599,6 +606,24 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
     </div>
   </section>
 <section class="tab" id="tab-setup" hidden>
+    <div class="card owner-only" id="usersCard">
+      <h2>ผู้ใช้และรหัส</h2>
+      <div class="mut">พนักงานเข้าเว็บด้วยชื่อ + รหัสที่บอท Telegram ส่งให้ตามเวลาที่ตั้ง (เวลาไทย) · รหัสเก่าใช้เข้าใหม่ไม่ได้ทันที คนที่เข้าอยู่แล้วใช้ต่อได้ไม่เกิน 12 ชั่วโมง · พนักงานใช้เครื่องมือได้หมด แต่เปลี่ยนค่าหลังบ้านไม่ได้</div>
+      <h3>บอท Telegram</h3>
+      <div id="tgState" class="mut">-</div>
+      <div class="row" style="margin-top:6px"><input type="password" id="tgToken" placeholder="Token จาก @BotFather" autocomplete="off" style="flex:1;min-width:200px"><button class="blue" data-act="tgSave">ตั้งบอท</button></div>
+      <h3>พนักงาน</h3>
+      <div class="list" id="staffList"><div class="item mut">-</div></div>
+      <h3>เพิ่มพนักงาน</h3>
+      <div style="display:grid;gap:8px">
+        <input type="text" id="sfName" placeholder="ชื่อ (ใช้พิมพ์ตอนเข้าเว็บ)" autocomplete="off">
+        <input type="text" id="sfChat" placeholder="Chat ID ใน Telegram (ให้พนักงานทักบอทก่อน บอทจะตอบเลขนี้)" inputmode="numeric" autocomplete="off">
+        <input type="text" id="sfTimes" placeholder="เปลี่ยนรหัสกี่โมง เช่น 7 หรือ 7,19" autocomplete="off">
+      </div>
+      <div class="row end" style="margin-top:8px"><button class="blue" data-act="staffAdd">เพิ่มพนักงาน</button></div>
+      <h3>รหัสเจ้าของ</h3>
+      <div class="row"><input type="password" id="adOld" placeholder="รหัสเดิม" autocomplete="current-password" style="flex:1;min-width:140px"><input type="password" id="adNew" placeholder="รหัสใหม่ 8 ตัวขึ้นไป" autocomplete="new-password" style="flex:1;min-width:140px"><button data-act="adminPw">เปลี่ยนรหัส</button></div>
+    </div>
     <div class="card">
       <h2>ตั้งค่าชุดมาตรฐานฮับ</h2>
       <div class="mut">ตั้งค่าแบบเดียวกันทุกเครื่องในคลิกเดียว เหมาะกับเครื่องที่เพิ่งรีเซ็ต</div>
@@ -621,7 +646,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
         <div class="mut" id="flSeen"></div>
         <div class="flcache"><b id="flCache">-</b><div class="row"><button class="blue" data-act="flashDownload">โหลดไฟล์ล่าสุดเก็บไว้</button><button data-act="flashPick">เลือกไฟล์ .apk ในคอม</button></div></div>
       </div>
-      <div class="row end" style="margin-top:10px"><a class="tool flash-link" href="https://fle.pub/ay9kj5" target="_blank" rel="noopener"><svg class="i"><use href="#i-download"/></svg>โหลดไฟล์เอง</a><button class="need-dev" data-act="flashSelected">ติดตั้ง/อัปเดตให้เครื่องที่เลือก</button><button class="blue" data-act="flashSave">บันทึก</button></div>
+      <div class="row end" style="margin-top:10px"><a class="tool flash-link" href="https://fle.pub/ay9kj5" target="_blank" rel="noopener"><svg class="i"><use href="#i-download"/></svg>โหลดไฟล์เอง</a><button class="need-dev" data-act="flashSelected">ติดตั้ง/อัปเดตให้เครื่องที่เลือก</button><button class="admin-only blue" data-act="flashSave">บันทึก</button></div>
     </div>
     <div class="card">
       <h2>พื้นหลัง</h2>
@@ -633,7 +658,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
       <div class="mut">ถ้ามีรุ่นใหม่ที่เก็บรูปคนละที่ เพิ่มได้ที่นี่ ระบบจะเลือกตามชื่อรุ่นของเครื่องเอง ถ้าไม่ตรงรุ่นไหนจะใช้แบบ K3S</div>
       <div class="mut need-dev" style="margin-top:6px">เครื่องที่เลือกอยู่: <b id="curModel">-</b> · ใช้ค่า: <b id="curProfile">-</b></div>
       <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>ชื่อ</th><th>ชื่อรุ่นมีคำว่า</th><th>โฟลเดอร์ success</th><th>โฟลเดอร์ fail</th><th></th></tr></thead><tbody id="profTable"></tbody></table></div>
-      <div class="row end" style="margin-top:8px"><button data-act="profAdd">+ เพิ่มรุ่น</button><button class="blue" data-act="profSave">บันทึก</button></div>
+      <div class="row end" style="margin-top:8px"><button class="admin-only" data-act="profAdd">+ เพิ่มรุ่น</button><button class="admin-only blue" data-act="profSave">บันทึก</button></div>
     </div>
   </section>
 <section class="tab" id="tab-records" hidden>
@@ -643,7 +668,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
       <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>Android</th><th>แบต</th><th>พื้นที่</th><th>แอป Flash</th><th>เห็นล่าสุด</th><th></th></tr></thead><tbody id="regTable"></tbody></table></div>
     </div>
     <div class="card">
-      <div class="row" style="justify-content:space-between"><h2 style="margin:0">ประวัติการลบ</h2><div class="row"><button data-act="histCsv">CSV</button><button class="red" data-act="histClear">ล้างประวัติ</button></div></div>
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">ประวัติการลบ</h2><div class="row"><button data-act="histCsv">CSV</button><button class="admin-only red" data-act="histClear">ล้างประวัติ</button></div></div>
       <div class="mut" id="histSum"></div>
       <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>เวลา</th><th>เครื่อง</th><th>ทำอะไร</th><th>ไฟล์</th><th>ได้พื้นที่คืน</th></tr></thead><tbody id="histTable"></tbody></table></div>
     </div>

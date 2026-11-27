@@ -3,8 +3,11 @@ const KEY = "k3s-tool:";
 export function load(name, def) {
   try { const v = localStorage.getItem(KEY + name); return v == null ? def : JSON.parse(v); } catch (e) { return def; }
 }
+let hook = null;
+export function onSave(f) { hook = f; }
 export function save(name, v) {
   try { localStorage.setItem(KEY + name, JSON.stringify(v)); } catch (e) {}
+  if (hook) hook(name);
 }
 
 /* ---------- Model profiles: where each model keeps its photos ---------- */

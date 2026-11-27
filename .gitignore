@@ -1,3 +1,6 @@
 node_modules/
 dist/test.html
 dist/preview.html
+site/
+wrangler.deploy.toml
+.wrangler/

@@ -1,4 +1,6 @@
-name: Deploy to GitHub Pages
+name: Deploy
+# With the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets set, the site goes to Cloudflare
+# behind the login (worker/index.js). Without them it is published on GitHub Pages as before (no login).
 on:
   push:
     branches: [main]
@@ -8,10 +10,41 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: true
 jobs:
-  deploy:
+  target:
+    runs-on: ubuntu-latest
+    outputs:
+      cf: ${{ steps.t.outputs.cf }}
+    steps:
+      - id: t
+        env:
+          CF: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: if [ -n "$CF" ]; then echo "cf=yes" >> "$GITHUB_OUTPUT"; else echo "cf=no" >> "$GITHUB_OUTPUT"; fi
+
+  cloudflare:
+    needs: target
+    if: needs.target.outputs.cf == 'yes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node test/build-preview.mjs
+      - run: node scripts/make-site.mjs
+      - run: node scripts/cf-deploy.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  pages:
+    needs: target
+    if: needs.target.outputs.cf != 'yes'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -25,7 +58,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: node test/build-preview.mjs
-      - run: mkdir -p site && cp dist/k3s-tool.html site/index.html && cp dist/classic.html site/classic.html && cp dist/preview.html site/preview.html && cp public/* site/
+      - run: node scripts/make-site.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -35,6 +35,7 @@ const HELP = {
   NO_FS: ["เบราว์เซอร์นี้บันทึกลงโฟลเดอร์ไม่ได้", ["ใช้ Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุดบนคอม Windows", "ตอนหน้าต่างเลือกโฟลเดอร์เด้งขึ้น ให้เลือกโฟลเดอร์ แล้วกด อนุญาต/ดูไฟล์ และ บันทึกการเปลี่ยนแปลง"]],
   SETTINGS: ["ตั้งค่าบางข้อไม่สำเร็จ", ["ข้อที่ไม่สำเร็จอาจถูกระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ข้ออื่นที่สำเร็จแล้วใช้งานได้ตามปกติ"]],
   WIFI: ["ต่อ Wi-Fi ไม่สำเร็จ", ["เช็กชื่อ Wi-Fi ให้ตรงตัวพิมพ์เล็ก/ใหญ่ และรหัสผ่านให้ถูก", "เครื่องต้องอยู่ในระยะสัญญาณ (กด ค้นหา ดูว่าเครื่องเห็น Wi-Fi นี้ไหม)", "ถ้าขึ้นว่าไม่อนุญาต / not allowed: ระบบบริษัทล็อกการตั้ง Wi-Fi ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash"]],
+  WIFI_MANUAL: ["เครื่องรุ่นนี้ต้องแตะเลือก Wi-Fi เอง 1 ครั้ง", ["Android ของเครื่องนี้ไม่ให้คอมสั่งต่อ Wi-Fi (ใช้ได้กับ Android 12 ขึ้นไป เช่น K3S) ไม่ใช่ระบบบริษัทบล็อก", "เว็บเปิดหน้า Wi-Fi ที่เครื่องให้แล้ว: แตะชื่อ Wi-Fi ที่ต้องการ (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "พอขึ้นช่องใส่รหัส กดปุ่ม พิมพ์รหัส... ด้านล่าง เว็บจะพิมพ์รหัสที่บันทึกไว้และกด Enter ให้", "ไม่อยากจับเครื่อง: ใช้ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกชื่อ Wi-Fi จากคอม"]],
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
@@ -1147,19 +1148,43 @@ function wifiConnect(w) {
   run(`ต่อ Wi-Fi ${w.ssid}`, async () => {
     const ts = targets();
     if (ts.length > 1 && !(await confirmBox(`ต่อ Wi-Fi "${w.ssid}" ให้ ${ts.length} เครื่อง?`))) return false;
-    const fails = [];
-    for (const d of ts) {
-      busyMsg(`กำลังต่อ ${w.ssid} · ${label(d)}`);
+    const fails = [], manual = [];
+    await Promise.all(ts.map(async (d) => {
+      setStatus(d, { title: "ต่อ Wi-Fi", big: "…" });
       await d.sh("svc wifi enable");
       const r = await d.sh(`cmd wifi connect-network ${q(w.ssid)} ${w.sec}${w.sec === "open" ? "" : " " + q(w.pass)}`);
       const t = (r.out + r.err).trim();
-      if (r.code || /exception|denied|not allowed|error|unknown command/i.test(t)) { fails.push(`${label(d)}: ${t || "failed"}`); continue; }
+      // Older Android (11 and below) keeps these Wi-Fi commands for root only: not a company block, a version limit.
+      // Then the page opens the device's Wi-Fi screen and can type the saved password for you.
+      if (/does not have access to wifi commands|checkRootPermission/i.test(t)) {
+        manual.push(d);
+        await d.sh("input keyevent 224; am start -a android.settings.WIFI_SETTINGS");
+        setStatus(d, { title: "แตะ Wi-Fi ที่เครื่อง", big: w.ssid.slice(0, 10) });
+        return;
+      }
+      if (r.code || /exception|denied|not allowed|error|unknown command/i.test(t)) { fails.push(`${label(d)}: ${t.split("\n")[0].slice(0, 160) || "failed"}`); return; }
       log(`${label(d)}: สั่งต่อ ${w.ssid} แล้ว`);
+    }));
+    if (manual.length) {
+      log(`${manual.map(label).join(", ")}: Android รุ่นนี้ไม่ให้ต่อ Wi-Fi จากคอม เปิดหน้า Wi-Fi ที่เครื่องให้แล้ว`);
+      showWifiManual(manual, w);
+      if (!fails.length) return;
     }
     await new Promise((res) => setTimeout(res, 4000));
     await renderWifiNow();
     if (fails.length) throw new Error("WIFI: " + fails.join(" / "));
   }, "WIFI");
+}
+/** Semi-automatic Wi-Fi for older Android: the Wi-Fi screen is open on the device; one button types the password */
+function showWifiManual(ds, w) {
+  showHelp("WIFI_MANUAL", ds.map((d) => label(d) + (d.info.android ? " · Android " + d.info.android : "")).join(", "), true);
+  if (w.sec === "open") return;
+  $("help").insertBefore(el("div", { class: "row", style: "margin:8px 0" },
+    el("button", { class: "blue", text: `พิมพ์รหัส ${w.ssid} เข้าเครื่อง`, onclick: () => run("พิมพ์รหัส Wi-Fi", async () => {
+      for (const d of ds) { await d.shOk(`input text ${q(w.pass.replace(/ /g, "%s"))}`); await d.sh("input keyevent 66"); setStatus(d, { title: "ส่งรหัสแล้ว", done: true }); }
+      log("พิมพ์รหัส Wi-Fi เข้าเครื่องแล้ว รอเครื่องต่อสักครู่ แล้วกด เช็กสถานะ");
+    }) }),
+    el("button", { text: "เช็กสถานะ", onclick: () => run("เช็ก Wi-Fi", renderWifiNow, "WIFI") })), $("help").lastElementChild);
 }
 function parseScan(out) {
   const seen = new Map();

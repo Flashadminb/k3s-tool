@@ -48,7 +48,7 @@ if [ "$1" = wifi ]; then
   W="${join(ROOT, "wifi-")}$SERIAL"
   case "$2" in
     status) [ -f "$W" ] && printf 'Wifi is enabled\\nWifi is connected to "%s"\\n' "$(cat "$W")" || printf 'Wifi is enabled\\nWifi is not connected\\n';;
-    connect-network) echo "$3" > "$W"; echo "Connection initiated";;
+    connect-network) [ "$3" = OldAndroid ] && { echo "Security exception: Uid 2000 does not have access to wifi commands" >&2; exit 255; }; echo "$3" > "$W"; echo "Connection initiated";;
     list-scan-results) printf '    BSSID              Frequency      RSSI           Age(sec)     SSID                                 Flags\\n  a4:12:42:00:11:22       2437        -48             2.1         Flash-BPL                            [WPA2-PSK-CCMP][ESS]\\n  b8:27:eb:10:20:30       2462        -79             4.0         Guest Room                           [ESS]\\n';;
   esac
 fi`);
@@ -260,6 +260,13 @@ ok((await page.textContent("#wifiSaved")).includes("Flash-BPL"), "network saved"
 await page.click("#wifiSaved button.blue"); await idle();
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("connect-network Flash-BPL wpa2 pass word1"), "connect sent with the password");
 ok((await page.textContent("#wifiNow")).includes("ต่ออยู่กับ Flash-BPL"), "status shows the new Wi-Fi");
+// older Android: Wi-Fi commands are root-only, so the Wi-Fi screen is opened and the password typed on request
+await page.fill("#wfSsid", "OldAndroid"); await page.fill("#wfPass", "abcdefgh"); await click("wifiAdd");
+await page.click('#wifiSaved .item:has-text("OldAndroid") button.blue'); await idle();
+ok(await page.isVisible("#help.info") && (await page.textContent("#help")).includes("แตะเลือก Wi-Fi เอง"), "older Android: guide instead of an error");
+ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("android.settings.WIFI_SETTINGS"), "device Wi-Fi screen opened");
+await page.click('#help button:has-text("พิมพ์รหัส")'); await idle();
+ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("input text abcdefgh"), "saved password typed into the device");
 
 console.log("mobile width");
 await page.setViewportSize({ width: 375, height: 800 });

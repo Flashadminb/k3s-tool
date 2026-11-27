@@ -1,11 +1,11 @@
 ---
 version: 1
 slug: "src-space-html"
-primary_target: "src/space.html"
+primary_target: "src/index.html"
 related_targets: []
 ---
 
-# Surface: K3S Tool main screen (src/space.html → index after approval)
+# Surface: K3S Tool main screen (src/index.html → index after approval)
 
 Mode: Operate. Hub admins (Best + team), Thai, non-technical, desktop 1920 and 14-15" laptops. Task: plug PDA by USB, see storage, free space in one click; occasional device tools.
 

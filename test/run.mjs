@@ -23,7 +23,9 @@ stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
  package) echo "    versionName=1.2.$RANDOM";;
  device_policy) echo "  Device Owner: admin=ComponentInfo{com.mdm.agent/com.mdm.agent.Admin} package=com.mdm.agent";;
+ power) [ -f "${join(ROOT, "awake-")}$SERIAL" ] && echo "  mWakefulness=Awake" || echo "  mWakefulness=Asleep";;
 esac`);
+stub("svc", `echo "svc $*" >> "${join(ROOT, "calls.log")}"`);
 stub("pm", `S="$PMSTATE"; touch "$S"
 case "$1" in
  list) all="com.flashexpress.kit com.zhiliaoapp.musically com.mdm.agent jp.naver.line.android"; sys="com.android.settings com.android.chrome com.oem.bloat"
@@ -34,10 +36,20 @@ case "$1" in
  install) echo Success;;
  trim-caches) ;;
 esac`);
-stub("cmd", `[ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3" "$PMSTATE" > "$PMSTATE.n"; mv "$PMSTATE.n" "$PMSTATE"; echo "Package $3 installed for user: 0"; }`);
+stub("cmd", `[ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3" "$PMSTATE" > "$PMSTATE.n"; mv "$PMSTATE.n" "$PMSTATE"; echo "Package $3 installed for user: 0"; }
+if [ "$1" = wifi ]; then
+  echo "cmd $*" >> "${join(ROOT, "calls.log")}"
+  W="${join(ROOT, "wifi-")}$SERIAL"
+  case "$2" in
+    status) [ -f "$W" ] && printf 'Wifi is enabled\\nWifi is connected to "%s"\\n' "$(cat "$W")" || printf 'Wifi is enabled\\nWifi is not connected\\n';;
+    connect-network) echo "$3" > "$W"; echo "Connection initiated";;
+    list-scan-results) printf '    BSSID              Frequency      RSSI           Age(sec)     SSID                                 Flags\\n  a4:12:42:00:11:22       2437        -48             2.1         Flash-BPL                            [WPA2-PSK-CCMP][ESS]\\n  b8:27:eb:10:20:30       2462        -79             4.0         Guest Room                           [ESS]\\n';;
+  esac
+fi`);
 stub("screencap", `cp "${join(ROOT, "shot.png")}" "$2"`);
 stub("screenrecord", `echo fake > "$3"`);
-for (const c of ["am", "monkey", "settings", "input"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
+for (const c of ["am", "monkey", "settings"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
+stub("input", `echo "input $*" >> "${join(ROOT, "calls.log")}"; [ "$2" = 224 ] && touch "${join(ROOT, "awake-")}$SERIAL"; true`);
 stub("content", `echo "Row: 0 _id=42"`);
 stub("logcat", `echo "11-27 10:00:00.000 I/Test: hello"`);
 // 1x1 png
@@ -46,7 +58,7 @@ writeFileSync(join(ROOT, "shot.png"), Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAA
 const map = (s) => s.replaceAll("/sdcard", SD).replaceAll("/data/local/tmp", TMP);
 const unmap = (s) => s.replaceAll(SD, "/sdcard").replaceAll(TMP, "/data/local/tmp");
 const shell = (serial, cmd) => {
-  const r = spawnSync("dash", ["-c", map(cmd)], { encoding: "utf8", env: { ...process.env, PATH: BIN + ":" + process.env.PATH, PMSTATE: join(ROOT, "pm-" + serial) } });
+  const r = spawnSync("dash", ["-c", map(cmd)], { encoding: "utf8", env: { ...process.env, PATH: BIN + ":" + process.env.PATH, PMSTATE: join(ROOT, "pm-" + serial), SERIAL: serial } });
   return { out: unmap(r.stdout), err: unmap(r.stderr), code: r.status };
 };
 
@@ -55,7 +67,7 @@ const srv = http.createServer((q, s) => { s.setHeader("content-type", "text/html
 const url = `http://localhost:${srv.address().port}/`;
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 800, height: 1000 }, acceptDownloads: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
@@ -81,7 +93,18 @@ await page.waitForFunction(() => !document.getElementById("cSuccess").textConten
 ok((await page.textContent("#cSuccess")).startsWith("60 ไฟล์"), "success count = 60: " + await page.textContent("#cSuccess"));
 ok((await page.textContent("#cFail")).startsWith("5 ไฟล์"), "fail count = 5");
 ok((await page.textContent("#cTrash")).startsWith("3 ไฟล์"), "trash count = 3");
-ok((await page.textContent("#devices")).includes("K3S"), "device chip shows model");
+ok((await page.$$("#devices .satw")).length === 1, "device appears as a satellite");
+ok((await page.textContent("#devCard")).includes("K3S"), "device card shows the model");
+
+console.log("screen off: wake + ask to keep on");
+await page.waitForSelector(".sat-tag.wake");
+await page.click(".sat-tag.wake"); await accept(); await idle();
+let calls0 = readFileSync(join(ROOT, "calls.log"), "utf8");
+ok(calls0.includes("input keyevent 224") && calls0.includes("svc power stayon usb"), "screen woken and kept on after confirm");
+ok(!(await page.isVisible(".sat-tag.wake")), "screen-off tag gone");
+
+console.log("Flash Kit check");
+ok(await page.isVisible("#flashNeed"), "old Flash Kit version flagged at the hub");
 
 console.log("delete success");
 await click("success"); await accept(); await idle();
@@ -94,7 +117,6 @@ await click("trash"); await page.waitForSelector("#dlg:not([hidden])"); await pa
 ok(count("DCIM") === "3", "trash kept after cancel");
 
 console.log("fail: confirm only, no typing");
-await page.click("details.more summary");
 await click("fail"); await page.waitForSelector("#dlg:not([hidden])");
 ok(await page.isHidden("#dlgInput"), "no DELETE text box");
 await page.click("#dlgOk"); await idle();
@@ -151,32 +173,55 @@ await click("stdApply"); await accept(); await idle();
 const calls = readFileSync(join(ROOT, "calls.log"), "utf8");
 ok(calls.includes("put system screen_off_timeout 300000") && calls.includes("window_animation_scale 0"), "standard settings sent");
 
-console.log("second device + all devices");
+console.log("type text into the device (iLauncher password etc.)");
+await page.click("button[data-tab=device]");
+await page.fill("#typeText", "ab cd"); await click("typeSend"); await idle();
+calls0 = readFileSync(join(ROOT, "calls.log"), "utf8");
+ok(calls0.includes("input text ab%scd") && calls0.includes("input keyevent 66"), "text typed with Enter");
+
+console.log("second device + group");
 await page.click("button[data-tab=data]");
 await click("connect"); await idle();
-ok(await page.isVisible("#allDevWrap"), "all-devices option appears with 2 devices");
-ok((await page.$$("#devices .dev")).length === 2, "2 device chips");
+ok((await page.$$("#devices .satw")).length === 2, "2 satellites");
+await page.click("#selTool"); await page.click("#selAll");
+ok((await page.textContent("#status")).includes("กลุ่ม 2"), "status shows the group");
+ok((await page.$$("#links path")).length === 1, "gold line joins the group");
+await page.click("#selDone");
+ok((await page.textContent("#dockScope")).includes("รวม 2"), "dock shows totals for the group");
 
-console.log("wallpaper + APK: choose devices");
+console.log("wallpaper to the group, then APK with the picker");
 await page.click("button[data-tab=device]");
 writeFileSync(join(ROOT, "w.jpg"), Buffer.alloc(2048, 7));
-await page.setInputFiles("#wallFile", join(ROOT, "w.jpg"));
-await page.waitForSelector("#dlgList label");
-ok((await page.$$("#dlgList input")).length === 3, "picker lists 'all' + 2 devices");
-await page.click("#dlgList label:first-child input"); await page.click("#dlgOk"); await idle();
+await page.setInputFiles("#wallFile", join(ROOT, "w.jpg")); await idle();
 const wc = readFileSync(join(ROOT, "calls.log"), "utf8").split("CROP_AND_SET_WALLPAPER").length - 1;
-ok(wc === 2, "wallpaper screen opened on both devices: " + wc);
+ok(wc === 2, "group: wallpaper screen opened on both devices without asking: " + wc);
 ok(await page.isVisible("#help.info"), "green 'tap once' guide shown");
 ok(readdirSync(join(SD, "Pictures")).length === 2, "2 wallpapers pushed");
+await page.click("#dcGroup button");
+ok(!(await page.textContent("#status")).includes("กลุ่ม"), "group cleared");
 writeFileSync(join(ROOT, "a.apk"), Buffer.alloc(1024, 1));
 await page.setInputFiles("#apkFile", join(ROOT, "a.apk"));
 await page.waitForSelector("#dlgList label");
+ok((await page.$$("#dlgList input")).length === 3, "no group: picker lists 'all' + 2 devices");
 await page.click("#dlgOk"); await idle();
 ok((await page.textContent("#log")).includes("ติดตั้ง a.apk สำเร็จ") && !(await page.isVisible("#help:not(.info)")), "APK installed on the selected device");
 
+console.log("Wi-Fi");
+await page.click("button[data-tab=wifi]");
+await click("wifiScan"); await idle();
+ok((await page.textContent("#wifiScanList")).includes("Guest Room"), "scan lists networks (SSID with a space)");
+await page.fill("#wfSsid", "Flash-BPL"); await page.fill("#wfPass", "pass word1"); await click("wifiAdd");
+ok((await page.textContent("#wifiSaved")).includes("Flash-BPL"), "network saved");
+await page.click("#wifiSaved button.blue"); await idle();
+ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("connect-network Flash-BPL wpa2 pass word1"), "connect sent with the password");
+ok((await page.textContent("#wifiNow")).includes("ต่ออยู่กับ Flash-BPL"), "status shows the new Wi-Fi");
+
 console.log("mobile width");
 await page.setViewportSize({ width: 375, height: 800 });
-ok(await page.evaluate(() => document.documentElement.scrollWidth <= 375), "no horizontal scroll at phone width");
+await page.waitForTimeout(400);
+const wide = await page.evaluate(() => document.documentElement.scrollWidth <= 375 ? "" :
+  [...document.querySelectorAll("body *")].filter((e) => e.getBoundingClientRect().right > 377 && !e.closest(".tabs")).slice(0, 6).map((e) => e.tagName + "." + e.className + "#" + e.id + ":" + Math.round(e.getBoundingClientRect().right)).join(", "));
+ok(!wide, "no horizontal scroll at phone width " + wide);
 
 ok(errors.length === 0, "no JS errors " + errors.join(" | "));
 await page.screenshot({ path: join(ROOT, "page.png"), fullPage: true });

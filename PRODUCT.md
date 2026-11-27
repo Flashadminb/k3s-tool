@@ -7,10 +7,10 @@
 web
 
 ## Users
-Best (Hub Admin Supervisor, Flash Express BPL HUB, Bang Phli) and his team (hub admins). Thai speakers, not technical. They sit at a hub admin desk with the PDA scanners (iData K3S) plugged into the PC by USB, usually between shifts when a device's storage is full. Best said text in v0.2 was hard to read; they need large, plain Thai and one obvious action at a time.
+Best (Hub Admin Supervisor, Flash Express BPL HUB, Bang Phli) and their team (hub admins), up to 10-15 devices plugged in at once. Thai speakers, not technical. They sit at a hub admin desk with the PDA scanners (iData K3S) plugged into the PC by USB, usually between shifts when a device's storage is full. Best said text in v0.2 was hard to read; they need large, plain Thai and one obvious action at a time.
 
 ## Product Purpose
-K3S Tool frees storage on Flash Kit PDA scanners without a factory reset. Flash Kit saves a photo for every scan (`/sdcard/imagePath/success` uploaded, `/fail` maybe not uploaded) and deleted files linger in the trash (`.trashed-*`), so devices filled up and were reset 2-3 times a day. Success = one click frees the space, no reset, no commands typed.
+IDATA TOOLS (formerly K3S Tool) frees storage on Flash Kit PDA scanners without a factory reset. Flash Kit saves a photo for every scan (`/sdcard/imagePath/success` uploaded, `/fail` maybe not uploaded) and deleted files linger in the trash (`.trashed-*`), so devices filled up and were reset 2-3 times a day. Success = one click frees the space, no reset, no commands typed.
 
 ## Positioning
 A single web page that talks to the device directly over USB from Chrome/Edge (WebUSB + ADB), so the hub needs no installed software and no Google account on the device.

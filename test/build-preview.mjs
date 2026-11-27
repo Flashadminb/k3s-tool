@@ -1,4 +1,4 @@
-// Builds dist/preview.html: the space design (src/space.html) driven by fake in-browser devices
+// Builds dist/preview.html: the space design (src/index.html) driven by fake in-browser devices
 import { build } from "esbuild";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -9,5 +9,5 @@ const r = await build({
   plugins: [{ name: "mock", setup(b) { b.onResolve({ filter: /^\.\/adb\.js$/ }, () => ({ path: mock })); } }]
 });
 mkdirSync("dist", { recursive: true });
-writeFileSync("dist/preview.html", readFileSync("src/space.html", "utf8").replace("/*__BUNDLE__*/", () => r.outputFiles[0].text.replace(/<\/script>/g, "<\\/script>")));
+writeFileSync("dist/preview.html", readFileSync("src/index.html", "utf8").replace("/*__BUNDLE__*/", () => r.outputFiles[0].text.replace(/<\/script>/g, "<\\/script>")));
 console.log("built dist/preview.html");

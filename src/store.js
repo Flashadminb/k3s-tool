@@ -57,3 +57,12 @@ export function toCsv(rows) {
   const esc = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   return "﻿" + rows.map((r) => r.map(esc).join(",")).join("\r\n");
 }
+
+/* ---------- Flash Kit: where to download it and which version counts as current ---------- */
+export const DEFAULT_FLASH = { url: "https://fle.pub/ay9kj5", latest: "8.2.65" };
+export function flashCfg() { return { ...DEFAULT_FLASH, ...load("flash", {}) }; }
+export function saveFlashCfg(v) { save("flash", v); }
+
+/* ---------- Saved Wi-Fi networks (this browser only, plain text: the page warns about it) ---------- */
+export function wifiList() { return load("wifi", []); }
+export function saveWifiList(v) { save("wifi", v); }

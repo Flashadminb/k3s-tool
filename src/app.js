@@ -34,6 +34,8 @@ const HELP = {
   NO_FLASH: ["ไม่เจอแอป Flash ในเครื่อง", ["เช็กว่าเครื่องนี้ติดตั้ง Flash Kit แล้ว", "ดูชื่อแอปในแท็บ แอป แล้วแจ้งผู้ดูแลเว็บให้เพิ่มชื่อ"]],
   NO_FS: ["เบราว์เซอร์นี้บันทึกลงโฟลเดอร์ไม่ได้", ["ใช้ Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุดบนคอม Windows", "ตอนหน้าต่างเลือกโฟลเดอร์เด้งขึ้น ให้เลือกโฟลเดอร์ แล้วกด อนุญาต/ดูไฟล์ และ บันทึกการเปลี่ยนแปลง"]],
   SETTINGS: ["ตั้งค่าบางข้อไม่สำเร็จ", ["ข้อที่ไม่สำเร็จอาจถูกระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ข้ออื่นที่สำเร็จแล้วใช้งานได้ตามปกติ"]],
+  WIFI: ["ต่อ Wi-Fi ไม่สำเร็จ", ["เช็กชื่อ Wi-Fi ให้ตรงตัวพิมพ์เล็ก/ใหญ่ และรหัสผ่านให้ถูก", "เครื่องต้องอยู่ในระยะสัญญาณ (กด ค้นหา ดูว่าเครื่องเห็น Wi-Fi นี้ไหม)", "ถ้าขึ้นว่าไม่อนุญาต / not allowed: ระบบบริษัทล็อกการตั้ง Wi-Fi ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash"]],
+  TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
@@ -129,6 +131,10 @@ function confirmBox(text, word) {
 
 /** Ask which plugged-in devices to use. One device = no question. Returns [] if cancelled */
 function pickDevices(title) {
+  if (pendingInstall && Date.now() - pendingInstall.t < 180000) { const p = pendingInstall.list; pendingInstall = null; return Promise.resolve(p); }
+  pendingInstall = null;
+  const g = groupDevs();
+  if (g.length) return Promise.resolve(g);
   const ds = all();
   if (ds.length <= 1) return Promise.resolve(ds.length ? [cur()] : []);
   return new Promise((resolve) => {
@@ -173,7 +179,12 @@ function cur() {
   return d;
 }
 const all = () => [...devices.values()].filter((d) => !d.closed);
-const targets = () => ($("allDev").checked && devices.size > 1 ? all() : [cur()]);
+const targets = () => {
+  const g = groupDevs();
+  if (g.length) return g;
+  const ad = $("allDev");
+  return ad && ad.checked && devices.size > 1 ? all() : [cur()];
+};
 const label = (d) => (d.info.model || "เครื่อง") + " · " + d.serial.slice(-6);
 
 async function addDevice(d) {
@@ -186,7 +197,7 @@ async function addDevice(d) {
   log("เชื่อมต่อ " + label(d) + " (ใช้ที่เก็บรูปแบบ " + d.info.profile.name + ")");
   d.disconnected.then(() => {
     log("ถอดสายแล้ว: " + label(d));
-    devices.delete(d.serial);
+    devices.delete(d.serial); group.delete(d.serial);
     if (selected === d.serial) selected = devices.keys().next().value || null;
     if (live.dev === d) stopLive();
     renderAll();
@@ -199,6 +210,7 @@ async function addDevice(d) {
   await refreshStorage(d);
   await loadInfo(d).catch((e) => log("อ่านข้อมูลเครื่องไม่ครบ: " + e.message));
   await checkBanned(d).catch(() => {});
+  await pollStatus(d).catch(() => {});
   renderAll();
   return d;
 }
@@ -236,8 +248,17 @@ async function autoConnect() {
   } finally { autoConnecting = false; }
 }
 
+/* ---------- Group selection: actions apply to every linked device until the group is cleared ---------- */
+const group = new Set();
+let selectMode = false, hoverSerial = null, groupPin = null, pendingInstall = null;
+const groupDevs = () => [...group].map((s) => devices.get(s)).filter((d) => d && !d.closed);
+
 function renderDevices() {
   const box = $("devices");
+  const n = all().length;
+  document.body.classList.toggle("has-dev", !!n);
+  document.body.classList.toggle("selecting", selectMode);
+  renderHubTools(); // before layout: the select bar and hub tools are areas the devices must avoid
   if (box.classList.contains("orbit")) renderOrbit(box);
   else box.replaceChildren(...all().map((d) => {
     const s = d.info.storage;
@@ -246,61 +267,231 @@ function renderDevices() {
     return el("button", { class: "dev" + (d.serial === selected ? " sel" : ""), onclick: () => { selected = d.serial; renderAll(); } },
       el("b", { text: d.info.model || "เครื่อง" }), el("small", { text: "รหัส " + d.serial.slice(-6) + (pct ? " · ใช้ " + pct : "") + ban }));
   }));
-  const n = all().length;
-  document.body.classList.toggle("has-dev", !!n);
-  $("status").textContent = n ? `เชื่อมต่อ ${n} เครื่อง` : "ยังไม่เชื่อมต่อ";
+  const g = groupDevs().length;
+  $("status").textContent = !n ? "ยังไม่เชื่อมต่อ" : g ? `กลุ่ม ${g} จาก ${n} เครื่อง` : `เชื่อมต่อ ${n} เครื่อง`;
   $("status").className = n ? "pill ok" : "pill";
-  $("allDevWrap").hidden = n < 2; $("devCount").textContent = n;
-  $("stdAll").parentElement.hidden = n < 2;
+  if ($("allDevWrap")) { $("allDevWrap").hidden = n < 2; $("devCount").textContent = n; }
+  if ($("stdAll")) $("stdAll").parentElement.hidden = n < 2;
   document.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !n));
   const tab = document.querySelector(".tabs .on").dataset.tab;
   // In the space layout the empty-state note lives on the stage, so it shows on every tab
   $("nodev").hidden = !!n || (!box.classList.contains("orbit") && !["data", "device", "apps", "setup"].includes(tab));
+  renderWifiSaved();
 }
 
 /* ---------- Space layout: devices float on orbits around the connect hub ---------- */
 const TINTS = ["#5b8cff", "#3cc6b4", "#c98bff", "#ff9d6b", "#6fd49a", "#ffd36b"];
 function tintOf(serial) { let h = 0; for (const c of serial) h = (h * 31 + c.charCodeAt(0)) >>> 0; return TINTS[h % TINTS.length]; }
+const satSizeFor = (n, narrow) => Math.min(narrow ? 104 : 999, n <= 4 ? 132 : n <= 8 ? 112 : n <= 12 ? 96 : 86);
+
+/**
+ * Free spots around the hub. A honeycomb of cells (wide enough for the floating motion, tall enough for the
+ * tags under a device) is laid over the stage, cells that touch the hub, the device card or the edges are
+ * dropped, and the cells nearest the hub win. A small fixed jitter keeps neighbours from reading as rows.
+ */
+function orbitSlots(box, n, size, tagRows) {
+  const W = box.clientWidth || 800, H = box.clientHeight || 500;
+  const cs = getComputedStyle(box);
+  const cx = W * (parseFloat(cs.getPropertyValue("--cx")) || 50) / 100, cy = H * (parseFloat(cs.getPropertyValue("--cy")) || 50) / 100;
+  const br = box.getBoundingClientRect();
+  const avoid = [];
+  const addRect = (e, pad) => { if (!e || e.hidden || !e.offsetParent) return; const r = e.getBoundingClientRect(); if (r.width) avoid.push({ x1: r.left - br.left - pad, y1: r.top - br.top - pad, x2: r.right - br.left + pad, y2: r.bottom - br.top + pad }); };
+  addRect($("devCard"), 12); addRect(document.querySelector(".hubwrap"), 10); addRect($("selBar"), 6);
+  const tagH = tagRows * 24;
+  const sx = size * 1.3, sy = size + tagH + 22;
+  const R = size / 2 + 8;
+  const fits = (x, y) => x - R >= 0 && x + R <= W && y - R >= 0 && y + R + tagH <= H &&
+    !avoid.some((a) => x + R > a.x1 && x - R < a.x2 && y + R + tagH > a.y1 && y - R < a.y2);
+  const cells = [];
+  const rows = Math.ceil(H / sy) + 1, cols = Math.ceil(W / sx) + 1;
+  for (let r = -rows; r <= rows; r++) for (let k = -cols; k <= cols; k++) {
+    const j = ((r * 7 + k * 13) % 5 + 5) % 5 - 2, jy = ((r * 11 + k * 5) % 5 + 5) % 5 - 2;
+    const x = cx + (k + (r & 1) * 0.5) * sx + j * size * 0.06, y = cy + r * sy + jy * size * 0.05;
+    if (fits(x, y)) cells.push({ x, y, d: ((x - cx) / W) ** 2 + ((y - cy) / H) ** 2 });
+  }
+  cells.sort((a, b) => a.d - b.d);
+  // keep a stable, pleasant order: nearest ring first, then clockwise from the top
+  const slots = cells.slice(0, n).sort((a, b) => Math.atan2(a.x - cx, cy - a.y) - Math.atan2(b.x - cx, cy - b.y));
+  return { slots, cx, cy };
+}
+
+function batteryIcon(level) {
+  const lv = Math.max(0, Math.min(100, +level || 0));
+  const col = lv < 20 ? "var(--bad)" : lv < 50 ? "var(--warn)" : "var(--ok)";
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 26 13"); svg.setAttribute("class", "bat"); svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML = `<rect x="0.75" y="0.75" width="21.5" height="11.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="23" y="4" width="2.2" height="5" rx="1" fill="currentColor"/><rect x="2.5" y="2.5" width="${(18 * lv / 100).toFixed(1)}" height="8" rx="1.2" fill="${col}"/>`;
+  return svg;
+}
+
+function flashState(d) {
+  const f = d.info.flash;
+  if (!f) return "";
+  if (!f.length) return "missing";
+  const main = f.find((x) => /courier/.test(x.pkg)) || f[0];
+  return verLess(main.ver, st.flashCfg().latest) ? "old" : "ok";
+}
+function verLess(a, b) {
+  const pa = String(a || "0").split(/[^\d]+/).map(Number), pb = String(b || "0").split(/[^\d]+/).map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x < y; }
+  return false;
+}
+
 function renderOrbit(box) {
   const ds = all();
-  const w = box.clientWidth || 800, h = box.clientHeight || 500;
-  // two elliptical lanes so neighbours never sit in a row; skip the top-left arc where the device card sits
-  const lanes = [[0.27, 0.32], [0.36, 0.40]];
-  const from = -75, span = 200;
+  const narrow = innerWidth <= 980;
+  const tagRows = Math.min(2, Math.max(0, ...ds.map((d) => (d.info.screenOn === false) + (["missing", "old"].includes(flashState(d)) || (d.info.bannedFound || []).length ? 1 : 0))));
+  const fit = (rows) => {
+    let s = satSizeFor(ds.length, narrow), l;
+    for (;;) { l = orbitSlots(box, ds.length, s, rows); if (l.slots.length >= ds.length || s <= 56) return [s, l]; s = Math.round(s * 0.92); }
+  };
+  // With many devices the tags shrink into short labels on the ring itself, which frees a whole row of space
+  let [size, lay] = fit(tagRows);
+  const compact = tagRows > 0 && (size < 92 || lay.slots.length < ds.length);
+  if (compact) [size, lay] = fit(0);
+  box.style.setProperty("--s", size + "px");
+  const pos = new Map();
   box.replaceChildren(...ds.map((d, i) => {
-    const s = d.info.storage;
+    const p = lay.slots[i] || { x: lay.cx + (i - ds.length / 2) * 20, y: lay.cy + 140 };
+    pos.set(d.serial, p);
+    const s = d.info.storage, b = d.info.battery;
     const pct = s && s.total ? Math.round((s.used / s.total) * 100) : 0;
-    const ang = from + (ds.length === 1 ? span * 0.35 : (i * span) / (ds.length - 1 || 1));
-    const [rx, ry] = lanes[i % 2];
-    const x = Math.cos((ang * Math.PI) / 180) * rx * w, y = Math.sin((ang * Math.PI) / 180) * ry * h;
+    const inGroup = group.has(d.serial), off = d.info.screenOn === false, fs = flashState(d);
     const ban = d.info.bannedFound && d.info.bannedFound.length;
-    const b = el("button", {
-      class: "sat" + (d.serial === selected ? " sel" : "") + (pct > 85 ? " full" : ""),
-      style: `--x:${x.toFixed(0)}px;--y:${y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.7).toFixed(1)}s`,
-      title: label(d), "aria-pressed": d.serial === selected ? "true" : "false",
-      onclick: () => { selected = d.serial; renderAll(); }
+    const isSel = group.size ? groupPin === d.serial : d.serial === selected;
+    const sat = el("button", {
+      class: "sat" + (isSel ? " sel" : "") + (pct > 85 ? " full" : "") + (off ? " off" : ""),
+      title: label(d) + (selectMode ? " · กดเพื่อเลือก/เอาออก" : ""), "aria-pressed": String(selectMode ? inGroup : isSel),
+      onclick: () => {
+        if (selectMode) { inGroup ? group.delete(d.serial) : group.add(d.serial); }
+        else if (group.size) groupPin = groupPin === d.serial ? null : d.serial;
+        else selected = d.serial;
+        renderAll();
+      }
     },
       el("span", { class: "sat-ring" }),
       el("span", { class: "sat-body" },
         el("b", { class: "sat-pct", text: s ? pct + "%" : "…" }),
-        el("span", { class: "sat-name", text: d.info.model || "เครื่อง" }),
+        el("span", { class: "sat-bat" }, batteryIcon(b && b.level), el("span", { text: b && b.level !== "" ? b.level + "%" : "" })),
         el("span", { class: "sat-id", text: d.serial.slice(-6) })),
-      ban ? el("span", { class: "sat-ban", text: "แอปต้องห้าม " + ban }) : null);
-    return b;
+      inGroup ? el("span", { class: "sat-check", "aria-hidden": "true" }) : null);
+    const tags = [];
+    if (off) tags.push(el("button", { class: "sat-tag wake", text: compact ? "จอดับ" : "จอดับ · แตะเพื่อเปิด", title: "แตะเพื่อเปิดหน้าจอ", onclick: () => wakeScreen(d) }));
+    if (fs === "missing") tags.push(el("span", { class: "sat-tag bad", text: compact ? "ไม่มี Flash" : "ไม่มี Flash Kit" }));
+    else if (fs === "old") tags.push(el("span", { class: "sat-tag warn", text: compact ? "Flash เก่า" : "Flash Kit เก่า" }));
+    if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
+    const w = el("div", {
+      class: "satw" + (inGroup ? " in-group" : ""), "data-serial": d.serial,
+      style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s`
+    }, sat, tags.length ? el("div", { class: "sat-tags" + (compact ? " compact" : "") }, tags) : null);
+    return w;
   }));
-  renderDevCard(devices.get(selected));
+  drawLinks(lay, pos);
+  renderCard();
 }
-function renderDevCard(d) {
+
+/** Gold lines joining the grouped devices (ordered around the hub) */
+function drawLinks(lay, pos) {
+  const svg = $("links");
+  if (!svg) return;
+  const pts = groupDevs().map((d) => pos.get(d.serial)).filter(Boolean)
+    .sort((a, b) => Math.atan2(a.y - lay.cy, a.x - lay.cx) - Math.atan2(b.y - lay.cy, b.x - lay.cx));
+  svg.innerHTML = "";
+  if (pts.length < 2) return;
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", pts.map((p, i) => (i ? "L" : "M") + p.x.toFixed(0) + " " + p.y.toFixed(0)).join(" ") + (pts.length > 2 ? " Z" : ""));
+  path.setAttribute("class", "link");
+  svg.append(path);
+}
+
+function renderHubTools() {
+  const tools = $("hubTools");
+  if (!tools) return;
+  const n = all().length, g = groupDevs().length;
+  tools.hidden = n < 1;
+  $("selTool").classList.toggle("on", selectMode);
+  $("selTool").setAttribute("aria-pressed", String(selectMode));
+  $("selBar").hidden = !selectMode && !g;
+  $("selInfo").textContent = selectMode ? (g ? `เลือกแล้ว ${g} เครื่อง` : "แตะดาวเพื่อเลือกเครื่อง") : `กลุ่ม ${g} เครื่อง`;
+  $("selDone").hidden = !selectMode;
+  $("selAll").hidden = !selectMode;
+  const need = all().filter((d) => ["missing", "old"].includes(flashState(d)));
+  $("flashNeed").hidden = !need.length;
+  $("flashNeedN").textContent = need.length;
+}
+
+/** Left card: the hovered device, else the clicked one; with a group it also lists the group */
+function renderCard() {
   const c = $("devCard");
   if (!c) return;
-  c.hidden = !d;
+  const gs = groupDevs();
+  const d = devices.get(hoverSerial) || (gs.length ? devices.get(groupPin) : devices.get(selected));
+  c.hidden = !d && !gs.length;
+  $("dcGroup").hidden = !gs.length;
+  if (gs.length) {
+    $("dcGroupTitle").textContent = `กลุ่มที่เลือก ${gs.length} เครื่อง`;
+    $("dcGroupList").replaceChildren(...gs.map((x) => el("span", { class: "chip" + (d === x ? " on" : ""), text: x.serial.slice(-6) })));
+  }
+  $("dcDetail").hidden = !d;
   if (!d) return;
-  const i = d.info, b = i.battery;
-  $("dcBattery").textContent = b ? `${b.level}%${b.status ? " · " + b.status : ""}` : "-";
+  const s = d.info.storage, i = d.info, b = i.battery;
+  $("model").textContent = label(d);
+  if (s) {
+    const pct = s.total ? Math.round((s.used / s.total) * 100) : 0;
+    $("used").textContent = human(s.used) + " (" + pct + "%)";
+    $("total").textContent = "เหลือว่าง " + human(s.total - s.used) + " จาก " + human(s.total);
+    $("bar").style.width = pct + "%"; $("bar").className = pct > 85 ? "bar bad" : pct > 70 ? "bar warn" : "bar";
+  } else { $("used").textContent = "-"; $("total").textContent = ""; $("bar").style.width = 0; }
+  $("dcBattery").replaceChildren(...(b ? [batteryIcon(b.level), ` ${b.level}%${b.status ? " · " + b.status : ""}`] : ["-"]));
   $("dcHealth").textContent = b ? b.health + (b.temp ? ` · ${b.temp}°C` : "") : "-";
   $("dcAndroid").textContent = i.android ? "Android " + i.android : "-";
-  $("dcFlash").textContent = i.flash && i.flash.length ? i.flash.map((f) => f.ver || f.pkg).join(", ") : "-";
+  const fs = flashState(d);
+  $("dcFlash").textContent = i.flash ? (i.flash.length ? i.flash.map((f) => f.ver || f.pkg).join(", ") + (fs === "old" ? " (เก่า)" : "") : "ไม่มี") : "-";
+  $("dcScreen").textContent = i.screenOn === false ? "ดับอยู่" : i.screenOn ? "เปิดอยู่" : "-";
   $("dcSerial").textContent = d.serial;
+}
+function renderDevCard() { renderCard(); }
+
+/** Bottom dock numbers: the group added up, or the selected device */
+function renderDock() {
+  if (!$("dockScope")) return;
+  const gs = groupDevs();
+  const ds = gs.length ? gs : [devices.get(selected)].filter(Boolean);
+  $("dockScope").textContent = gs.length ? `รวม ${gs.length} เครื่อง` : ds[0] ? label(ds[0]) : "";
+  if (!ds.length || ds.some((d) => !d.info.storage)) { ["cSuccess", "cTrash", "cFail"].forEach((k) => ($(k).textContent = ds.length ? "กำลังนับ..." : "-")); return; }
+  const counting = ds.some((d) => d.info.storage.counting);
+  const sum = (k) => ds.reduce((a, d) => [a[0] + (d.info.storage[k] || [0])[0], a[1] + (d.info.storage[k] || [0, 0])[1]], [0, 0]);
+  const f = (x) => (counting ? "กำลังนับ..." : x[0].toLocaleString() + " ไฟล์ · " + human(x[1]));
+  $("cSuccess").textContent = f(sum("success")); $("cTrash").textContent = f(sum("trash")); $("cFail").textContent = f(sum("fail"));
+}
+
+/* ---------- Screen off: wake it, then ask (every time) whether to keep it on while on USB ---------- */
+async function wakeScreen(d) {
+  await run("เปิดหน้าจอ " + label(d), async () => {
+    await d.sh("input keyevent 224");
+    d.info.screenOn = true; renderDevices();
+    if (await confirmBox(`เปิดหน้าจอ ${label(d)} แล้ว\n\nให้หน้าจอเครื่องนี้เปิดค้างไว้ ไม่ดับเอง ตอนเสียบสาย USB อยู่ไหม?\n(ถอดสายแล้วจอจะดับตามปกติ)`)) {
+      await d.shOk("svc power stayon usb");
+      log(`${label(d)}: ตั้งให้จอเปิดค้างตอนเสียบสาย USB แล้ว`);
+    }
+  });
+}
+
+/* ---------- Light status poll: screen on/off and battery, every 15 s ---------- */
+async function pollStatus(d) {
+  const r = await d.sh("dumpsys power | grep -m1 mWakefulness=; dumpsys battery | grep -m1 ' level:'");
+  const wake = (r.out.match(/mWakefulness=(\w+)/) || [])[1];
+  const lvl = (r.out.match(/level:\s*(\d+)/) || [])[1];
+  let changed = false;
+  if (wake) { const on = wake === "Awake"; if (d.info.screenOn !== on) { d.info.screenOn = on; changed = true; } }
+  if (lvl && d.info.battery && d.info.battery.level !== lvl) { d.info.battery.level = lvl; changed = true; }
+  return changed;
+}
+async function pollAll() {
+  if (busy || document.hidden) return;
+  let changed = false;
+  for (const d of all()) { try { if (await pollStatus(d)) changed = true; } catch (e) {} }
+  if (changed) renderDevices();
 }
 
 function renderAll() {
@@ -340,6 +531,7 @@ async function refreshStorage(d) {
 }
 
 function renderStorage(d) {
+  if ($("devCard")) { renderCard(); renderDock(); return; }
   const s = d && d.info.storage;
   $("model").textContent = d ? label(d) : "-";
   if (!s) { ["used", "total", "cSuccess", "cTrash", "cFail"].forEach((k) => ($(k).textContent = "-")); $("bar").style.width = 0; return; }
@@ -670,6 +862,73 @@ function removeBanned(ds) {
     if (fails.length) throw new Error(fails.join("\n"));
   }, "UNINSTALL");
 }
+/* =====================================================================
+   Wi-Fi: saved networks, scan, connect one device or the whole group
+   ===================================================================== */
+async function wifiNow(d) {
+  const r = await d.sh("cmd wifi status");
+  const t = r.out + r.err;
+  const m = t.match(/connected to "([^"]*)"/i);
+  if (/Wifi is disabled/i.test(t)) return "Wi-Fi ปิดอยู่";
+  return m ? "ต่ออยู่กับ " + m[1] : "ยังไม่ได้ต่อ Wi-Fi";
+}
+async function renderWifiNow() {
+  const box = $("wifiNow");
+  if (!box) return;
+  const ds = groupDevs().length ? groupDevs() : all();
+  if (!ds.length) { box.textContent = "-"; return; }
+  const rows = [];
+  for (const d of ds) { try { rows.push(label(d) + ": " + (await wifiNow(d))); } catch (e) { rows.push(label(d) + ": อ่านไม่ได้"); } }
+  box.replaceChildren(...rows.map((t) => el("div", { text: t })));
+}
+function renderWifiSaved() {
+  const box = $("wifiSaved");
+  if (!box) return;
+  const list = st.wifiList();
+  box.replaceChildren(...(list.length ? list.map((w, i) => el("div", { class: "item" },
+    el("div", { class: "nm" }, w.ssid, el("small", { text: w.sec === "open" ? "ไม่มีรหัส" : w.sec.toUpperCase() + " · มีรหัสบันทึกไว้" })),
+    el("div", { class: "row" },
+      el("button", { class: "blue need-dev", text: "เชื่อมต่อ", onclick: () => wifiConnect(w) }),
+      el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบ Wi-Fi "${w.ssid}" ออกจากรายการ?`)) { const l = st.wifiList(); l.splice(i, 1); st.saveWifiList(l); renderWifiSaved(); } } }))
+  )) : [el("div", { class: "item mut", text: "ยังไม่มี เพิ่มได้ด้านล่าง" })]));
+  box.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !all().length));
+}
+function wifiConnect(w) {
+  run(`ต่อ Wi-Fi ${w.ssid}`, async () => {
+    const ts = targets();
+    if (ts.length > 1 && !(await confirmBox(`ต่อ Wi-Fi "${w.ssid}" ให้ ${ts.length} เครื่อง?`))) return false;
+    const fails = [];
+    for (const d of ts) {
+      busyMsg(`กำลังต่อ ${w.ssid} · ${label(d)}`);
+      await d.sh("svc wifi enable");
+      const r = await d.sh(`cmd wifi connect-network ${q(w.ssid)} ${w.sec}${w.sec === "open" ? "" : " " + q(w.pass)}`);
+      const t = (r.out + r.err).trim();
+      if (r.code || /exception|denied|not allowed|error|unknown command/i.test(t)) { fails.push(`${label(d)}: ${t || "failed"}`); continue; }
+      log(`${label(d)}: สั่งต่อ ${w.ssid} แล้ว`);
+    }
+    await new Promise((res) => setTimeout(res, 4000));
+    await renderWifiNow();
+    if (fails.length) throw new Error("WIFI: " + fails.join(" / "));
+  }, "WIFI");
+}
+function parseScan(out) {
+  const seen = new Map();
+  for (const line of out.split("\n")) {
+    const m = line.match(/^\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5})\s+(\d+)\s+(-?\d+)\s+\S+\s+(.*?)\s*(\[.*\])?\s*$/i);
+    if (!m || !m[4]) continue;
+    const ssid = m[4], rssi = +m[3], flags = m[5] || "";
+    const sec = /SAE/.test(flags) && !/PSK/.test(flags) ? "wpa3" : /WPA|PSK|SAE/.test(flags) ? "wpa2" : "open";
+    if (!seen.has(ssid) || seen.get(ssid).rssi < rssi) seen.set(ssid, { ssid, rssi, sec });
+  }
+  return [...seen.values()].sort((a, b) => b.rssi - a.rssi);
+}
+
+function loadFlashForm() {
+  if (!$("flUrl")) return;
+  const c = st.flashCfg();
+  $("flUrl").value = c.url; $("flLatest").value = c.latest;
+  document.querySelectorAll("a.flash-link").forEach((a) => (a.href = c.url));
+}
 function loadBannedText() { $("bannedText").value = st.banned().join("\n"); }
 
 /* =====================================================================
@@ -804,7 +1063,7 @@ const actions = {
   logcat: () => run("บันทึก log", async () => {
     const d = cur();
     const r = await d.sh("logcat -d -v time -t 20000");
-    const head = `K3S Tool log\nเครื่อง: ${d.info.manufacturer || ""} ${d.info.model} (${d.serial})\nAndroid: ${d.info.android || ""}\nเวลา: ${new Date().toString()}\n\n`;
+    const head = `IDATA TOOLS log\nเครื่อง: ${d.info.manufacturer || ""} ${d.info.model} (${d.serial})\nAndroid: ${d.info.android || ""}\nเวลา: ${new Date().toString()}\n\n`;
     download(head + r.out, `log-${d.serial.slice(-6)}-${stamp()}.txt`, "text/plain");
   }),
   apk: () => $("apkFile").click(),
@@ -831,7 +1090,8 @@ const actions = {
 
   stdApply: () => run("ตั้งค่ามาตรฐาน", async () => {
     const s = readStdForm();
-    const ts = $("stdAll").checked && devices.size > 1 ? all() : [cur()];
+    const sa = $("stdAll");
+    const ts = groupDevs().length ? groupDevs() : sa && sa.checked && devices.size > 1 ? all() : [cur()];
     if (!(await confirmBox(`ตั้งค่ามาตรฐานให้ ${ts.length > 1 ? ts.length + " เครื่อง" : label(ts[0])}?`))) return false;
     const fails = [];
     for (const d of ts) { const f = await applyStd(d, s); if (f.length) fails.push(label(d) + ": " + f.join(", ")); }
@@ -846,6 +1106,57 @@ const actions = {
     renderAll(); log("บันทึกรุ่นเครื่องแล้ว กด อัปเดตตัวเลข เพื่อนับใหม่");
   },
 
+  selTool: () => { selectMode = !selectMode; if (selectMode && !group.size && selected) group.add(selected); renderAll(); },
+  selAll: () => { all().forEach((d) => group.add(d.serial)); renderAll(); },
+  selClear: () => { group.clear(); groupPin = null; renderAll(); log("ล้างกลุ่มแล้ว คำสั่งจะทำกับเครื่องที่เลือกเครื่องเดียว"); },
+  selDone: () => { selectMode = false; renderAll(); if (group.size) log(`กลุ่ม ${group.size} เครื่อง: ทุกคำสั่งจะทำกับทั้งกลุ่ม จนกว่าจะกด ล้างกลุ่ม`); },
+  flashNeed: async () => {
+    const need = all().filter((d) => ["missing", "old"].includes(flashState(d)));
+    const cfg = st.flashCfg();
+    $("dlgList").replaceChildren(el("a", { href: cfg.url, target: "_blank", rel: "noopener", class: "dl-link", text: "1. กดตรงนี้เพื่อโหลด Flash Kit (เปิดแท็บใหม่)" }));
+    const ok = await confirmBox(`เครื่องที่ยังไม่มี Flash Kit หรือเวอร์ชันเก่ากว่า ${cfg.latest}:\n${need.map((d) => "• " + label(d) + (flashState(d) === "missing" ? " (ไม่มี)" : " (เก่า)")).join("\n")}\n\n2. โหลดเสร็จแล้ว กด ยืนยัน แล้วเลือกไฟล์ APK ที่โหลดมา เว็บจะติดตั้ง/อัปเดตให้เครื่องเหล่านี้`);
+    $("dlgList").replaceChildren();
+    if (ok) { pendingInstall = { list: need, t: Date.now() }; $("apkFile").click(); }
+  },
+  flashSave: () => {
+    const url = $("flUrl").value.trim(), latest = $("flLatest").value.trim();
+    if (!/^https?:\/\//.test(url)) { showHelp("UNKNOWN", "ลิงก์ต้องขึ้นต้นด้วย https://"); return; }
+    st.saveFlashCfg({ url, latest }); loadFlashForm(); renderAll(); log("บันทึกข้อมูล Flash Kit แล้ว");
+  },
+  typeSend: () => run("ส่งรหัสเข้าเครื่อง", async () => {
+    const t = $("typeText").value;
+    if (!t) return false;
+    // `input text` types ASCII only; spaces must be sent as %s
+    if (/[^\x20-\x7e]/.test(t)) throw new Error("TYPE");
+    for (const d of targets()) {
+      await d.shOk(`input text ${q(t.replace(/ /g, "%s"))}`);
+      if ($("typeEnter").checked) await d.sh("input keyevent 66");
+      log(`${label(d)}: ส่งข้อความแล้ว`);
+    }
+    $("typeText").value = "";
+  }, "TYPE"),
+  wifiStatus: () => run("เช็ก Wi-Fi", renderWifiNow, "WIFI"),
+  wifiAdd: () => {
+    const ssid = $("wfSsid").value.trim(), pass = $("wfPass").value, sec = $("wfSec").value;
+    if (!ssid) { $("wfSsid").focus(); return; }
+    if (sec !== "open" && pass.length < 8) { showHelp("WIFI", "รหัส Wi-Fi ต้องยาวอย่างน้อย 8 ตัว"); return; }
+    const l = st.wifiList().filter((w) => w.ssid !== ssid);
+    l.unshift({ ssid, pass: sec === "open" ? "" : pass, sec });
+    st.saveWifiList(l); $("wfSsid").value = ""; $("wfPass").value = "";
+    renderWifiSaved(); log(`บันทึก Wi-Fi ${ssid} แล้ว`);
+  },
+  wifiScan: () => run("ค้นหา Wi-Fi", async () => {
+    const d = cur();
+    await d.sh("svc wifi enable; cmd wifi start-scan");
+    await new Promise((res) => setTimeout(res, 4000));
+    const r = await d.sh("cmd wifi list-scan-results");
+    const nets = parseScan(r.out);
+    $("wifiScanList").replaceChildren(...(nets.length ? nets.map((n) => el("div", { class: "item wifi-row" },
+      el("div", { class: "nm" }, n.ssid, el("small", { text: n.sec === "open" ? "ไม่มีรหัส" : n.sec.toUpperCase() })),
+      el("div", { class: "row" }, el("span", { class: "sig", text: n.rssi > -60 ? "แรง" : n.rssi > -75 ? "พอใช้" : "อ่อน" }),
+        el("button", { text: "ใช้ชื่อนี้", onclick: () => { $("wfSsid").value = n.ssid; $("wfSec").value = n.sec; $("wfPass").focus(); } }))
+    )) : [el("div", { class: "item mut", text: "ไม่เจอ Wi-Fi (หรือเครื่องไม่ยอมให้ค้นหา)" })]));
+  }, "WIFI"),
   regCsv: () => {
     const r = Object.values(st.registry());
     download(st.toCsv([["รหัสเครื่อง", "ยี่ห้อ", "รุ่น", "Android", "แบต", "พื้นที่", "แอป Flash", "เห็นครั้งแรก", "เห็นล่าสุด"],
@@ -870,7 +1181,7 @@ async function installApk(file) {
       const r = await d.sh(`pm install -r ${tmp}`);
       await d.sh(`rm -f ${tmp}`);
       const msg = (r.out + r.err).trim();
-      if (/Success/i.test(r.out)) log(`${label(d)}: ติดตั้ง ${file.name} สำเร็จ`); else fails.push(`${label(d)}: ${msg || "install failed"}`);
+      if (/Success/i.test(r.out)) { log(`${label(d)}: ติดตั้ง ${file.name} สำเร็จ`); await loadInfo(d).catch(() => {}); } else fails.push(`${label(d)}: ${msg || "install failed"}`);
     }
     if (fails.length) throw new Error(fails.join("\n"));
   }, "INSTALL");
@@ -916,6 +1227,7 @@ function showTab(name) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => (t.hidden = t.id !== "tab-" + name));
   renderDevices();
+  if (name === "wifi" && all().length && !busy) renderWifiNow().catch(() => {});
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -946,12 +1258,25 @@ window.addEventListener("DOMContentLoaded", () => {
   $("autoPct").addEventListener("change", (e) => { auto.pct = +e.target.value; scheduleAuto(); });
   if (auto.every) scheduleAuto(); else renderAuto();
   setInterval(autoTick, 30000);
+  setInterval(pollAll, 15000);
   window.addEventListener("beforeunload", (e) => { if (auto.every && all().length) { e.preventDefault(); e.returnValue = ""; } });
 
-  loadStdForm(); loadBannedText(); renderProfTable(); renderRegistry(); renderHistory(); renderAll();
+  loadStdForm(); loadBannedText(); loadFlashForm(); renderWifiSaved();
+  [["typeShow", "typeText"], ["wfShow", "wfPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
+  if ($("typeText")) $("typeText").addEventListener("keydown", (e) => { if (e.key === "Enter") actions.typeSend(); });
+  if ($("fxMode")) {
+    $("fxMode").value = st.load("fx", "auto");
+    $("fxMode").addEventListener("change", (e) => { st.save("fx", e.target.value); if (window.__fx) window.__fx(e.target.value); });
+  } renderProfTable(); renderRegistry(); renderHistory(); renderAll();
   if (!st.load("everConnected", false)) showTab("guide");
 
-  window.addEventListener("resize", () => { if ($("devices").classList.contains("orbit")) renderDevices(); });
+  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if ($("devices").classList.contains("orbit")) renderDevices(); }, 150); });
+  // Hover preview survives re-renders: work out the hovered device from whatever is under the pointer
+  document.addEventListener("pointerover", (e) => {
+    const w = e.target.closest && e.target.closest(".satw");
+    const s = w ? w.dataset.serial : null;
+    if (s !== hoverSerial) { hoverSerial = s; renderCard(); }
+  });
   if (!adb.hasWebUsb()) { showHelp("NO_WEBUSB"); return; }
   navigator.usb.addEventListener("connect", () => setTimeout(autoConnect, 800));
   autoConnect();

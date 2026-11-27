@@ -18,5 +18,6 @@
   "devDependencies": {
     "esbuild": "^0.28.2",
     "wrangler": "^4.169.0"
-  }
+  },
+  "author": "THANAWAT PHUTTARIT"
 }

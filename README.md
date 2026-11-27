@@ -1,5 +1,7 @@
 # IDATA TOOLS
 
+Created by **THANAWAT PHUTTARIT** · © 2026 THANAWAT PHUTTARIT
+
 หน้าเว็บสำหรับเปิดใน Chrome/Edge บนคอม แล้วเสียบสาย USB กับเครื่อง PDA (iData K3S / Flash Kit) เพื่อลบรูปและขยะที่ทำให้พื้นที่เต็ม
 ดูแลเครื่อง จัดการแอป ต่อ Wi-Fi และตั้งค่าเครื่อง โดยไม่ต้องพิมพ์คำสั่ง ทำทีละเครื่องหรือเป็นกลุ่มได้
 ใช้ WebUSB + ไลบรารี `@yume-chan/adb` (ไม่ต้องติดตั้ง adb.exe)

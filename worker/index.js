@@ -1,3 +1,4 @@
+/*! IDATA TOOLS · created by THANAWAT PHUTTARIT */
 /*
  * IDATA TOOLS login server (Cloudflare Worker, free plan).
  *
@@ -114,7 +115,7 @@ async function rotate(env, staff, s, why) {
 /* ---------- login page (served without a session) ---------- */
 function loginPage(needSetup) {
   return new Response(`<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>IDATA TOOLS · เข้าสู่ระบบ</title><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png">
+<title>IDATA TOOLS · เข้าสู่ระบบ</title><meta name="author" content="THANAWAT PHUTTARIT"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#070b1a;--card:rgba(20,27,52,.86);--line:rgba(232,190,90,.28);--gold:#e8be5a;--text:#eef1fb;--mut:#a7b0cc;--red:#ff7b7b}
@@ -137,7 +138,7 @@ ${needSetup ? `<p>ตั้งค่าครั้งแรก: ตั้งช
 <label for="n">ชื่อ</label><input id="n" name="username" autocomplete="username" required>
 <label for="p">รหัส</label><input id="p" name="password" type="password" autocomplete="current-password" required>
 <button>เข้าสู่ระบบ</button>`}
-<div id="err" role="alert"></div></form>
+<div id="err" role="alert"></div><div style="margin-top:18px;text-align:center;font-size:9px;letter-spacing:.12em;color:rgba(200,210,235,.22);text-transform:uppercase">made by THANAWAT PHUTTARIT</div></form>
 <script>
 const f=document.getElementById("f"),err=document.getElementById("err");
 f.addEventListener("submit",async(e)=>{e.preventDefault();err.textContent="";

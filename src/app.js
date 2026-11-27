@@ -57,6 +57,23 @@ function log(msg) {
 }
 // Progress toast at the bottom + tab title. Several jobs can run at once (one per device), one line each.
 const TITLE = "IDATA TOOLS";
+/*
+ * Author mark. Kept in several places on purpose (plain text, base64, a faint label on the page, the build banner,
+ * the login page and the device notification), and put back if someone removes the label from the page.
+ */
+const AUTHOR = (() => { try { return atob("VEhBTkFXQVQgUEhVVFRBUklU"); } catch (e) { return "THANAWAT PHUTTARIT"; } })();
+function authorMark() {
+  const put = () => {
+    if (document.getElementById("wm-a")) return;
+    const m = document.createElement("div");
+    m.id = "wm-a"; m.setAttribute("aria-hidden", "true"); m.textContent = "made by " + AUTHOR;
+    m.style.cssText = "position:fixed;left:10px;bottom:4px;z-index:1;font:500 9px/1 system-ui,sans-serif;letter-spacing:.12em;color:rgba(200,210,235,.16);pointer-events:none;user-select:none;text-transform:uppercase";
+    document.body.appendChild(m);
+  };
+  put();
+  new MutationObserver(put).observe(document.body, { childList: true });
+  console.info("%cIDATA TOOLS%c · created by " + AUTHOR, "font-weight:700;color:#e8be5a", "color:#8a93ad");
+}
 const toast = { lines: new Map(), last: null, timer: null, firstStart: 0 };
 function busyMsg(t, key) {
   // no key: the detail belongs to the job started most recently
@@ -1960,7 +1977,7 @@ const actions = {
     await d.sh("input keyevent 224");
     await signalDevice(d);
     // A notification with the id on the device's own screen: easy to spot which one on the desk it is
-    const r = await d.sh(`cmd notification post -S bigtext -t ${q("IDATA TOOLS")} idata-find ${q((st.nameOf(d.serial) ? "เครื่องนี้คือ " + st.nameOf(d.serial) + " · " : "เครื่องนี้คือ") + "รหัส " + id + " (" + d.serial + ")")}`);
+    const r = await d.sh(`cmd notification post -S bigtext -t ${q("IDATA TOOLS · " + AUTHOR)} idata-find ${q((st.nameOf(d.serial) ? "เครื่องนี้คือ " + st.nameOf(d.serial) + " · " : "เครื่องนี้คือ") + "รหัส " + id + " (" + d.serial + ")")}`);
     d.info.screenOn = true; renderDevices();
     setStatus(d, { title: "เครื่องนี้", big: "👋", done: true });
     log(`${label(d)}: ส่งสัญญาณแล้ว (จอกะพริบ + สั่น) เปิดจอแล้ว${r.code ? "" : " และขึ้นแจ้งเตือนรหัส " + id + " ที่เครื่อง"}`);
@@ -2515,6 +2532,7 @@ async function renderUsers() {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
+  authorMark();
   applyRole(await auth.initAuth());
   document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => actions[b.dataset.act]()));
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));

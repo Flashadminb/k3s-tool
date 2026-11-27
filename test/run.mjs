@@ -138,6 +138,12 @@ let calls0 = readFileSync(join(ROOT, "calls.log"), "utf8");
 ok(calls0.includes("input keyevent 224") && calls0.includes("svc power stayon usb"), "screen woken and kept on after confirm");
 ok(!(await page.isVisible(".sat-tag.wake")), "screen-off tag gone");
 
+console.log("device name");
+await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
+await page.fill("#dlgInput", "Hub-07"); await page.click("#dlgOk");
+ok((await page.textContent(".satw")).includes("Hub-07") && (await page.textContent("#model")).includes("Hub-07"), "name shown in the circle and the card");
+ok(await page.evaluate(() => JSON.parse(localStorage.getItem("k3s-tool:names"))["TESTSERIAL001"] === "Hub-07"), "name remembered for this serial");
+
 console.log("find this device");
 await click("findDev"); await idle();
 ok((await page.textContent("#log")).includes("เปิดจอแล้ว"), "find button wakes the device");

@@ -3,7 +3,7 @@
 import * as st from "./store.js";
 
 // Settings shared by every computer and phone: the owner's copy lives on the server
-export const SYNC_KEYS = ["profiles", "banned", "std", "flash", "wifi", "fieldLock", "gEmail"];
+export const SYNC_KEYS = ["profiles", "banned", "std", "flash", "wifi", "fieldLock", "gEmail", "names"];
 export let me = { role: "local", name: "" };
 
 async function call(method, path, body) {

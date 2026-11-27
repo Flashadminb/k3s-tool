@@ -176,6 +176,29 @@ function choiceBox(text, choices) {
   });
 }
 
+/** Ask for one line of text; resolves to the text (may be empty) or null when cancelled */
+function promptBox(text, value, placeholder) {
+  return new Promise((resolve) => {
+    $("dlgText").textContent = text;
+    const inp = $("dlgInput"); inp.hidden = false; inp.value = value || ""; inp.placeholder = placeholder || "";
+    $("dlg").hidden = false; inp.focus(); inp.select();
+    const done = (v) => { $("dlg").hidden = true; inp.hidden = true; $("dlgOk").onclick = $("dlgNo").onclick = inp.onkeydown = null; resolve(v); };
+    $("dlgNo").onclick = () => done(null);
+    $("dlgOk").onclick = () => done(inp.value.trim());
+    inp.onkeydown = (e) => { if (e.key === "Enter") done(inp.value.trim()); };
+  });
+}
+async function nameDevice(d) {
+  const v = await promptBox(`ตั้งชื่อเครื่อง ${d.info.model || ""} รหัส ${d.serial}\nชื่อจะผูกกับรหัสเครื่องนี้ จำไว้ตลอด เสียบครั้งหน้าขึ้นชื่อเอง (เว้นว่าง = ลบชื่อ)`, st.nameOf(d.serial), "เช่น 07 หรือ K3S-07 หรือ ชื่อคนถือ");
+  if (v === null) return;
+  const taken = Object.entries(st.names()).find(([s, n]) => s !== d.serial && v && n.toLowerCase() === v.toLowerCase());
+  if (taken && !(await confirmBox(`ชื่อ "${v}" ใช้กับเครื่อง ${taken[0]} อยู่แล้ว ใช้ซ้ำไหม?`))) return;
+  st.setName(d.serial, v);
+  st.updateRegistry(d.serial, { name: v });
+  log(v ? `ตั้งชื่อ ${d.serial} ว่า "${v}"` : `ลบชื่อของ ${d.serial}`);
+  renderAll(); renderRegistry();
+}
+
 function confirmBox(text, word) {
   return new Promise((resolve) => {
     $("dlgText").textContent = text;
@@ -246,7 +269,9 @@ const targets = () => {
   const ad = $("allDev");
   return ad && ad.checked && devices.size > 1 ? all() : [cur()];
 };
-const label = (d) => (d.info.model || "เครื่อง") + " · " + d.serial.slice(-6);
+// A named device shows its name first ("เครื่อง 07 · 294734"), otherwise model + last 6 of the serial
+const label = (d) => { const n = st.nameOf(d.serial); return (n || d.info.model || "เครื่อง") + " · " + d.serial.slice(-6); };
+const shortName = (d) => st.nameOf(d.serial) || d.serial.slice(-6);
 
 async function addDevice(d) {
   const old = devices.get(d.serial);
@@ -565,7 +590,8 @@ function storagePct(d) { const s = d.info.storage; return s && s.total ? Math.ro
 const ringPct = (d) => (d.status && d.status.ring != null ? Math.max(0, Math.min(100, Math.round(d.status.ring))) : storagePct(d));
 const statusClass = (d) => (d.status ? " has-status" + (d.status.err ? " st-err" : d.status.done ? " st-done" : "") : "");
 function satBody(d) {
-  const id = el("span", { class: "sat-id", text: d.serial.slice(-6) });
+  const nm = st.nameOf(d.serial);
+  const id = el("span", { class: "sat-id" + (nm ? " named" : ""), text: nm || d.serial.slice(-6), title: d.serial });
   const s0 = d.status;
   if (s0) return [el("span", { class: "sat-st", text: s0.title }), s0.big != null ? el("b", { class: "sat-big", text: s0.big }) : null,
     s0.unit ? el("span", { class: "sat-unit", text: s0.unit }) : null, id].filter(Boolean);
@@ -626,7 +652,7 @@ function renderCard() {
   $("dcGroup").hidden = !gs.length;
   if (gs.length) {
     $("dcGroupTitle").textContent = `กลุ่มที่เลือก ${gs.length} เครื่อง`;
-    $("dcGroupList").replaceChildren(...gs.map((x) => el("span", { class: "chip" + (d === x ? " on" : ""), text: x.serial.slice(-6) })));
+    $("dcGroupList").replaceChildren(...gs.map((x) => el("span", { class: "chip" + (d === x ? " on" : ""), text: shortName(x) })));
   }
   $("dcDetail").hidden = !d;
   cardDev = d || null;
@@ -646,6 +672,7 @@ function renderCard() {
   $("dcFlash").textContent = i.flash ? (i.flash.length ? i.flash.map((f) => f.ver || f.pkg).join(", ") + (fs === "old" ? " (เก่า)" : "") : "ไม่มี") : "-";
   $("dcScreen").textContent = i.screenOn === false ? "ดับอยู่" : i.screenOn ? "เปิดอยู่" : "-";
   $("dcSerial").textContent = d.serial;
+  if ($("dcName")) $("dcName").textContent = st.nameOf(d.serial) ? "เปลี่ยนชื่อ" : "ตั้งชื่อ";
   if ($("dcKiosk")) $("dcKiosk").hidden = !i.kiosk;
 }
 /** Commands that bring another app to the front make iLauncher cut USB: warn first on those devices */
@@ -1750,7 +1777,7 @@ function renderProfTable() {
 function renderRegistry() {
   const r = Object.values(st.registry()).sort((a, b) => b.lastSeen - a.lastSeen);
   $("regTable").replaceChildren(...(r.length ? r.map((x) => el("tr", {},
-    el("td", { text: x.serial }), el("td", { text: x.model || "" }), el("td", { text: x.android || "" }),
+    el("td", {}, el("b", { text: st.nameOf(x.serial) || "-" }), el("div", { class: "mut", text: x.serial })), el("td", { text: x.model || "" }), el("td", { text: x.android || "" }),
     el("td", { text: x.battery || "" }), el("td", { text: x.storage || "" }), el("td", { text: x.flash || "" }),
     el("td", { text: fmtTime(x.lastSeen) }),
     el("td", {}, el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox("ลบเครื่อง " + x.serial + " ออกจากทะเบียน?")) { st.removeRegistry(x.serial); renderRegistry(); } } })))) : [el("tr", {}, el("td", { colspan: "8", class: "mut", text: "ยังไม่มีเครื่อง" }))]));
@@ -1846,12 +1873,13 @@ const actions = {
     await Promise.all(ts.map((d) => unlockDevice(d)));
     renderAll();
   }),
+  nameDev: () => { const d = cardDev && !cardDev.closed ? cardDev : devices.get(selected); if (d) nameDevice(d); },
   findDev: () => run("หาเครื่อง", async () => {
     const d = cardDev && !cardDev.closed ? cardDev : cur();
     const id = d.serial.slice(-6);
     await d.sh("input keyevent 224");
     // A notification with the id on the device's own screen: easy to spot which one on the desk it is
-    const r = await d.sh(`cmd notification post -S bigtext -t ${q("IDATA TOOLS")} idata-find ${q("เครื่องนี้คือรหัส " + id + " (" + d.serial + ")")}`);
+    const r = await d.sh(`cmd notification post -S bigtext -t ${q("IDATA TOOLS")} idata-find ${q((st.nameOf(d.serial) ? "เครื่องนี้คือ " + st.nameOf(d.serial) + " · " : "เครื่องนี้คือ") + "รหัส " + id + " (" + d.serial + ")")}`);
     d.info.screenOn = true; renderDevices();
     log(`${label(d)}: เปิดจอแล้ว${r.code ? "" : " และขึ้นแจ้งเตือนรหัส " + id + " ที่เครื่อง"}`);
   }),
@@ -2036,8 +2064,8 @@ const actions = {
   }, "WIFI"),
   regCsv: () => {
     const r = Object.values(st.registry());
-    download(st.toCsv([["รหัสเครื่อง", "ยี่ห้อ", "รุ่น", "Android", "แบต", "พื้นที่", "แอป Flash", "เห็นครั้งแรก", "เห็นล่าสุด"],
-      ...r.map((x) => [x.serial, x.manufacturer, x.model, x.android, x.battery, x.storage, x.flash, isoTime(x.firstSeen), isoTime(x.lastSeen)])]), `devices-${stamp()}.csv`, "text/csv");
+    download(st.toCsv([["ชื่อ", "รหัสเครื่อง", "ยี่ห้อ", "รุ่น", "Android", "แบต", "พื้นที่", "แอป Flash", "เห็นครั้งแรก", "เห็นล่าสุด"],
+      ...r.map((x) => [st.nameOf(x.serial), x.serial, x.manufacturer, x.model, x.android, x.battery, x.storage, x.flash, isoTime(x.firstSeen), isoTime(x.lastSeen)])]), `devices-${stamp()}.csv`, "text/csv");
   },
   histCsv: () => {
     download(st.toCsv([["เวลา", "รหัสเครื่อง", "รุ่น", "ทำอะไร", "วิธี", "จำนวนไฟล์", "ได้พื้นที่คืน (MB)"],

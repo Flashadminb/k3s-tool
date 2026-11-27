@@ -28,6 +28,15 @@ export function addHistory(e) {
 }
 export function clearHistory() { save("history", []); }
 
+/* ---------- Device names: the hub's own name for each device, tied to its serial number ---------- */
+export function names() { return load("names", {}); }
+export function nameOf(serial) { return names()[serial] || ""; }
+export function setName(serial, name) {
+  const n = names(); name = String(name || "").trim().slice(0, 24);
+  if (name) n[serial] = name; else delete n[serial];
+  save("names", n);
+}
+
 /* ---------- Device registry (every device ever connected) ---------- */
 export function registry() { return load("registry", {}); }
 export function updateRegistry(serial, data) {

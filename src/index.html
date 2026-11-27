@@ -117,6 +117,7 @@ body.selecting .sat{cursor:copy}
 .sat-bat{display:flex;align-items:center;gap:4px;font:600 calc(var(--s)*.1)/1 var(--display);text-shadow:0 1px 2px rgba(0,0,0,.8)}
 .bat{width:calc(var(--s)*.2);height:auto;color:rgba(238,241,247,.9);filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
 .sat-id{font:500 max(9px,calc(var(--s)*.09))/1.2 var(--display);color:rgba(238,241,247,.82);letter-spacing:.05em}
+.sat-id.named{font-weight:700;font-size:max(11px,calc(var(--s)*.12));color:var(--gold,#e8be5a);max-width:86%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sat.sel::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid var(--gold-hi)}
 .sat.sel::before{content:"";position:absolute;inset:-16px;border-radius:50%;border:1px solid rgba(227,180,106,.3)}
 .sat:hover .sat-body{filter:brightness(1.15)}
@@ -374,7 +375,7 @@ body:not(.role-admin) .owner-only{display:none!important}
         </div>
         <div id="dcDetail">
         <div class="sub">เครื่องที่เลือก · ชี้ที่ดาวเพื่อดูเครื่องอื่น</div>
-        <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 id="model">-</h2><button class="tool" data-act="findDev" title="เปิดจอเครื่องนี้ และขึ้นข้อความบอกรหัส จะได้รู้ว่าเป็นเครื่องไหนบนโต๊ะ">หาเครื่องนี้</button></div>
+        <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 id="model">-</h2><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="tool" id="dcName" data-act="nameDev" title="ตั้งชื่อเครื่องนี้ ผูกกับรหัสเครื่อง จำไว้ตลอด">ตั้งชื่อ</button><button class="tool" data-act="findDev" title="เปิดจอเครื่องนี้ และขึ้นข้อความบอกรหัส จะได้รู้ว่าเป็นเครื่องไหนบนโต๊ะ">หาเครื่องนี้</button></div></div>
         <div class="used"><b id="used">-</b><span id="total"></span></div>
         <div class="barbox"><div id="bar" class="bar"></div></div>
         <dl class="facts">
@@ -676,7 +677,7 @@ body:not(.role-admin) .owner-only{display:none!important}
     <div class="card">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">ทะเบียนเครื่อง</h2><button data-act="regCsv">โหลดเป็น Excel (CSV)</button></div>
       <div class="mut">ทุกเครื่องที่เคยเสียบกับคอมเครื่องนี้ บันทึกอัตโนมัติ</div>
-      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>Android</th><th>แบต</th><th>พื้นที่</th><th>แอป Flash</th><th>เห็นล่าสุด</th><th></th></tr></thead><tbody id="regTable"></tbody></table></div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>ชื่อ / รหัสเครื่อง</th><th>รุ่น</th><th>Android</th><th>แบต</th><th>พื้นที่</th><th>แอป Flash</th><th>เห็นล่าสุด</th><th></th></tr></thead><tbody id="regTable"></tbody></table></div>
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">ประวัติการลบ</h2><div class="row"><button data-act="histCsv">CSV</button><button class="admin-only red" data-act="histClear">ล้างประวัติ</button></div></div>

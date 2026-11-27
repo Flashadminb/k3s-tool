@@ -91,7 +91,7 @@ export class Device {
     const procs = [...this._procs]; this._procs.clear();
     await Promise.all(procs.map((p) => Promise.resolve(p.kill()).catch(() => {})));
     // belt and braces: anything our shell user still has running from a delete or a scan
-    await this._sh("pkill -x find; pkill -x xargs; pkill -x uiautomator; pkill -x screenrecord; true").catch(() => {});
+    await this._sh("pkill -x find; pkill -x xargs; pkill -x uiautomator; pkill -x screenrecord; pkill -x getevent; true").catch(() => {});
   }
 
   /** Shell command, throws if exit code != 0 */

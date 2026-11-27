@@ -34,6 +34,7 @@ stub("df", `if [ "$SERIAL" = TESTSERIAL003 ]; then [ "$1" = -k ] && { echo "df: 
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
  package) if [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
+ activity) [ -f "${join(ROOT, "w-")}$SERIAL" ] && echo "  mResumedActivity: ActivityRecord{1 u0 com.android.wallpaper/.CropActivity t5}" || echo "  mResumedActivity: ActivityRecord{2 u0 com.android.launcher3/.Launcher t1}";;
  account) [ "$(cat "${join(ROOT, "g-")}$SERIAL" 2>/dev/null)" = done ] && echo "  Account {name=hub@example.com, type=com.google}";;
  device_policy) echo "  Device Owner: admin=ComponentInfo{com.mdm.agent/com.mdm.agent.Admin} package=com.mdm.agent";;
  power) [ -f "${join(ROOT, "awake-")}$SERIAL" ] && echo "  mWakefulness=Awake" || echo "  mWakefulness=Asleep";;
@@ -71,16 +72,24 @@ stub("screencap", `cp "${join(ROOT, "shot.png")}" "$2"`);
 stub("screenrecord", `echo fake > "$3"`);
 for (const c of ["monkey", "settings"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
 // wallpaper screens: TESTSERIAL001 shows "Set wallpaper" then "Home and lock screens"; TESTSERIAL002 an unknown one
-stub("am", `echo "$0 $*" >> "${join(ROOT, "calls.log")}"; case "$*" in *CROP_AND_SET_WALLPAPER*) [ "$SERIAL" = TESTSERIAL001 ] && echo set > "${join(ROOT, "w-")}$SERIAL";; esac; true`);
+stub("am", `echo "$0 $*" >> "${join(ROOT, "calls.log")}"; case "$*" in *CROP_AND_SET_WALLPAPER*) [ "$SERIAL" = TESTSERIAL001 ] && echo set > "${join(ROOT, "w-")}$SERIAL" || echo custom > "${join(ROOT, "w-")}$SERIAL";; esac; true`);
+stub("wm", `echo "Physical size: 720x1440"`);
+// a person tapping "Apply now" on TESTSERIAL002's unknown wallpaper screen, as the touch screen reports it
+stub("getevent", `case "$1" in -lp) printf '  ABS_MT_POSITION_X     : value 0, min 0, max 719\n  ABS_MT_POSITION_Y     : value 0, min 0, max 1439\n';;
+ -lt) W="${join(ROOT, "w-")}$SERIAL"; sleep 3; [ "$(cat "$W" 2>/dev/null)" = custom ] || exit 0
+   printf '[ 1.000] /dev/input/event1: EV_ABS ABS_MT_TRACKING_ID 00000001\n[ 1.000] /dev/input/event1: EV_ABS ABS_MT_POSITION_X 0000015e\n[ 1.000] /dev/input/event1: EV_ABS ABS_MT_POSITION_Y 000004e2\n[ 1.000] /dev/input/event1: EV_KEY BTN_TOUCH DOWN\n[ 1.100] /dev/input/event1: EV_KEY BTN_TOUCH UP\n'
+   sleep 2; rm -f "$W"; echo "$SERIAL-by-hand" >> "${join(ROOT, "wall-done")}";;
+esac`);
 stub("input", `echo "input $*" >> "${join(ROOT, "calls.log")}"; [ "$2" = 224 ] && touch "${join(ROOT, "awake-")}$SERIAL"
 G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null)
 W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
-case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G"; [ "$ws" = set ] && [ "$3" = 1050 ] && echo both > "$W"; [ "$ws" = both ] && [ "$3" = 650 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; };; esac; true`);
+case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G"; [ "$ws" = set ] && [ "$3" = 1050 ] && echo both > "$W"; [ "$ws" = both ] && [ "$3" = 650 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; }; [ "$ws" = custom ] && [ "$3" = 1250 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; };; esac; true`);
 // Google sign-in screens as uiautomator sees them: email field, then password field, then "I agree"
 stub("uiautomator", `G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null || echo email)
 W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
-[ "$ws" = set ] && gs=wset; [ "$ws" = both ] && gs=wboth
+[ "$ws" = set ] && gs=wset; [ "$ws" = both ] && gs=wboth; [ "$ws" = custom ] && gs=wcustom
 case "$gs" in
+ wcustom) n='<node text="Preview" bounds="[0,100][720,1100]" /><node text="Apply now" class="android.widget.Button" bounds="[100,1200][600,1300]" />';;
  wset) n='<node text="" content-desc="Set wallpaper" class="android.widget.Button" bounds="[100,1000][600,1100]" />';;
  wboth) n='<node text="Home screen" bounds="[100,400][600,500]" /><node text="Lock screen" bounds="[100,500][600,600]" /><node text="Home and lock screens" bounds="[100,600][600,700]" />';;
  email) n='<node text="" resource-id="identifierId" class="android.widget.EditText" password="false" bounds="[40,300][680,380]" />';;
@@ -385,8 +394,13 @@ const wc = readFileSync(join(ROOT, "calls.log"), "utf8").split("CROP_AND_SET_WAL
 ok(wc === 2, "group: wallpaper screen opened on both devices without asking: " + wc);
 await page.waitForFunction(() => document.getElementById("busy").hidden, null, { timeout: 60000 });
 ok(existsSync(join(ROOT, "wall-done")) && readFileSync(join(ROOT, "wall-done"), "utf8").includes("TESTSERIAL001"), "wallpaper set by itself: Set wallpaper → Home and lock screens tapped");
+ok(readFileSync(join(ROOT, "wall-done"), "utf8").includes("TESTSERIAL002-by-hand") && await page.evaluate(() => (JSON.parse(localStorage.getItem("k3s-tool:wallLearn") || "{}")["Q9"] || []).includes("Apply now")), "unknown screen: the button tapped by hand is learnt for that model");
 ok(await page.isVisible("#help.info") && (await page.textContent("#help")).includes("IAL002") && !(await page.textContent("#help")).includes("IAL001"), "unknown wallpaper screen: only that device asks for one tap");
 ok(readdirSync(join(SD, "Pictures")).filter((f) => f.startsWith("k3s-wallpaper")).length === 2, "2 wallpapers pushed");
+await page.evaluate(() => { document.getElementById("help").hidden = true; });
+await page.setInputFiles("#wallFile", join(ROOT, "w.jpg")); await page.waitForFunction(() => document.getElementById("busy").hidden, null, { timeout: 90000 });
+ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("input tap 350 1250") && readFileSync(join(ROOT, "wall-done"), "utf8").split("\n").includes("TESTSERIAL002"), "second time the learnt model is set by itself");
+ok(!(await page.isVisible("#help.info")), "no tap needed any more");
 await page.click("#dcGroup button");
 ok(!(await page.textContent("#status")).includes("กลุ่ม"), "group cleared");
 writeFileSync(join(ROOT, "a.apk"), Buffer.alloc(1024, 1));

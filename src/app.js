@@ -40,7 +40,7 @@ const HELP = {
   WIFI_MANUAL: ["เครื่องรุ่นนี้ต้องแตะเลือก Wi-Fi เอง 1 ครั้ง", ["Android ของเครื่องนี้ไม่ให้คอมสั่งต่อ Wi-Fi (ใช้ได้กับ Android 12 ขึ้นไป เช่น K3S) ไม่ใช่ระบบบริษัทบล็อก", "เว็บเปิดหน้า Wi-Fi ที่เครื่องให้แล้ว: แตะชื่อ Wi-Fi ที่ต้องการ (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "พอขึ้นช่องใส่รหัส กดปุ่ม พิมพ์รหัส... ด้านล่าง เว็บจะพิมพ์รหัสที่บันทึกไว้และกด Enter ให้", "ไม่อยากจับเครื่อง: ใช้ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกชื่อ Wi-Fi จากคอม"]],
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
-  WALL_TAP: ["เครื่องนี้ต้องกดยืนยันที่เครื่อง 1 ครั้ง", ["เว็บกดเองไม่ได้ เพราะหน้าตั้งวอลเปเปอร์ของรุ่นนี้ต่างจากที่รู้จัก","ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
+  WALL_TAP: ["เครื่องนี้ต้องกดยืนยันที่เครื่อง 1 ครั้ง (ครั้งแรกของรุ่นนี้)", ["หน้าตั้งวอลเปเปอร์ของรุ่นนี้เว็บยังไม่รู้จัก: แตะที่เครื่องตามปกติ เว็บจะดูแล้วจำไว้ ครั้งหน้ากดเองทุกเครื่องรุ่นนี้","ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ตั้งกลับให้ครบในคลิกเดียว: แท็บ เครื่อง > ตั้งเครื่องใหม่ทั้งหมด (Flash Kit, ตั้งค่า, Wi-Fi, ล็อก)"]],
@@ -1695,7 +1695,7 @@ async function readScreen(d) {
   return [...doc.querySelectorAll("node")].map((n) => {
     const b = (n.getAttribute("bounds") || "").match(/\d+/g) || [0, 0, 0, 0];
     return { text: (n.getAttribute("text") || "").trim(), desc: (n.getAttribute("content-desc") || "").trim(), id: n.getAttribute("resource-id") || "", cls: n.getAttribute("class") || "",
-      pass: n.getAttribute("password") === "true", click: n.getAttribute("clickable") === "true", x: Math.round((+b[0] + +b[2]) / 2), y: Math.round((+b[1] + +b[3]) / 2), w: b[2] - b[0] };
+      pass: n.getAttribute("password") === "true", click: n.getAttribute("clickable") === "true", x: Math.round((+b[0] + +b[2]) / 2), y: Math.round((+b[1] + +b[3]) / 2), w: b[2] - b[0], h: b[3] - b[1] };
   });
 }
 const typeable = (s) => s.replace(/ /g, "%s");
@@ -2348,25 +2348,76 @@ const W_BOTH = /^(home and lock screens?|home screen and lock screen|both|หน
 const W_SET = /^(set wallpaper|set as wallpaper|apply|ตั้งค่าวอลเปเปอร์|ตั้งวอลเปเปอร์|ตั้งเป็นวอลเปเปอร์|ใช้)$/i;
 const W_APP = /^(wallpaper|wallpapers|วอลเปเปอร์|ภาพพื้นหลัง)$/i;
 const W_ONCE = /^(just once|เพียงครั้งเดียว|ครั้งเดียว)$/i;
+// Is a wallpaper screen (or an app chooser opened for it) still in front?
+async function inWallpaperFlow(d) {
+  const t = (await d.sh("dumpsys activity activities 2>/dev/null | grep -m2 -E 'mResumedActivity|ResumedActivity:'")).out;
+  return /wallpaper|Wallpaper|Resolver|Chooser|crop|Crop/.test(t);
+}
+// Buttons learnt per model by watching a person tap through the screens once (see learnWallpaper)
+const wallLearnt = (d) => (st.load("wallLearn", {})[d.info.model || "?"] || []);
+const nodeKey = (n) => n.text || n.desc || n.id;
 async function autoWallpaper(d) {
-  let tappedSet = false;
+  let tapped = false;
+  const learnt = wallLearnt(d);
   const until = Date.now() + 25000;
   while (Date.now() < until) {
     await sleep(1500);
+    if (tapped && !(await inWallpaperFlow(d))) return true;   // the wallpaper screens closed after our taps = set
     const nodes = (await readScreen(d)).filter((n) => n.w > 0);
     const find = (re) => nodes.find((n) => re.test(n.text) || re.test(n.desc));
-    const both = find(W_BOTH);
-    if (both) { await d.sh(`input tap ${both.x} ${both.y}`); await sleep(1500); return true; }
-    const set = find(W_SET);
-    if (set) { await d.sh(`input tap ${set.x} ${set.y}`); tappedSet = true; continue; }
-    const once = find(W_ONCE);
-    if (once) { await d.sh(`input tap ${once.x} ${once.y}`); continue; }
-    const app = find(W_APP);
-    if (app && !tappedSet) { await d.sh(`input tap ${app.x} ${app.y}`); continue; }
-    // older Android sets both screens straight after "Set wallpaper": the wallpaper screen is gone = done
-    if (tappedSet) return true;
+    // what a person tapped on this model before comes first, then the screens the page knows
+    const lrn = learnt.length && nodes.find((n) => learnt.includes(nodeKey(n)));
+    const hit = lrn || find(W_BOTH) || find(W_SET) || find(W_ONCE) || (!tapped && find(W_APP));
+    if (hit) { await d.sh(`input tap ${hit.x} ${hit.y}`); tapped = true; continue; }
+    if (tapped) return !(await inWallpaperFlow(d));
   }
   return false;
+}
+/*
+ * Learning: on a screen the page does not know, a person taps through it on the device once. Meanwhile the page
+ * records the touches (getevent) and the screen under them (uiautomator) and keeps the tapped buttons' names for
+ * this model, so next time it taps them itself.
+ */
+const EV_FILE = "/data/local/tmp/idt-ev.txt";
+async function learnWallpaper(d) {
+  const model = d.info.model || "?";
+  const caps = (await d.sh("getevent -lp 2>/dev/null; wm size 2>/dev/null")).out;
+  const mx = parseInt((caps.match(/ABS_MT_POSITION_X[^\n]*max (\d+)/) || [])[1], 10);
+  const my = parseInt((caps.match(/ABS_MT_POSITION_Y[^\n]*max (\d+)/) || [])[1], 10);
+  const sz = caps.match(/(?:Override|Physical) size: (\d+)x(\d+)/);
+  if (!mx || !my || !sz) return [];
+  const sx = +sz[1] / (mx + 1), sy = +sz[2] / (my + 1);
+  const pid = (await d.sh(`rm -f ${EV_FILE}; getevent -lt > ${EV_FILE} 2>/dev/null & echo $!`)).out.trim();
+  const keys = [];
+  let screen = await readScreen(d), seen = 0, x = 0, y = 0;
+  const until = Date.now() + 120000;
+  try {
+    while (Date.now() < until) {
+      await sleep(1200);
+      const ev = (await d.sh(`cat ${EV_FILE} 2>/dev/null`)).out.split("\n");
+      for (const line of ev.slice(seen)) {
+        const m = line.match(/(ABS_MT_POSITION_X|ABS_MT_POSITION_Y|BTN_TOUCH|ABS_MT_TRACKING_ID)\s+(\w+)/);
+        if (!m) continue;
+        if (m[1] === "ABS_MT_POSITION_X") x = parseInt(m[2], 16) * sx;
+        else if (m[1] === "ABS_MT_POSITION_Y") y = parseInt(m[2], 16) * sy;
+        else if ((m[1] === "BTN_TOUCH" && m[2] === "UP") || (m[1] === "ABS_MT_TRACKING_ID" && m[2] === "ffffffff")) {
+          // the smallest named thing under the finger on the screen that was showing before the tap
+          const under = screen.filter((n) => n.w > 0 && nodeKey(n) && Math.abs(n.x - x) <= n.w / 2 && Math.abs(n.y - y) <= Math.max(24, n.h / 2)).sort((a, b) => a.w - b.w)[0];
+          if (under && !keys.includes(nodeKey(under))) keys.push(nodeKey(under));
+        }
+      }
+      seen = Math.max(0, ev.length - 1);
+      if (!(await inWallpaperFlow(d))) break;
+      screen = await readScreen(d);
+    }
+  } finally { await d.sh(`kill ${parseInt(pid, 10) || 0} 2>/dev/null; rm -f ${EV_FILE}`).catch(() => {}); }
+  if (keys.length) {
+    const all = st.load("wallLearn", {});
+    all[model] = keys;
+    st.save("wallLearn", all);
+    log(`เรียนรู้หน้าตั้งวอลเปเปอร์ของ ${model} แล้ว: ${keys.join(" → ")} · ครั้งหน้าเว็บกดเอง`);
+  }
+  return keys;
 }
 async function setWallpaper(file) {
   await run("ส่งรูปหน้าจอ", async () => {
@@ -2398,10 +2449,17 @@ async function setWallpaper(file) {
       // the page reads the screen and taps "Set wallpaper" → "Home and lock screens" itself
       setStatus(d, { title: "ตั้งวอลเปเปอร์", big: "…" });
       if (await autoWallpaper(d)) { done.push(d); setStatus(d, { title: "ตั้งวอลเปเปอร์แล้ว", big: "✓", ring: 100, done: true }); log(`${label(d)}: ตั้งวอลเปเปอร์ หน้าจอหลัก + หน้าจอล็อก แล้ว`); }
-      else { manual.push(d); setStatus(d, { title: "กดตั้งที่เครื่อง", big: "👆", done: true }); }
+      else { manual.push(d); setStatus(d, { title: "กดตั้งที่เครื่อง · เว็บกำลังจำ", big: "👆" }); }
     }
     if (fails.length) throw new Error(fails.join("\n"));
-    if (manual.length) showHelp("WALL_TAP", manual.map(label).join(", "), true);
+    if (manual.length) {
+      showHelp("WALL_TAP", manual.map(label).join(", "), true);
+      // watch the person tap through it once, and remember the buttons for that model
+      await Promise.all(manual.map(async (d) => {
+        const keys = await learnWallpaper(d).catch(() => []);
+        setStatus(d, keys.length ? { title: "จำวิธีตั้งแล้ว", big: "✓", ring: 100, done: true } : { title: "ตั้งที่เครื่องเอง", big: "👆", done: true });
+      }));
+    }
   }, "WALLPAPER");
 }
 

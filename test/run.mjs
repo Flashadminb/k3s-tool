@@ -3,7 +3,7 @@
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("playwright"); // globally installed in CI image; or npm i -D playwright
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, chmodSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, chmodSync, symlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import http from "node:http";
@@ -252,6 +252,20 @@ await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.inc
 await click("lockRelease"); await idle();
 ok(comp().trim() === "" && dis().trim() === "", "unlock: Settings screens and apps all back");
 await page.uncheck("#lockSettingsWifi");
+// device locked, then factory reset (all apps back on, lock list on the device gone), then plugged in again
+await click("lockApply"); await accept(); await idle();
+ok(dis().includes("jp.naver.line.android"), "locked again before the simulated reset");
+writeFileSync(join(ROOT, "pm-TESTSERIAL001.dis"), ""); rmSync(join(TMP, "idata-tools-locked.txt"), { force: true });
+await page.click("button[data-tab=device]");
+await click("reboot"); await accept(); await idle();
+await page.waitForFunction(() => !document.querySelector("#devices .satw"), null, { timeout: 10000 });
+await page.evaluate(() => { window.__pick = "TESTSERIAL001"; });
+await click("connect"); await idle();
+await page.waitForFunction(() => document.getElementById("log").textContent.includes("อาจถูกรีเซ็ต"), null, { timeout: 20000 }).catch(() => {});
+ok((await page.textContent("#log")).includes("อาจถูกรีเซ็ต") && (await page.textContent("#help")).includes("เคยล็อกออกงานไว้"), "lock lost after a reset is reported on connect");
+ok((await page.textContent(".satw")).includes("หลุดล็อก"), "circle tagged as lock lost");
+await page.evaluate(() => { document.getElementById("help").hidden = true; });
+await page.click("button[data-tab=apps]");
 
 console.log("settings");
 await page.click("button[data-tab=setup]");

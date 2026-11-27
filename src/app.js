@@ -42,6 +42,7 @@ const HELP = {
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
+  LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ถ้า Flash Kit หายไปด้วย: กดอัปเดต Flash Kit ที่วงกลางเพื่อลงใหม่", "ล็อกใหม่: แท็บ แอป > โหมดออกงาน > ล็อกออกงาน"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
 
@@ -515,6 +516,7 @@ function renderOrbit(box) {
       inGroup ? el("span", { class: "sat-check", "aria-hidden": "true" }) : null);
     const tags = [];
     if (off) tags.push(el("button", { class: "sat-tag wake", text: compact ? "จอดับ" : "จอดับ · แตะเพื่อเปิด", title: "แตะเพื่อเปิดหน้าจอ", onclick: () => wakeScreen(d) }));
+    if (d.info.resetSuspect) tags.push(el("span", { class: "sat-tag bad", text: compact ? "หลุดล็อก" : "หลุดล็อก · อาจรีเซ็ต", title: "เคยล็อกออกงานไว้ ตอนนี้ไม่ล็อกแล้ว" }));
     if (fs === "missing") tags.push(el("span", { class: "sat-tag bad", text: compact ? "ไม่มี Flash" : "ไม่มี Flash Kit" }));
     else if (fs === "old") tags.push(el("span", { class: "sat-tag warn", text: compact ? "Flash เก่า" : "Flash Kit เก่า" }));
     if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
@@ -1244,10 +1246,20 @@ async function unlockSettingsScreens(d) {
 async function readLockState(d) {
   d.info.settingsLocked = parseInt((await d.sh(`[ -f ${SETTINGS_FILE} ] && sort -u ${SETTINGS_FILE} | wc -l || echo 0`)).out.trim(), 10) || 0;
   const mine = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d))])];
-  if (!mine.length) { d.info.locked = []; return; }
-  const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
-  d.info.locked = mine.filter((p) => disabled.has(p));
-  st.save(lockedKey(d), d.info.locked);
+  if (mine.length) {
+    const disabled = new Set(pkgList((await d.sh("pm list packages -d")).out));
+    d.info.locked = mine.filter((p) => disabled.has(p));
+    st.save(lockedKey(d), d.info.locked);
+  } else d.info.locked = [];
+  // Locked last time this computer saw it, nothing locked now (and no lock list left on the device): likely a reset
+  const reg = st.registry()[d.serial] || {};
+  if (reg.fieldLock === "ล็อก" && !d.info.locked.length && !d.info.settingsLocked) {
+    const noFlash = d.info.flash && !d.info.flash.length;
+    d.info.resetSuspect = true;
+    st.updateRegistry(d.serial, { fieldLock: "หลุดล็อก (อาจรีเซ็ต)" });
+    log(`⚠️ ${label(d)}: เคยล็อกออกงานไว้ ตอนนี้ไม่ล็อกแล้ว${noFlash ? " และไม่มี Flash Kit" : ""} อาจถูกรีเซ็ตเครื่อง`);
+    showHelp("LOCK_LOST", label(d) + (noFlash ? " · Flash Kit หายด้วย (น่าจะรีเซ็ต)" : ""));
+  }
 }
 async function lockDevice(d) {
   if (!d.info.apps) await loadApps(d);
@@ -1262,6 +1274,7 @@ async function lockDevice(d) {
   const all = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d)), ...done])];
   st.save(lockedKey(d), all); d.info.locked = all;
   await saveDeviceLockList(d, all);
+  if (all.length) { st.updateRegistry(d.serial, { fieldLock: "ล็อก", fieldLockAt: Date.now() }); d.info.resetSuspect = false; }
   const cfg = lockCfg();
   if (cfg.settingsWifi && !cfg.settings) {
     if (d.info.kiosk) log(`${label(d)}: ใช้ iLauncher จึงไม่ปิด Settings (ต้องใช้เปิด USB debugging)`);
@@ -1288,6 +1301,7 @@ async function unlockDevice(d) {
   for (const p of list) { const r = await d.sh(`pm enable ${q(p)}`); if (/enabled/i.test(r.out + r.err)) n++; }
   st.save(lockedKey(d), []); d.info.locked = [];
   await saveDeviceLockList(d, []);
+  st.updateRegistry(d.serial, { fieldLock: "ไม่ล็อก" }); d.info.resetSuspect = false;
   const sN = await unlockSettingsScreens(d);
   if (sN) log(`${label(d)}: เปิดหน้าใน Settings คืน ${sN} หน้า`);
   d.info.settingsLocked = 0;

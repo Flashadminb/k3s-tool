@@ -18,6 +18,18 @@ export class Device {
   async close() { this._bye(); }
 }
 let n = 0;
-export async function requestAndOpen(onAuth) { n++; const s = (window.__serials && window.__serials[n - 1]) || "TESTSERIAL00" + n; onAuth && onAuth(s); if (window.__authDelay) await new Promise((r) => setTimeout(r, window.__authDelay)); return new Device((window.__serials && window.__serials[n - 1]) || "TESTSERIAL00" + n); }
+const cancelled = new Set();
+// window.__pick (test only) makes the browser popup return a given serial once, e.g. a device already connected
+export async function requestUsb() {
+  if (window.__pick) { const s = window.__pick; window.__pick = null; return { serial: s }; }
+  n++; return { serial: (window.__serials && window.__serials[n - 1]) || "TESTSERIAL00" + n };
+}
+export async function openUsb(u, onAuth) {
+  onAuth && onAuth(u.serial);
+  const until = Date.now() + (window.__authDelay || 0);
+  while (Date.now() < until) { if (cancelled.has(u.serial)) { cancelled.delete(u.serial); throw new Error("CANCELLED"); } await new Promise((r) => setTimeout(r, 50)); }
+  return new Device(u.serial);
+}
+export async function requestAndOpen(onAuth) { return openUsb(await requestUsb(), onAuth); }
+export async function cancelWait(serial) { cancelled.add(serial); }
 export async function knownDevices() { return []; }
-export async function openUsb(u) { return new Device(u.serial); }

@@ -232,6 +232,11 @@ console.log("second device + group");
 await page.click("button[data-tab=data]");
 await click("connect"); await idle();
 ok((await page.$$("#devices .satw")).length === 2, "2 satellites");
+// picking a device that is already connected in the browser popup: no second "Allow", it just gets selected
+await page.evaluate(() => { window.__pick = "TESTSERIAL001"; window.__authDelay = 3000; });
+await click("connect"); await idle();
+ok((await page.textContent("#log")).includes("เชื่อมต่ออยู่แล้ว") && (await page.$$("#devices .satw")).length === 2 && await page.isHidden("#authWait"), "already-connected device is selected, not re-authorised");
+await page.evaluate(() => { window.__authDelay = 0; });
 ok((await page.textContent("#log")).includes("เรียนรู้รุ่นใหม่: Q9") && (await page.inputValue('#profTable tr:last-child td:nth-child(3) input')).includes("/sdcard/Documents/fk/imagePath/success"), "new model learned: photo folder found and saved");
 await page.click("#selTool"); await page.click("#selAll");
 ok((await page.textContent("#status")).includes("กลุ่ม 2"), "status shows the group");

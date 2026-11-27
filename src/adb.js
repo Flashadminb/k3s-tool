@@ -115,28 +115,53 @@ async function readAll(stream) {
   return await stream.pipeThrough(new ConcatBufferStream());
 }
 
+// Connections still waiting for "Allow", so the page can cancel a wait that will never finish
+const waiting = new Map();   // serial -> raw USBDevice
+
 async function open(usbDev, onAuth) {
   let conn;
-  try { conn = await usbDev.connect(); }
+  const tryConnect = () => usbDev.connect();
+  try { conn = await tryConnect(); }
   catch (e) {
-    if (/busy|claim|access denied|in use/i.test(String(e && (e.name + " " + e.message)))) throw new Error("BUSY");
-    throw e;
+    const msg = String(e && (e.name + " " + e.message));
+    // A connection left open by this page (device switched ADB off and back on, e.g. iLauncher): close it and retry once
+    if (/InvalidState|already|claim/i.test(msg) && usbDev.raw) {
+      try { await usbDev.raw.close(); } catch (e2) {}
+      try { conn = await tryConnect(); }
+      catch (e3) { if (/busy|claim|access denied|in use/i.test(String(e3 && (e3.name + " " + e3.message)))) throw new Error("BUSY"); throw e3; }
+    } else if (/busy|access denied|in use/i.test(msg)) throw new Error("BUSY");
+    else throw e;
   }
   // From here the device may show "Allow USB debugging?" and we wait until someone taps it
   onAuth && onAuth(usbDev.serial);
-  const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: store });
-  return new Device(new Adb(transport), usbDev.serial);
+  waiting.set(usbDev.serial, usbDev.raw);
+  try {
+    const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: store });
+    return new Device(new Adb(transport), usbDev.serial);
+  } catch (e) {
+    if (waiting.get(usbDev.serial) === "cancelled") throw new Error("CANCELLED");
+    throw e;
+  } finally { waiting.delete(usbDev.serial); }
 }
 
-/** Ask the user to pick a device in the browser popup */
-export async function requestAndOpen(onAuth) {
+/** Stop waiting for "Allow" on a device (closes that USB connection; the device can be connected again) */
+export async function cancelWait(serial) {
+  const raw = waiting.get(serial);
+  if (!raw || raw === "cancelled") return;
+  waiting.set(serial, "cancelled");
+  try { await raw.close(); } catch (e) {}
+}
+
+/** Ask the user to pick a device in the browser popup (not connected yet) */
+export async function requestUsb() {
   if (!mgr) throw new Error("NO_WEBUSB");
   let dev;
   try { dev = await mgr.requestDevice(); }
   catch (e) { throw new Error("NO_DEVICE_SELECTED"); }
   if (!dev) throw new Error("NO_DEVICE_SELECTED");
-  return open(dev, onAuth);
+  return dev;
 }
+export async function requestAndOpen(onAuth) { return open(await requestUsb(), onAuth); }
 
 /** Devices this browser was already allowed to use (no popup needed) */
 export async function knownDevices() {

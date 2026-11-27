@@ -134,9 +134,9 @@ function codeOf(e) {
  */
 let jobSeq = 0;
 const anyBusy = () => toast.lines.size > 0;
-async function run(name, fn, helpCode) {
+async function run(name, fn, helpCode, opts = {}) {
   let devs = [];
-  try { devs = targets(); } catch (e) {}
+  if (!opts.free) { try { devs = targets(); } catch (e) {} }
   const clash = devs.find((d) => d.busy);
   if (clash) {
     log(`${label(clash)} กำลัง${clash.busy}อยู่ รอให้เสร็จก่อน หรือเลือกเครื่องอื่น`);
@@ -293,10 +293,26 @@ async function learnProfile(d) {
 
 async function connectNew() {
   log("รอเลือกเครื่องในหน้าต่างของเบราว์เซอร์ ...");
+  const usb = await adb.requestUsb();
+  // Picked a device that is already on the stage: just select it, never ask for "Allow" again
+  let have = devices.get(usb.serial);
+  if (have && !have.closed) {
+    // still answering? (after iLauncher the old link can look alive but be dead)
+    const alive = await Promise.race([have.sh("echo ok").then((r) => r.out.includes("ok")).catch(() => false), sleep(3000).then(() => false)]);
+    if (!alive) { log(`${label(have)}: การเชื่อมต่อเก่าค้าง ล้างแล้วเชื่อมใหม่`); await have.close(); devices.delete(usb.serial); have = null; }
+  }
+  if (have && !have.closed) {
+    selected = usb.serial; groupPin = group.has(usb.serial) ? usb.serial : groupPin;
+    renderAll();
+    log(`${label(have)} เชื่อมต่ออยู่แล้ว (เลือกเครื่องนี้ให้แล้ว)`);
+    setStatus(have, { title: "ต่ออยู่แล้ว", done: true });
+    return false;
+  }
+  if (pending.has(usb.serial)) { log(`รหัส ${usb.serial.slice(-6)} กำลังรอกด Allow อยู่แล้ว ดูที่หน้าจอเครื่อง`); return false; }
   let d;
-  let waiting = null;
-  try { d = await adb.requestAndOpen((s) => { waiting = s; busyMsg(`รอกด Allow ที่เครื่องรหัส ${String(s || "").slice(-6)}`); authWait(true, s); }); }
-  finally { authWait(false, waiting); }
+  try { d = await adb.openUsb(usb, (s) => { busyMsg(`รอกด Allow ที่เครื่องรหัส ${String(s || "").slice(-6)}`); authWait(true, s); }); }
+  catch (e) { if (e.message === "CANCELLED") { log(`ยกเลิกการรอเครื่องรหัส ${usb.serial.slice(-6)}`); return false; } throw e; }
+  finally { authWait(false, usb.serial); }
   busyMsg("กำลังอ่านข้อมูลเครื่อง");
   await addDevice(d);
 }
@@ -309,6 +325,7 @@ async function autoConnect() {
   try {
     for (const usb of await adb.knownDevices()) {
       if (devices.has(usb.serial) && !devices.get(usb.serial).closed) continue;
+      if (pending.has(usb.serial)) continue;
       // Right after plug-in or reboot the device may not be ready yet: try a few times
       for (let tryNo = 1; tryNo <= 5; tryNo++) {
         try {
@@ -317,6 +334,7 @@ async function autoConnect() {
           break;
         } catch (e) {
           if (e.message === "BUSY") { showHelp("BUSY"); break; }
+          if (e.message === "CANCELLED") { log(`ยกเลิกการรอเครื่องรหัส ${usb.serial.slice(-6)}`); break; }
           if (tryNo === 5) { log("เชื่อมต่ออัตโนมัติไม่สำเร็จ (" + (e.message || e) + ") กด + เชื่อมต่อเครื่อง เอง"); break; }
           await new Promise((r) => setTimeout(r, 3000));
         } finally { authWait(false, usb.serial); }
@@ -625,7 +643,16 @@ async function pollStatus(d) {
 async function pollAll() {
   if (document.hidden) return;
   let changed = false;
-  for (const d of all()) { if (d.busy) continue; try { if (await pollStatus(d)) changed = true; } catch (e) {} }
+  for (const d of all()) {
+    if (d.busy) continue;
+    try {
+      const r = await Promise.race([pollStatus(d), sleep(8000).then(() => { throw new Error("no answer"); })]);
+      d._fails = 0; if (r) changed = true;
+    } catch (e) {
+      // two silent polls in a row = the link is dead (e.g. the device turned USB debugging off): drop it so it can reconnect
+      if (++d._fails >= 2) { log(`${label(d)} ไม่ตอบสนอง ตัดการเชื่อมต่อเก่าแล้ว เสียบใหม่หรือรอเครื่องกลับมา เว็บจะต่อให้เอง`); await d.close(); setTimeout(autoConnect, 3000); }
+    }
+  }
   if (changed) renderDevices();
 }
 
@@ -1322,7 +1349,9 @@ function renderHistory() {
    Button actions
    ===================================================================== */
 const actions = {
-  connect: () => run("เชื่อมต่อเครื่อง", connectNew),
+  // connecting a new device never locks or marks the devices already on the stage
+  connect: () => run("เชื่อมต่อเครื่องใหม่", connectNew, null, { free: true }),
+  cancelAuth: () => { [...pending].forEach((s) => adb.cancelWait(s)); },
   refresh: () => run("อัปเดตตัวเลข", async () => { for (const d of targets()) await refreshStorage(d); }),
 
   success: () => run("ลบรูป success", () => cleanupAction(["success"], "ลบรูปทั้งหมดในโฟลเดอร์ success (อัปโหลดแล้ว)\nลบถาวร ไม่เข้าถังขยะ")),

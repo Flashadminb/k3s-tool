@@ -69,13 +69,20 @@ if [ "$1" = wifi ]; then
 fi`);
 stub("screencap", `cp "${join(ROOT, "shot.png")}" "$2"`);
 stub("screenrecord", `echo fake > "$3"`);
-for (const c of ["am", "monkey", "settings"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
+for (const c of ["monkey", "settings"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
+// wallpaper screens: TESTSERIAL001 shows "Set wallpaper" then "Home and lock screens"; TESTSERIAL002 an unknown one
+stub("am", `echo "$0 $*" >> "${join(ROOT, "calls.log")}"; case "$*" in *CROP_AND_SET_WALLPAPER*) [ "$SERIAL" = TESTSERIAL001 ] && echo set > "${join(ROOT, "w-")}$SERIAL";; esac; true`);
 stub("input", `echo "input $*" >> "${join(ROOT, "calls.log")}"; [ "$2" = 224 ] && touch "${join(ROOT, "awake-")}$SERIAL"
 G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null)
-case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G";; esac; true`);
+W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
+case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G"; [ "$ws" = set ] && [ "$3" = 1050 ] && echo both > "$W"; [ "$ws" = both ] && [ "$3" = 650 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; };; esac; true`);
 // Google sign-in screens as uiautomator sees them: email field, then password field, then "I agree"
 stub("uiautomator", `G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null || echo email)
+W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
+[ "$ws" = set ] && gs=wset; [ "$ws" = both ] && gs=wboth
 case "$gs" in
+ wset) n='<node text="" content-desc="Set wallpaper" class="android.widget.Button" bounds="[100,1000][600,1100]" />';;
+ wboth) n='<node text="Home screen" bounds="[100,400][600,500]" /><node text="Lock screen" bounds="[100,500][600,600]" /><node text="Home and lock screens" bounds="[100,600][600,700]" />';;
  email) n='<node text="" resource-id="identifierId" class="android.widget.EditText" password="false" bounds="[40,300][680,380]" />';;
  pass) n='<node text="" resource-id="password" class="android.widget.EditText" password="true" bounds="[40,300][680,380]" />';;
  agree) n='<node text="Google Terms" class="android.view.View" bounds="[0,100][720,200]" /><node text="I agree" class="android.widget.Button" clickable="true" bounds="[100,800][300,900]" />';;
@@ -373,10 +380,12 @@ ok((await page.textContent("#dockScope")).includes("รวม 2"), "dock shows t
 console.log("wallpaper to the group, then APK with the picker");
 await page.click("button[data-tab=device]");
 writeFileSync(join(ROOT, "w.jpg"), Buffer.alloc(2048, 7));
-await page.setInputFiles("#wallFile", join(ROOT, "w.jpg")); await idle();
+await page.setInputFiles("#wallFile", join(ROOT, "w.jpg")); await page.waitForFunction(() => document.getElementById("busy").hidden, null, { timeout: 90000 });
 const wc = readFileSync(join(ROOT, "calls.log"), "utf8").split("CROP_AND_SET_WALLPAPER").length - 1;
 ok(wc === 2, "group: wallpaper screen opened on both devices without asking: " + wc);
-ok(await page.isVisible("#help.info"), "green 'tap once' guide shown");
+await page.waitForFunction(() => document.getElementById("busy").hidden, null, { timeout: 60000 });
+ok(existsSync(join(ROOT, "wall-done")) && readFileSync(join(ROOT, "wall-done"), "utf8").includes("TESTSERIAL001"), "wallpaper set by itself: Set wallpaper → Home and lock screens tapped");
+ok(await page.isVisible("#help.info") && (await page.textContent("#help")).includes("IAL002") && !(await page.textContent("#help")).includes("IAL001"), "unknown wallpaper screen: only that device asks for one tap");
 ok(readdirSync(join(SD, "Pictures")).filter((f) => f.startsWith("k3s-wallpaper")).length === 2, "2 wallpapers pushed");
 await page.click("#dcGroup button");
 ok(!(await page.textContent("#status")).includes("กลุ่ม"), "group cleared");

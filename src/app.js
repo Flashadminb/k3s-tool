@@ -40,7 +40,7 @@ const HELP = {
   WIFI_MANUAL: ["เครื่องรุ่นนี้ต้องแตะเลือก Wi-Fi เอง 1 ครั้ง", ["Android ของเครื่องนี้ไม่ให้คอมสั่งต่อ Wi-Fi (ใช้ได้กับ Android 12 ขึ้นไป เช่น K3S) ไม่ใช่ระบบบริษัทบล็อก", "เว็บเปิดหน้า Wi-Fi ที่เครื่องให้แล้ว: แตะชื่อ Wi-Fi ที่ต้องการ (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "พอขึ้นช่องใส่รหัส กดปุ่ม พิมพ์รหัส... ด้านล่าง เว็บจะพิมพ์รหัสที่บันทึกไว้และกด Enter ให้", "ไม่อยากจับเครื่อง: ใช้ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกชื่อ Wi-Fi จากคอม"]],
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
-  WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
+  WALL_TAP: ["เครื่องนี้ต้องกดยืนยันที่เครื่อง 1 ครั้ง", ["เว็บกดเองไม่ได้ เพราะหน้าตั้งวอลเปเปอร์ของรุ่นนี้ต่างจากที่รู้จัก","ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ตั้งกลับให้ครบในคลิกเดียว: แท็บ เครื่อง > ตั้งเครื่องใหม่ทั้งหมด (Flash Kit, ตั้งค่า, Wi-Fi, ล็อก)"]],
@@ -2339,6 +2339,35 @@ async function installApk(file) {
   }, "INSTALL");
 }
 
+/*
+ * Android has no shell command that sets a wallpaper, so after opening its own wallpaper screen the page taps
+ * through it like a person: "Set wallpaper", then "Home and lock screens" (or, from an app chooser, "Wallpaper"
+ * then "Just once"). Returns false when the screen is not one it knows: then a person taps once.
+ */
+const W_BOTH = /^(home and lock screens?|home screen and lock screen|both|หน้าจอหลักและหน้าจอล็อก|ทั้งหน้าจอหลักและหน้าจอล็อก|หน้าจอหลักและล็อกหน้าจอ|ทั้งสองอย่าง)$/i;
+const W_SET = /^(set wallpaper|set as wallpaper|apply|ตั้งค่าวอลเปเปอร์|ตั้งวอลเปเปอร์|ตั้งเป็นวอลเปเปอร์|ใช้)$/i;
+const W_APP = /^(wallpaper|wallpapers|วอลเปเปอร์|ภาพพื้นหลัง)$/i;
+const W_ONCE = /^(just once|เพียงครั้งเดียว|ครั้งเดียว)$/i;
+async function autoWallpaper(d) {
+  let tappedSet = false;
+  const until = Date.now() + 25000;
+  while (Date.now() < until) {
+    await sleep(1500);
+    const nodes = (await readScreen(d)).filter((n) => n.w > 0);
+    const find = (re) => nodes.find((n) => re.test(n.text) || re.test(n.desc));
+    const both = find(W_BOTH);
+    if (both) { await d.sh(`input tap ${both.x} ${both.y}`); await sleep(1500); return true; }
+    const set = find(W_SET);
+    if (set) { await d.sh(`input tap ${set.x} ${set.y}`); tappedSet = true; continue; }
+    const once = find(W_ONCE);
+    if (once) { await d.sh(`input tap ${once.x} ${once.y}`); continue; }
+    const app = find(W_APP);
+    if (app && !tappedSet) { await d.sh(`input tap ${app.x} ${app.y}`); continue; }
+    // older Android sets both screens straight after "Set wallpaper": the wallpaper screen is gone = done
+    if (tappedSet) return true;
+  }
+  return false;
+}
 async function setWallpaper(file) {
   await run("ส่งรูปหน้าจอ", async () => {
     const ts = await pickDevices("ส่งรูปหน้าจอ " + file.name);
@@ -2346,7 +2375,7 @@ async function setWallpaper(file) {
     if (!(await kioskOk(ts, "การเปิดหน้าตั้งวอลเปเปอร์"))) return false;
     const ext = ((file.name.match(/\.(\w+)$/) || [, "jpg"])[1]).toLowerCase();
     const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-    const fails = [];
+    const fails = [], done = [], manual = [];
     for (const d of ts) {
       const name = `k3s-wallpaper-${Date.now()}.${ext}`;
       const dest = "/sdcard/Pictures/" + name;
@@ -2365,11 +2394,14 @@ async function setWallpaper(file) {
       // Android's own "crop and set wallpaper" screen; falls back to "set as" chooser
       let r = await d.sh(`am start -a android.service.wallpaper.CROP_AND_SET_WALLPAPER -d ${uri} -t ${mime} --grant-read-uri-permission`);
       if (/Error|unable|not found|Exception/i.test(r.out + r.err)) r = await d.sh(`am start -a android.intent.action.ATTACH_DATA -d ${uri} -t ${mime} --grant-read-uri-permission`);
-      log(`${label(d)}: ${(r.out + r.err).trim()}`);
-      if (/Error|unable|not found|Exception/i.test(r.out + r.err)) fails.push(label(d) + ": เปิดหน้าตั้งวอลเปเปอร์ไม่ได้");
+      if (/Error|unable|not found|Exception/i.test(r.out + r.err)) { fails.push(label(d) + ": เปิดหน้าตั้งวอลเปเปอร์ไม่ได้"); continue; }
+      // the page reads the screen and taps "Set wallpaper" → "Home and lock screens" itself
+      setStatus(d, { title: "ตั้งวอลเปเปอร์", big: "…" });
+      if (await autoWallpaper(d)) { done.push(d); setStatus(d, { title: "ตั้งวอลเปเปอร์แล้ว", big: "✓", ring: 100, done: true }); log(`${label(d)}: ตั้งวอลเปเปอร์ หน้าจอหลัก + หน้าจอล็อก แล้ว`); }
+      else { manual.push(d); setStatus(d, { title: "กดตั้งที่เครื่อง", big: "👆", done: true }); }
     }
     if (fails.length) throw new Error(fails.join("\n"));
-    showHelp("WALL_TAP", "", true);
+    if (manual.length) showHelp("WALL_TAP", manual.map(label).join(", "), true);
   }, "WALLPAPER");
 }
 

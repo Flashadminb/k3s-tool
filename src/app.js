@@ -1071,6 +1071,11 @@ async function loadInfo(d) {
   i.manufacturer = await g("ro.product.manufacturer");
   i.android = await g("ro.build.version.release");
   i.sdk = await g("ro.build.version.sdk");
+  // Factory reset protection (FRP) needs all of: a place to keep the account through a reset (ro.frp.pst),
+  // OEM unlocking switched off, Google's own setup wizard (it asks for the account), and a Google account
+  i.frp = { pst: await g("ro.frp.pst"), oem: (await g("sys.oem_unlock_allowed")) === "1",
+    wizard: /setupwizard/.test((await d.sh("pm list packages com.google.android.setupwizard 2>/dev/null")).out),
+    account: await hasGoogle(d).catch(() => false) };
   const bat = (await d.sh("dumpsys battery")).out;
   const bv = (k) => { const m = bat.match(new RegExp("^\\s*" + k + ":\\s*(.+)$", "m")); return m ? m[1].trim() : ""; };
   i.battery = { level: bv("level"), health: HEALTH[bv("health")] || bv("health"), status: STATUS[bv("status")] || "", temp: bv("temperature") ? (parseInt(bv("temperature"), 10) / 10).toFixed(1) : "" };
@@ -1102,6 +1107,15 @@ async function loadInfo(d) {
   renderRegistry();
 }
 
+function frpText(f) {
+  if (!f) return "-";
+  const why = [];
+  if (!f.pst) why.push("เครื่องไม่มีที่เก็บบัญชีข้ามการรีเซ็ต (ผู้ผลิตไม่ได้ใส่ระบบนี้)");
+  if (!f.wizard) why.push("ไม่มีหน้าตั้งค่าเครื่องของ Google (ตัวที่ถามอีเมล)");
+  if (f.oem) why.push("เปิด OEM unlocking อยู่ ให้ปิดใน Developer options");
+  if (!f.account) why.push("ยังไม่มีบัญชี Google ในเครื่อง");
+  return why.length ? "✘ ไม่ทำงาน: " + why.join(" · ") : "✔ ทำงาน: รีเซ็ตจากปุ่มแล้วจะถามบัญชี Google";
+}
 function renderInfo(d) {
   renderDevCard(devices.get(selected));
   const g = $("infoGrid");
@@ -1113,7 +1127,8 @@ function renderInfo(d) {
     ["Android", `${i.android} (SDK ${i.sdk})`], ["แบตเตอรี่", `${b.level}% · ${b.status}`],
     ["สุขภาพแบต", b.health + (b.temp ? ` · ${b.temp}°C` : "")], ["RAM ว่าง", `${human(i.ram.avail)} จาก ${human(i.ram.total)}`],
     ["เปิดเครื่องมาแล้ว", up >= 24 ? `${Math.floor(up / 24)} วัน ${up % 24} ชม.` : `${up} ชม.`],
-    ["แอป Flash", i.flash.length ? i.flash.map((f) => `${f.pkg} ${f.ver}`).join("\n") : "ไม่พบ"]
+    ["แอป Flash", i.flash.length ? i.flash.map((f) => `${f.pkg} ${f.ver}`).join("\n") : "ไม่พบ"],
+    ["กันรีเซ็ต (FRP)", frpText(i.frp)]
   ];
   g.replaceChildren(...items.map(([k, v]) => el("div", { class: "stat" }, el("span", { class: "mut", text: k }), el("b", { text: v, style: "white-space:pre-line;overflow-wrap:anywhere" }))));
 }

@@ -199,6 +199,7 @@ ol,ul{padding-left:22px;margin:8px 0}li{margin:4px 0}
 .item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}.item:last-child{border-bottom:0}
 .item .nm{min-width:0;overflow-wrap:anywhere}.item .nm small{display:block;color:var(--mut);font-size:14px}
 .item button{min-height:38px;padding:6px 12px;font-size:15px}
+.fico{color:var(--gold);display:inline-flex;flex:0 0 auto}.fico svg{width:22px;height:22px}
 .tag{font-size:13px;padding:2px 8px;border-radius:6px;background:var(--badbg);color:#ffb2a8;margin-left:6px;white-space:nowrap}.tag.sys{background:rgba(170,190,230,.12);color:var(--mut)}
 table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:600}
 .tblwrap{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:12px;padding:4px 8px}
@@ -285,6 +286,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
   <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 11v2"/></symbol>
   <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></symbol>
   <symbol id="i-android" viewBox="0 0 24 24"><path d="M5 16V10a7 7 0 0 1 14 0v6z"/><path d="M5 12h14"/><path d="m7 4 1.5 2"/><path d="m17 4-1.5 2"/><path d="M9 8.5h.01"/><path d="M15 8.5h.01"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.3 11 16.7 7"/><path d="m7.3 13 9.4 4"/><path d="M19 8.5v7"/></symbol>
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.6a10 10 0 0 1 14 0"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></symbol>
@@ -400,6 +402,17 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
             </div>
           </div>
           <div class="card">
+            <h2>ไฟล์ทั้งหมดในเครื่อง</h2>
+            <div class="mut" style="margin-bottom:10px">ดูและลบได้ทุกไฟล์ทุกโฟลเดอร์ เรียงจากใหญ่ไปเล็ก กด เปิด เพื่อเข้าโฟลเดอร์ · โฟลเดอร์ Android (ข้อมูลของแอป รวม Flash Kit) ดูได้แต่ลบไม่ได้</div>
+            <button data-act="fbOpen">เปิดไฟล์ในเครื่อง</button>
+            <div id="fbCard" hidden style="margin-top:10px">
+              <div class="row" style="justify-content:space-between;margin-bottom:8px"><b id="fbPath" style="overflow-wrap:anywhere"></b><button id="fbUp" data-act="fbUp">ย้อนกลับ</button></div>
+              <div id="fbLockNote" class="warnbox" hidden>โฟลเดอร์นี้เป็นข้อมูลของแอป ลบแล้วแอปอาจพังหรืองานที่ยังไม่ส่งหาย จึงไม่ให้ลบ</div>
+              <div class="list" id="fbList"></div>
+              <div class="row end" style="margin-top:10px"><button class="red" data-act="fbDelete">ลบที่ติ๊ก</button></div>
+            </div>
+          </div>
+          <div class="card">
             <h2>อื่นๆ</h2>
             <div class="grid"><button data-act="cache">ล้างแคชแอป</button><button data-act="bigFiles">หาไฟล์ใหญ่ที่สุด</button></div>
           </div>
@@ -465,8 +478,9 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
         <div id="bannedFound" class="mut">กด โหลดรายชื่อแอป ด้านล่างเพื่อตรวจ</div>
       </div>
       <div class="card">
-        <div class="row" style="justify-content:space-between"><h2 style="margin:0">แอปในเครื่อง</h2><button data-act="apps">โหลดรายชื่อแอป</button></div>
-        <div class="row" style="margin:8px 0"><input type="text" id="appSearch" placeholder="ค้นหา เช่น tiktok, line, flash" style="flex:1"><label><input type="checkbox" id="showSys"> แสดงแอประบบ</label></div>
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">แอปทั้งหมดในเครื่อง</h2><button data-act="apps">โหลดใหม่</button></div>
+        <div class="mut" id="appCount" style="margin-top:4px"></div>
+        <div class="row" style="margin:8px 0"><input type="text" id="appSearch" placeholder="ค้นหา เช่น tiktok, line, flash" style="flex:1"><label><input type="checkbox" id="showSys" checked> รวมแอประบบ</label></div>
         <div class="mut" style="margin-bottom:6px">แอปที่ไม่มีชื่อภาษาคน แสดงเป็นชื่อเทคนิค ถ้าไม่แน่ใจ ให้เปิดดูในเครื่องก่อนกดถอน</div>
         <div class="list" id="appList"><div class="item mut">ยังไม่ได้โหลด</div></div>
         <h3>แอประบบที่เคยถอน (กดคืนได้)</h3>

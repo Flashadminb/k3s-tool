@@ -566,7 +566,45 @@ function delCmd(dir) {
   return `[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(find -H ${q(dir)} -type f | wc -l); find -H ${q(dir)} -type f -delete; c=$?; echo $n; exit $c`;
 }
 
-/* ---------- Other photos (Camera, camera&muxer, Pictures, ...): grouped by folder, delete the folders ticked ---------- */
+/* ---------- File manager: every file and folder in the phone storage, biggest first, delete what is ticked ---------- */
+const FB_ROOT = "/sdcard";
+let fbPath = FB_ROOT, fbItems = [];
+// Android/ holds every app's own data (Flash Kit's included): browsing is fine, deleting there is not offered
+const fbLocked = (p) => p === FB_ROOT + "/Android" || p.startsWith(FB_ROOT + "/Android/");
+const fbWarn = (p) => /\/imagePath(\/fail)?$/.test(p) || /\/imagePath\/fail\//.test(p);
+async function fbList(d, path) {
+  busyMsg("กำลังอ่านโฟลเดอร์ · " + (path.replace(FB_ROOT, "") || "/"));
+  const r = await d.sh(`cd ${q(path)} || exit 1; ls -A | while IFS= read -r f; do if [ -d "$f" ] && [ ! -L "$f" ]; then printf 'd\\t%s\\t%s\\n' "$(du -sk "$f" 2>/dev/null | cut -f1)" "$f"; else printf 'f\\t%s\\t%s\\n' "$(du -k "$f" 2>/dev/null | cut -f1)" "$f"; fi; done`);
+  if (r.code) throw new Error("เปิดโฟลเดอร์นี้ไม่ได้: " + (r.err || r.out).trim());
+  fbPath = path;
+  fbItems = r.out.split("\n").map((l) => { const [t, kb, ...n] = l.split("\t"); return { dir: t === "d", kb: +kb || 0, name: n.join("\t") }; })
+    .filter((x) => x.name).sort((a, b) => b.kb - a.kb);
+  renderFb();
+}
+function folderIcon() {
+  const s = el("span", { class: "fico", "aria-hidden": "true" });
+  s.innerHTML = '<svg class="i"><use href="#i-folder"/></svg>';
+  return s;
+}
+function renderFb() {
+  const box = $("fbList");
+  if (!box) return;
+  $("fbCard").hidden = false;
+  $("fbPath").textContent = "ที่เก็บในเครื่อง" + (fbPath.replace(FB_ROOT, "") || "") + "  ·  " + human(fbItems.reduce((s, x) => s + x.kb, 0));
+  $("fbUp").hidden = fbPath === FB_ROOT;
+  const locked = fbLocked(fbPath);
+  $("fbLockNote").hidden = !locked;
+  box.replaceChildren(...(fbItems.length ? fbItems.map((x) => {
+    const full = fbPath + "/" + x.name;
+    const lock = fbLocked(full);
+    const c = lock ? el("span", { class: "tag sys", text: "ห้ามลบ" }) : el("input", { type: "checkbox", "data-path": full, "data-kb": x.kb });
+    return el("div", { class: "item" },
+      el("label", { class: "row", style: "gap:10px;flex-wrap:nowrap;min-width:0;flex:1" }, c,
+        x.dir ? folderIcon() : null,
+        el("span", { class: "nm" }, x.name, el("small", { text: human(x.kb) + (x.dir ? " · โฟลเดอร์" : "") + (lock ? " · ข้อมูลของแอปต่างๆ" : fbWarn(full) ? " · รูปที่อาจยังไม่ส่ง" : "") }))),
+      x.dir ? el("button", { text: "เปิด", onclick: () => run("เปิดโฟลเดอร์", () => fbList(cur(), full)) }) : null);
+  }) : [el("div", { class: "item mut", text: "โฟลเดอร์ว่าง" })]));
+}
 let otherFolders = [];
 async function scanOther(ts) {
   const merged = new Map();
@@ -840,12 +878,19 @@ async function uninstall(d, pkg, isSys) {
 function renderApps(d) {
   const box = $("appList"), hid = $("hiddenList");
   const a = d && d.info.apps;
-  if (!a) { box.replaceChildren(el("div", { class: "item mut", text: "กด โหลดรายชื่อแอป" })); hid.replaceChildren(el("div", { class: "item mut", text: "-" })); return; }
+  if (!a) {
+    if ($("appCount")) $("appCount").textContent = "";
+    // Opening the Apps menu loads the full list of the device on screen by itself
+    const onApps = document.querySelector(".tabs .on") && document.querySelector(".tabs .on").dataset.tab === "apps";
+    if (d && onApps && !busy) { box.replaceChildren(el("div", { class: "item mut", text: "กำลังโหลดแอปทั้งหมด..." })); setTimeout(() => { if (!d.info.apps && !busy) actions.apps(); }, 0); return; }
+    box.replaceChildren(el("div", { class: "item mut", text: d ? "เปิดเมนูนี้แล้วจะโหลดให้เอง หรือกด โหลดใหม่" : "-" })); hid.replaceChildren(el("div", { class: "item mut", text: "-" })); return;
+  }
+  if ($("appCount")) { const u = a.list.filter((x) => !x.sys).length; $("appCount").textContent = `${label(d)} · ทั้งหมด ${a.list.length} แอป (ติดตั้งเอง ${u} · แอประบบ ${a.list.length - u})`; }
   const s = $("appSearch").value.trim().toLowerCase();
   const showSys = $("showSys").checked;
   const banned = new Set(st.banned());
   const rows = a.list.filter((x) => (showSys || !x.sys || banned.has(x.pkg)) && (!s || x.pkg.toLowerCase().includes(s) || x.name.toLowerCase().includes(s)));
-  box.replaceChildren(...(rows.length ? rows.slice(0, 400).map((x) => el("div", { class: "item" },
+  box.replaceChildren(...(rows.length ? rows.slice(0, 1500).map((x) => el("div", { class: "item" },
     el("div", { class: "nm" }, x.name || x.pkg,
       x.sys ? el("span", { class: "tag sys", text: "แอประบบ" }) : null,
       x.prot ? el("span", { class: "tag", text: "แอปบริษัท/ระบบ ห้ามถอน" }) : null,
@@ -1068,6 +1113,28 @@ const actions = {
     renderHistory(); renderToday();
   }),
   bigFiles: () => run("หาไฟล์ใหญ่", () => bigFiles(cur())),
+  fbOpen: () => run("เปิดไฟล์ในเครื่อง", () => fbList(cur(), FB_ROOT)),
+  fbUp: () => run("ย้อนกลับ", () => fbList(cur(), fbPath.replace(/\/[^/]+$/, "") || FB_ROOT)),
+  fbDelete: () => run("ลบไฟล์ที่เลือก", async () => {
+    const picks = [...document.querySelectorAll("#fbList input:checked")].map((c) => ({ path: c.dataset.path, kb: +c.dataset.kb }));
+    if (!picks.length) { log("ติ๊กไฟล์หรือโฟลเดอร์ที่จะลบก่อน"); return false; }
+    if (picks.some((p) => fbLocked(p.path))) throw new Error("Android/ ห้ามลบ");
+    const ts = targets();
+    const total = picks.reduce((s, p) => s + p.kb, 0);
+    const warn = picks.some((p) => fbWarn(p.path) || /\/imagePath$/.test(p.path)) ? "\n\n⚠️ มีรูป fail ที่อาจยังไม่ส่งอยู่ในที่เลือก" : "";
+    const list = picks.slice(0, 12).map((p) => "• " + p.path.replace(FB_ROOT + "/", "")).join("\n") + (picks.length > 12 ? `\n… และอีก ${picks.length - 12} รายการ` : "");
+    if (!(await confirmBox(`ลบ ${picks.length} รายการ (${human(total)}) ลบถาวร กู้คืนไม่ได้${ts.length > 1 ? "\nทำกับ " + ts.length + " เครื่องในกลุ่ม" : ""}\n${list}${warn}`))) return false;
+    for (const d of ts) {
+      const before = (await df(d)).used;
+      for (const p of picks) { busyMsg("กำลังลบ " + p.path.replace(FB_ROOT + "/", "") + " · " + label(d)); await d.sh(`rm -rf -- ${q(p.path)}`); }
+      const freed = Math.max(0, before - (await df(d)).used);
+      st.addHistory({ serial: d.serial, model: d.info.model, action: "ลบไฟล์เอง " + picks.length + " รายการ", how: "กดเอง", files: picks.length, freedKb: freed });
+      log(`${label(d)}: ลบ ${picks.length} รายการ ได้พื้นที่คืน ${human(freed)}`);
+      await refreshStorage(d);
+    }
+    renderHistory(); renderToday();
+    await fbList(cur(), fbPath);
+  }),
   otherScan: () => run("หารูปอื่นในเครื่อง", () => scanOther(targets())),
   otherDelete: () => run("ลบรูปอื่น", async () => {
     const dirs = [...document.querySelectorAll("#otherList input:checked")].map((c) => c.dataset.dir);
@@ -1289,6 +1356,7 @@ function showTab(name) {
   document.querySelectorAll(".tab").forEach((t) => (t.hidden = t.id !== "tab-" + name));
   renderDevices();
   if (name === "wifi" && all().length && !busy) renderWifiNow().catch(() => {});
+  if (name === "apps") renderApps(devices.get(selected));
 }
 
 window.addEventListener("DOMContentLoaded", () => {

@@ -160,6 +160,19 @@ await click("otherDelete"); await accept(); await idle();
 ok(count("camera&muxer") === "1" && existsSync(join(SD, "camera&muxer/notes.txt")), "only photos removed from the ticked folder");
 ok(count("DCIM/Camera") === "2", "unticked folder kept");
 
+console.log("file manager");
+await click("fbOpen"); await idle();
+const fb = await page.textContent("#fbList");
+ok(fb.includes("DCIM") && fb.includes("Download") && fb.includes("Android"), "top folders listed");
+ok(!(await page.$('#fbList input[data-path$="/Android"]')), "Android folder cannot be ticked");
+await page.click('#fbList .item:has-text("DCIM") button'); await idle();
+ok((await page.textContent("#fbList")).includes("Camera") && (await page.textContent("#fbPath")).includes("/DCIM"), "opened a folder");
+await click("fbUp"); await idle();
+await page.check('#fbList input[data-path$="/Download"]');
+await click("fbDelete"); await accept(); await idle();
+ok(!existsSync(join(SD, "Download")), "ticked folder deleted with everything in it");
+ok(existsSync(join(SD, "Android/data/some.app/cache/thumb.jpg")), "Android data untouched");
+
 console.log("device info");
 await page.click("button[data-tab=device]");
 const info = await page.textContent("#infoGrid");
@@ -172,9 +185,10 @@ ok(readFileSync(await lg.path(), "utf8").includes("hello"), "logcat downloaded")
 console.log("apps");
 await page.click("button[data-tab=apps]");
 ok((await page.textContent("#bannedFound")).includes("TikTok"), "banned TikTok detected on connect");
-await click("apps"); await idle();
+await page.waitForFunction(() => document.getElementById("appCount").textContent.includes("ทั้งหมด"), null, { timeout: 30000 }); await idle();
 const list = await page.textContent("#appList");
-ok(list.includes("LINE") && !list.includes("com.android.settings"), "user apps listed, system hidden");
+ok(list.includes("LINE") && list.includes("com.android.settings"), "opening Apps loads every app, system apps included");
+ok((await page.textContent("#appCount")).includes("ทั้งหมด 7 แอป"), "app count shown: " + await page.textContent("#appCount"));
 ok(await page.$$eval("#appList .item", (els) => els.some((e) => e.textContent.includes("com.mdm.agent") && e.textContent.includes("ห้ามถอน") && !e.querySelector("button.red"))), "MDM app protected (no uninstall button)");
 ok(await page.$$eval("#appList .item", (els) => els.some((e) => e.textContent.includes("com.flashexpress.kit") && !e.querySelector("button.red"))), "Flash app protected");
 await page.click("#bannedFound button.red"); await accept(); await idle();

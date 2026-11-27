@@ -17,6 +17,7 @@ put(join(SD, "DCIM/Camera/IMG_001.jpg"), 200); put(join(SD, "DCIM/Camera/VID_002
 put(join(SD, "camera&muxer/scan 1.jpg"), 180); put(join(SD, "camera&muxer/scan 2.JPG"), 180); put(join(SD, "camera&muxer/notes.txt"), 1);
 put(join(SD, "Pictures/Screenshots/s.png"), 50);
 put(join(SD, "Android/data/some.app/cache/thumb.jpg"), 10);
+put(join(SD, "Documents/fk/imagePath/success/q9.jpg"), 20);   // a new model keeping Flash Kit photos elsewhere
 for (let i = 0; i < 60; i++) put(join(SD, "imagePath/success", `2026112${i % 3}`, `img${i}.jpg`), 40);
 for (let i = 0; i < 5; i++) put(join(SD, "imagePath/fail", `bad ${i}'s.jpg`), 30);   // spaces + quote in names
 for (let i = 0; i < 3; i++) put(join(SD, "DCIM", `.trashed-1700-${i}.jpg`), 100);
@@ -24,7 +25,7 @@ put(join(SD, "Download/big video.mp4"), 3000);
 mkdirSync(BIN, { recursive: true }); mkdirSync(TMP, { recursive: true });
 
 const stub = (name, body) => { writeFileSync(join(BIN, name), "#!/bin/sh\n" + body + "\n"); chmodSync(join(BIN, name), 0o755); };
-stub("getprop", `case "$1" in ro.product.model) echo K3S;; ro.product.manufacturer) echo Urovo;; ro.build.version.release) echo 11;; ro.build.version.sdk) echo 30;; esac`);
+stub("getprop", `case "$1" in ro.product.model) [ "$SERIAL" = TESTSERIAL002 ] && echo Q9 || echo K3S;; ro.product.manufacturer) echo Urovo;; ro.build.version.release) echo 11;; ro.build.version.sdk) echo 30;; esac`);
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
  package) echo "    versionName=1.2.$RANDOM";;
@@ -164,6 +165,9 @@ await click("bigFiles"); await idle();
 ok((await page.textContent("#bigList")).includes("big video.mp4"), "big file listed");
 
 console.log("other photos (Camera, camera&muxer, Pictures)");
+await page.click("button[data-tab=files]");
+await page.waitForFunction(() => document.getElementById("fbList").textContent.length > 0, null, { timeout: 20000 }); await idle();
+ok((await page.textContent("#fbList")).includes("DCIM"), "Files menu opens the device storage by itself");
 await click("otherScan"); await idle();
 const other = await page.textContent("#otherList");
 ok(other.includes("DCIM/Camera") && other.includes("camera&muxer") && other.includes("Pictures/Screenshots"), "media folders listed");
@@ -174,7 +178,7 @@ ok(count("camera&muxer") === "1" && existsSync(join(SD, "camera&muxer/notes.txt"
 ok(count("DCIM/Camera") === "2", "unticked folder kept");
 
 console.log("file manager");
-await click("fbOpen"); await idle();
+await click("fbOpen"); await idle();   // back to the top folder
 const fb = await page.textContent("#fbList");
 ok(fb.includes("DCIM") && fb.includes("Download") && fb.includes("Android"), "top folders listed");
 ok(!(await page.$('#fbList input[data-path$="/Android"]')), "Android folder cannot be ticked");
@@ -228,6 +232,7 @@ console.log("second device + group");
 await page.click("button[data-tab=data]");
 await click("connect"); await idle();
 ok((await page.$$("#devices .satw")).length === 2, "2 satellites");
+ok((await page.textContent("#log")).includes("เรียนรู้รุ่นใหม่: Q9") && (await page.inputValue('#profTable tr:last-child td:nth-child(3) input')).includes("/sdcard/Documents/fk/imagePath/success"), "new model learned: photo folder found and saved");
 await page.click("#selTool"); await page.click("#selAll");
 ok((await page.textContent("#status")).includes("กลุ่ม 2"), "status shows the group");
 ok((await page.$$("#links path")).length === 1, "gold line joins the group");

@@ -43,6 +43,8 @@ window.__sh = async (serial, cmd) => {
   if (cmd.includes("grep -i flash")) return R(o.flash ? "package:com.flashexpress.express.courier\n" : "");
   if (cmd.includes("versionName")) return R(`    versionName=${o.flash}\n`);
   if (cmd.includes("pm list packages")) return R(serial.endsWith("164") ? "package:com.flashexpress.express.courier\npackage:com.zhiliaoapp.musically\npackage:jp.naver.line.android\n" : "package:com.flashexpress.express.courier\npackage:jp.naver.line.android\n");
+  if (cmd.includes("ls -A | while")) return R("d\t5200000\timagePath\nd\t2100000\tDCIM\nd\t800000\tAndroid\nd\t300000\tDownload\nd\t90000\tPictures\nd\t42000\tcamera&muxer\nf\t4\t.nomedia\n");
+  if (cmd.includes("-iname '*.jpg'")) { await wait(500); return R("1450000\t6800\t/sdcard/DCIM/Camera\n310000\t1700\t/sdcard/camera&muxer\n42000\t190\t/sdcard/Pictures/Screenshots\n8000\t12\t/sdcard/Download\n"); }
   if (cmd.includes("cmd wifi status")) return R(o.wifi ? `Wifi is enabled\nWifi is connected to "${o.wifi}"\n` : "Wifi is enabled\nWifi is not connected\n");
   if (cmd.includes("connect-network")) { await wait(600); o.wifi = (cmd.match(/connect-network '([^']*)'/) || [])[1] || o.wifi; return R("Connection initiated\n"); }
   if (cmd.includes("list-scan-results")) return R("    BSSID              Frequency      RSSI           Age(sec)     SSID                                 Flags\n  a4:12:42:00:11:22       2437        -48             2.1         Flash-BPL                            [WPA2-PSK-CCMP][ESS]\n  a4:12:42:00:11:33       5180        -63             2.3         Flash-BPL-5G                         [WPA2-PSK-CCMP][ESS]\n  b8:27:eb:10:20:30       2462        -79             4.0         Guest                                [ESS]\n");

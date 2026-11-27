@@ -232,7 +232,7 @@ ol,ul{padding-left:22px;margin:8px 0}li{margin:4px 0}
 .item .nm{min-width:0;overflow-wrap:anywhere}.item .nm small{display:block;color:var(--mut);font-size:14px}
 .item button{min-height:38px;padding:6px 12px;font-size:15px}
 .fico{color:var(--gold);display:inline-flex;flex:0 0 auto}.fico svg{width:22px;height:22px}
-.tag{font-size:13px;padding:2px 8px;border-radius:6px;background:var(--badbg);color:#ffb2a8;margin-left:6px;white-space:nowrap}.tag.sys{background:rgba(170,190,230,.12);color:var(--mut)}
+.tag{font-size:13px;padding:2px 8px;border-radius:6px;background:var(--badbg);color:#ffb2a8;margin-left:6px;white-space:nowrap}.tag.sys{background:rgba(170,190,230,.12);color:var(--mut)}.tag.ok{background:var(--okbg);color:var(--ok)}
 table{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:600}
 .tblwrap{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:12px;padding:4px 8px}
 #screenImg{max-width:100%;max-height:60vh;border:1px solid var(--line);border-radius:12px;display:block;margin:10px auto;cursor:crosshair;user-select:none;-webkit-user-drag:none}
@@ -274,7 +274,9 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
 #busy{position:fixed;left:50%;top:86px;transform:translateX(-50%);z-index:15;padding:12px 22px;border-radius:22px;white-space:pre-line;text-align:center;max-width:92vw;font:600 17px/1.3 var(--body);background:rgba(10,14,26,.92);border:1px solid var(--line-2);box-shadow:0 12px 30px -10px rgba(0,0,0,.8)}
 
 /* ---------- smaller screens: one column, page scrolls ---------- */
-@media (max-width:1500px){.stat svg{display:none}.stat{padding:6px 12px}}
+@media (max-width:1500px){.stat svg{display:none}.stat{padding:6px 12px}
+  .top{gap:16px}.tabs{gap:2px}.tabs button{padding:10px 11px;font-size:16px}.brand{font-size:21px}}
+@media (max-width:1400px){.tabs button svg{display:none}.top .flash-link{padding:8px 10px}}
 @media (max-width:1180px){
   main{grid-template-columns:minmax(0,1fr) 380px}
   .stat b{font-size:19px}
@@ -333,6 +335,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
       <button data-tab="data" class="on"><svg class="i"><use href="#i-broom"/></svg>ลบข้อมูล</button>
       <button data-tab="device"><svg class="i"><use href="#i-phone"/></svg>เครื่อง</button>
       <button data-tab="apps"><svg class="i"><use href="#i-apps"/></svg>แอป</button>
+      <button data-tab="files"><svg class="i"><use href="#i-folder"/></svg>ไฟล์</button>
       <button data-tab="wifi"><svg class="i"><use href="#i-wifi"/></svg>Wi-Fi</button>
       <button data-tab="setup"><svg class="i"><use href="#i-sliders"/></svg>ตั้งค่า</button>
       <button data-tab="records"><svg class="i"><use href="#i-clock"/></svg>ประวัติ</button>
@@ -427,24 +430,9 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
             <div class="mut" id="autoStatus" style="margin-top:8px">ปิดอยู่</div>
           </div>
           <div class="card">
-            <h2>รูปอื่นในเครื่อง</h2>
-            <div class="mut" style="margin-bottom:10px">รูปและวิดีโอนอก Flash Kit เช่น Camera, camera&amp;muxer, Pictures, Screenshots (ที่เห็นใน Files &gt; Recents) แยกตามโฟลเดอร์ ติ๊กโฟลเดอร์ที่จะลบ</div>
-            <button data-act="otherScan">หารูปอื่นในเครื่อง</button>
-            <div id="otherCard" hidden style="margin-top:10px">
-              <div class="list" id="otherList"></div>
-              <div class="row end" style="margin-top:10px"><button class="red" id="otherDel" data-act="otherDelete">ลบโฟลเดอร์ที่ติ๊ก</button></div>
-            </div>
-          </div>
-          <div class="card">
-            <h2>ไฟล์ทั้งหมดในเครื่อง</h2>
-            <div class="mut" style="margin-bottom:10px">ดูและลบได้ทุกไฟล์ทุกโฟลเดอร์ เรียงจากใหญ่ไปเล็ก กด เปิด เพื่อเข้าโฟลเดอร์ · โฟลเดอร์ Android (ข้อมูลของแอป รวม Flash Kit) ดูได้แต่ลบไม่ได้</div>
-            <button data-act="fbOpen">เปิดไฟล์ในเครื่อง</button>
-            <div id="fbCard" hidden style="margin-top:10px">
-              <div class="row" style="justify-content:space-between;margin-bottom:8px"><b id="fbPath" style="overflow-wrap:anywhere"></b><button id="fbUp" data-act="fbUp">ย้อนกลับ</button></div>
-              <div id="fbLockNote" class="warnbox" hidden>โฟลเดอร์นี้เป็นข้อมูลของแอป ลบแล้วแอปอาจพังหรืองานที่ยังไม่ส่งหาย จึงไม่ให้ลบ</div>
-              <div class="list" id="fbList"></div>
-              <div class="row end" style="margin-top:10px"><button class="red" data-act="fbDelete">ลบที่ติ๊ก</button></div>
-            </div>
+            <h2>รูปอื่น และไฟล์ทั้งหมดในเครื่อง</h2>
+            <div class="mut" style="margin-bottom:10px">รูปจาก Camera, Pictures, Screenshots และไฟล์ทุกอย่างในเครื่อง อยู่ที่เมนู ไฟล์ ด้านบน</div>
+            <button data-goto="files">ไปที่เมนู ไฟล์</button>
           </div>
           <div class="card">
             <h2>อื่นๆ</h2>
@@ -526,6 +514,31 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
       <div class="mut">ใส่ชื่อเทคนิคบรรทัดละ 1 แอป ระบบจะเตือนเมื่อเจอในเครื่อง กดปุ่ม ข้างแอปในรายการด้านบนเพื่อเพิ่มได้เลย</div>
       <textarea id="bannedText"></textarea>
       <div class="row end"><button data-act="bannedReset">คืนค่าเริ่มต้น</button><button class="blue" data-act="bannedSave">บันทึกรายการ</button></div>
+    </div>
+  </section>
+<section class="tab" id="tab-files" hidden>
+    <div class="ptitle"><svg class="i"><use href="#i-folder"/></svg>ไฟล์ในเครื่อง</div>
+    <div class="need-dev">
+      <div class="card">
+        <h2>รูปทั้งหมดในเครื่อง</h2>
+        <div class="mut" style="margin-bottom:10px">รูปและวิดีโอนอก Flash Kit เช่น Camera, camera&amp;muxer, Pictures, Screenshots, Download (ที่เห็นใน Files &gt; Recents) แยกตามโฟลเดอร์ ติ๊กโฟลเดอร์ที่จะลบ</div>
+        <button data-act="otherScan">หารูปทั้งหมด</button>
+        <div id="otherCard" hidden style="margin-top:10px">
+          <div class="list" id="otherList"></div>
+          <div class="row end" style="margin-top:10px"><button class="red" id="otherDel" data-act="otherDelete">ลบโฟลเดอร์ที่ติ๊ก</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>ไฟล์ทั้งหมดในเครื่อง</h2>
+        <div class="mut" style="margin-bottom:10px">ทุกไฟล์ทุกโฟลเดอร์ เรียงจากใหญ่ไปเล็ก กด เปิด เพื่อเข้าโฟลเดอร์ ติ๊กแล้วลบได้ทุกอย่าง · โฟลเดอร์ Android (ข้อมูลของแอป รวม Flash Kit) ดูได้แต่ลบไม่ได้</div>
+        <div id="fbCard" hidden>
+          <div class="row" style="justify-content:space-between;margin-bottom:8px"><b id="fbPath" style="overflow-wrap:anywhere"></b><div class="row"><button id="fbUp" data-act="fbUp">ย้อนกลับ</button><button data-act="fbOpen">กลับไปหน้าแรก</button></div></div>
+          <div id="fbLockNote" class="warnbox" hidden>โฟลเดอร์นี้เป็นข้อมูลของแอป ลบแล้วแอปอาจพังหรืองานที่ยังไม่ส่งหาย จึงไม่ให้ลบ</div>
+          <div class="list" id="fbList"></div>
+          <div class="row end" style="margin-top:10px"><button class="red" data-act="fbDelete">ลบที่ติ๊ก</button></div>
+        </div>
+        <div id="fbIdle" class="mut">กำลังเปิด...</div>
+      </div>
     </div>
   </section>
 <section class="tab" id="tab-wifi" hidden>

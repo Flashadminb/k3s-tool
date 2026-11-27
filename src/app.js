@@ -240,6 +240,7 @@ async function addDevice(d) {
   if (old && !old.closed) { await d.close(); return old; }
   d.info.model = (await d.sh("getprop ro.product.model")).out.trim();
   d.info.profile = st.profileFor(d.info.model);
+  await learnProfile(d).catch(() => {});
   devices.set(d.serial, d);
   if (!selected || !devices.get(selected) || devices.get(selected).closed) selected = d.serial;
   log("เชื่อมต่อ " + label(d) + " (ใช้ที่เก็บรูปแบบ " + d.info.profile.name + ")");
@@ -268,6 +269,26 @@ async function addDevice(d) {
   ]);
   renderAll();
   return d;
+}
+
+/**
+ * A model seen for the first time is learned: find where Flash Kit keeps its photos (imagePath) on that device
+ * and save it as a model profile (visible and editable in Settings > models).
+ */
+async function learnProfile(d) {
+  const model = (d.info.model || "").trim();
+  if (!model || st.profileFor(model) !== st.DEFAULT_PROFILE) return;
+  let base = "/sdcard/imagePath";
+  const here = (await d.sh(`[ -d ${q(base)} ] && echo yes`)).out.includes("yes");
+  if (!here) {
+    const found = (await d.sh("find -H /sdcard -maxdepth 4 -path /sdcard/Android -prune -o -type d -name imagePath -print 2>/dev/null | head -1")).out.trim();
+    if (!found) { log(`${label(d)}: รุ่นใหม่ (${model}) ยังไม่เจอโฟลเดอร์รูปของ Flash Kit อาจยังไม่เคยถ่ายรูปงาน ใช้แบบ K3S ไปก่อน แล้วจะเรียนรู้ใหม่ครั้งหน้า`); return; }
+    base = found;
+  }
+  st.saveProfiles([...st.profiles(), { name: model, match: model, success: base + "/success", fail: base + "/fail" }]);
+  profDraft = st.profiles(); renderProfTable();
+  d.info.profile = st.profileFor(model);
+  log(`เรียนรู้รุ่นใหม่: ${model} เก็บรูป Flash Kit ที่ ${base}`);
 }
 
 async function connectNew() {
@@ -618,6 +639,9 @@ function renderAll() {
   renderBannedFound(d);
   renderToday();
   renderRegistry();
+  // on the Files menu, picking another device opens that device's storage
+  const on = document.querySelector(".tabs .on");
+  if (on && on.dataset.tab === "files" && d && fbSerial !== d.serial) openFilesTab();
 }
 
 /* =====================================================================
@@ -702,10 +726,19 @@ async function fbList(d, path) {
   busyMsg("กำลังอ่านโฟลเดอร์ · " + (path.replace(FB_ROOT, "") || "/"));
   const r = await d.sh(`cd ${q(path)} || exit 1; ls -A | while IFS= read -r f; do if [ -d "$f" ] && [ ! -L "$f" ]; then printf 'd\\t%s\\t%s\\n' "$(du -sk "$f" 2>/dev/null | cut -f1)" "$f"; else printf 'f\\t%s\\t%s\\n' "$(du -k "$f" 2>/dev/null | cut -f1)" "$f"; fi; done`);
   if (r.code) throw new Error("เปิดโฟลเดอร์นี้ไม่ได้: " + (r.err || r.out).trim());
-  fbPath = path;
+  fbPath = path; fbSerial = d.serial;
   fbItems = r.out.split("\n").map((l) => { const [t, kb, ...n] = l.split("\t"); return { dir: t === "d", kb: +kb || 0, name: n.join("\t") }; })
     .filter((x) => x.name).sort((a, b) => b.kb - a.kb);
   renderFb();
+}
+// The Files menu opens the selected device's storage by itself (and again when another device is picked)
+let fbSerial = null;
+function openFilesTab() {
+  const d = devices.get(selected);
+  if (!d || d.closed) return;
+  if (fbSerial === d.serial && fbItems.length) return;
+  if (d.busy) { if ($("fbIdle")) $("fbIdle").textContent = "เครื่องนี้กำลังทำงานอื่นอยู่ เสร็จแล้วเปิดเมนูนี้ใหม่"; return; }
+  run("เปิดไฟล์ในเครื่อง", () => fbList(d, FB_ROOT));
 }
 function folderIcon() {
   const s = el("span", { class: "fico", "aria-hidden": "true" });
@@ -716,6 +749,7 @@ function renderFb() {
   const box = $("fbList");
   if (!box) return;
   $("fbCard").hidden = false;
+  if ($("fbIdle")) $("fbIdle").hidden = true;
   $("fbPath").textContent = "ที่เก็บในเครื่อง" + (fbPath.replace(FB_ROOT, "") || "") + "  ·  " + human(fbItems.reduce((s, x) => s + x.kb, 0));
   $("fbUp").hidden = fbPath === FB_ROOT;
   const locked = fbLocked(fbPath);
@@ -1018,10 +1052,13 @@ async function loadApps(d) {
   for (const m of pol.matchAll(/package=([\w.]+)/g)) prot.add(m[1]);
   const isProt = (p) => prot.has(p) || /flash/i.test(p) || CRITICAL.includes(p);
   const sysSet = new Set(sys);
+  // apps that have an icon on the home screen (Gmail, Chrome, Flash Kit...) are what people look for: list them first
+  const icons = new Set([...(await d.sh("cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER 2>/dev/null")).out
+    .matchAll(/([a-zA-Z][\w.]*)\/[\w.$]+/g)].map((m) => m[1]));
   d.info.apps = {
     list: [...user.map((p) => ({ pkg: p, sys: false })), ...sys.map((p) => ({ pkg: p, sys: true }))]
-      .map((a) => ({ ...a, name: appName(a.pkg), ver: ver[a.pkg] || "", prot: isProt(a.pkg) }))
-      .sort((a, b) => (a.sys - b.sys) || (a.name || a.pkg).localeCompare(b.name || b.pkg)),
+      .map((a) => ({ ...a, name: appName(a.pkg), ver: ver[a.pkg] || "", prot: isProt(a.pkg), icon: icons.has(a.pkg) }))
+      .sort((a, b) => (b.icon - a.icon) || (a.sys - b.sys) || (a.name || a.pkg).localeCompare(b.name || b.pkg)),
     hidden: sysAll.filter((p) => !sysSet.has(p)),
     at: Date.now()
   };
@@ -1056,13 +1093,14 @@ function renderApps(d) {
     if (d && onApps && d.busy) { box.replaceChildren(el("div", { class: "item mut", text: "เครื่องนี้กำลังทำงานอื่นอยู่ เสร็จแล้วกด โหลดใหม่" })); return; }
     box.replaceChildren(el("div", { class: "item mut", text: d ? "เปิดเมนูนี้แล้วจะโหลดให้เอง หรือกด โหลดใหม่" : "-" })); hid.replaceChildren(el("div", { class: "item mut", text: "-" })); return;
   }
-  if ($("appCount")) { const u = a.list.filter((x) => !x.sys).length; $("appCount").textContent = `${label(d)} · ทั้งหมด ${a.list.length} แอป (ติดตั้งเอง ${u} · แอประบบ ${a.list.length - u})`; }
+  if ($("appCount")) { const u = a.list.filter((x) => !x.sys).length, ic = a.list.filter((x) => x.icon).length; $("appCount").textContent = `${label(d)} · ทั้งหมด ${a.list.length} แอป (มีไอคอนบนหน้าจอ ${ic} · ติดตั้งเอง ${u} · แอประบบ ${a.list.length - u}) · แอปที่มีไอคอนอยู่บนสุด`; }
   const s = $("appSearch").value.trim().toLowerCase();
   const showSys = $("showSys").checked;
   const banned = new Set(st.banned());
   const rows = a.list.filter((x) => (showSys || !x.sys || banned.has(x.pkg)) && (!s || x.pkg.toLowerCase().includes(s) || x.name.toLowerCase().includes(s)));
   box.replaceChildren(...(rows.length ? rows.slice(0, 1500).map((x) => el("div", { class: "item" },
     el("div", { class: "nm" }, x.name || x.pkg,
+      x.icon ? el("span", { class: "tag ok", text: "มีไอคอน" }) : null,
       x.sys ? el("span", { class: "tag sys", text: "แอประบบ" }) : null,
       x.prot ? el("span", { class: "tag", text: "แอปบริษัท/ระบบ ห้ามถอน" }) : null,
       banned.has(x.pkg) ? el("span", { class: "tag", text: "ต้องห้าม" }) : null,
@@ -1667,6 +1705,7 @@ function showTab(name) {
   renderDevices();
   if (name === "wifi" && all().length) renderWifiNow().catch(() => {});
   if (name === "apps") renderApps(devices.get(selected));
+  if (name === "files") openFilesTab();
 }
 
 window.addEventListener("DOMContentLoaded", () => {

@@ -117,10 +117,7 @@ body.selecting .sat{cursor:copy}
 .sat-bat{display:flex;align-items:center;gap:4px;font:600 calc(var(--s)*.1)/1 var(--display);text-shadow:0 1px 2px rgba(0,0,0,.8)}
 .bat{width:calc(var(--s)*.2);height:auto;color:rgba(238,241,247,.9);filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
 .sat-id{font:500 max(9px,calc(var(--s)*.09))/1.2 var(--display);color:rgba(238,241,247,.82);letter-spacing:.05em}
-.sat-id.named{font-weight:700;font-size:max(10px,calc(var(--s)*.12));color:var(--gold,#e8be5a);max-width:78%;line-height:1.15;text-align:center;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.sat-id.named.n2{font-size:max(9px,calc(var(--s)*.095))}
-.sat-id.named.n3{font-size:max(8px,calc(var(--s)*.08))}
-.sat-id.named.n4{font-size:max(7px,calc(var(--s)*.068))}
+.sat-id.named{font-weight:700;font-size:max(10px,calc(var(--s)*.12));color:var(--gold,#e8be5a);width:calc(var(--s)*.68);max-width:calc(var(--s)*.68);text-align:center;white-space:nowrap;overflow:hidden;display:block}
 .sat.sel::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid var(--gold-hi)}
 .sat.sel::before{content:"";position:absolute;inset:-16px;border-radius:50%;border:1px solid rgba(227,180,106,.3)}
 .sat:hover .sat-body{filter:brightness(1.15)}

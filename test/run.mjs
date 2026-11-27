@@ -146,8 +146,9 @@ ok(await page.evaluate(() => JSON.parse(localStorage.getItem("k3s-tool:names"))[
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("screen_brightness 255"), "naming flashes the device being named");
 await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
 await page.fill("#dlgInput", "สำรองคลังสินค้า 12"); await page.click("#dlgOk");
-const fits = await page.$eval(".sat-id.named", (e) => { const c = e.closest(".sat").getBoundingClientRect(), r = e.getBoundingClientRect(); return e.scrollHeight <= e.clientHeight + 1 && r.left >= c.left && r.right <= c.right; });
-ok(fits, "a long name shrinks to fit inside the circle");
+await page.waitForTimeout(200);
+const fits = await page.$eval(".sat-id.named", (e) => { const c = e.closest(".sat").getBoundingClientRect(), r = e.getBoundingClientRect(); return e.scrollWidth <= e.clientWidth + 1 && r.left >= c.left && r.right <= c.right && r.height < parseFloat(getComputedStyle(e).fontSize) * 1.8; });
+ok(fits, "a long name stays on one line and shrinks to fit inside the circle " + await page.$eval(".sat-id.named", (e) => [e.scrollWidth, e.clientWidth, e.style.fontSize, getComputedStyle(e).fontSize, getComputedStyle(e).display].join(",")));
 await page.screenshot({ path: join(ROOT, "longname.png"), clip: await page.$eval(".satw", (e) => { const r = e.getBoundingClientRect(); return { x: r.x - 10, y: r.y - 10, width: r.width + 20, height: r.height + 20 }; }) });
 await click("nameDev"); await page.waitForSelector("#dlg:not([hidden])");
 await page.fill("#dlgInput", "Hub-07"); await page.click("#dlgOk");

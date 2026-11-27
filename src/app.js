@@ -466,13 +466,27 @@ const draining = new Set();   // devices deleting right now (files are drawn flo
 let selectMode = false, hoverSerial = null, groupPin = null, pendingInstall = null, cardDev = null;
 const groupDevs = () => [...group].map((s) => devices.get(s)).filter((d) => d && !d.closed);
 
+/** Names stay on one line: a long one gets smaller letters until it fits inside its circle */
+function fitNames(root) {
+  (root || document).querySelectorAll(".sat-id.named").forEach((e) => {
+    e.style.fontSize = "";
+    let size = parseFloat(getComputedStyle(e).fontSize) || 12;
+    const room = e.clientWidth;
+    if (!room || e.scrollWidth <= room + 1) return;
+    size = Math.max(6, size * (room / e.scrollWidth) - 0.2); e.style.fontSize = size + "px";
+    while (e.scrollWidth > room + 1 && size > 6) { size -= 0.5; e.style.fontSize = size + "px"; }
+  });
+}
+// the Thai web font can arrive after the first measure and is wider: measure again then
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitNames());
+if (document.fonts) document.fonts.addEventListener && document.fonts.addEventListener("loadingdone", () => fitNames());
 function renderDevices() {
   const box = $("devices");
   const n = all().length;
   document.body.classList.toggle("has-dev", !!n);
   document.body.classList.toggle("selecting", selectMode);
   renderHubTools(); // before layout: the select bar and hub tools are areas the devices must avoid
-  if (box.classList.contains("orbit")) renderOrbit(box);
+  if (box.classList.contains("orbit")) { renderOrbit(box); requestAnimationFrame(() => fitNames(box)); setTimeout(() => fitNames(box), 400); }
   else box.replaceChildren(...all().map((d) => {
     const s = d.info.storage;
     const pct = s && s.total ? Math.round((s.used / s.total) * 100) + "%" : "";
@@ -641,9 +655,7 @@ const ringPct = (d) => (d.status && d.status.ring != null ? Math.max(0, Math.min
 const statusClass = (d) => (d.status ? " has-status" + (d.status.err ? " st-err" : d.status.done ? " st-done" : "") : "");
 function satBody(d) {
   const nm = st.nameOf(d.serial);
-  // longer names get smaller letters (up to 2 lines) so the whole name fits inside the circle
-  const fit = !nm ? "" : nm.length <= 5 ? "" : nm.length <= 8 ? " n2" : nm.length <= 12 ? " n3" : " n4";
-  const id = el("span", { class: "sat-id" + (nm ? " named" + fit : ""), text: nm || d.serial.slice(-6), title: nm ? nm + " · " + d.serial : d.serial });
+  const id = el("span", { class: "sat-id" + (nm ? " named" : ""), text: nm || d.serial.slice(-6), title: nm ? nm + " · " + d.serial : d.serial });
   const s0 = d.status;
   if (s0) return [el("span", { class: "sat-st", text: s0.title }), s0.big != null ? el("b", { class: "sat-big", text: s0.big }) : null,
     s0.unit ? el("span", { class: "sat-unit", text: s0.unit }) : null, id].filter(Boolean);
@@ -659,7 +671,7 @@ function paintStatus(d) {
   w.classList.remove("has-status", "st-done", "st-err");
   statusClass(d).trim().split(" ").filter(Boolean).forEach((c) => w.classList.add(c));
   const body = w.querySelector(".sat-body");
-  if (body) body.replaceChildren(...satBody(d));
+  if (body) { body.replaceChildren(...satBody(d)); fitNames(body); }
 }
 const shortJob = (name) => name.replace(/ · .*$/, "").replace(/\.\.\.$/, "").slice(0, 18);
 

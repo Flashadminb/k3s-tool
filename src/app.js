@@ -35,7 +35,7 @@ const HELP = {
   NO_FS: ["เบราว์เซอร์นี้บันทึกลงโฟลเดอร์ไม่ได้", ["ใช้ Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุดบนคอม Windows", "ตอนหน้าต่างเลือกโฟลเดอร์เด้งขึ้น ให้เลือกโฟลเดอร์ แล้วกด อนุญาต/ดูไฟล์ และ บันทึกการเปลี่ยนแปลง"]],
   SETTINGS: ["ตั้งค่าบางข้อไม่สำเร็จ", ["ข้อที่ไม่สำเร็จอาจถูกระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ข้ออื่นที่สำเร็จแล้วใช้งานได้ตามปกติ"]],
   WIFI: ["ต่อ Wi-Fi ไม่สำเร็จ", ["เช็กชื่อ Wi-Fi ให้ตรงตัวพิมพ์เล็ก/ใหญ่ และรหัสผ่านให้ถูก", "เครื่องต้องอยู่ในระยะสัญญาณ (กด ค้นหา ดูว่าเครื่องเห็น Wi-Fi นี้ไหม)", "ถ้าขึ้นว่าไม่อนุญาต / not allowed: ระบบบริษัทล็อกการตั้ง Wi-Fi ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash"]],
-  DROPPED: ["เครื่องหลุดการเชื่อมต่อ", ["ถ้าถอดสายเอง: ไม่ต้องทำอะไร เสียบกลับเมื่อไหร่ เว็บจะต่อให้เอง", "ถ้าไม่ได้ถอดสาย และเครื่องเพิ่งเข้า iLauncher: iLauncher ของบริษัทปิดการเชื่อมต่อ USB ตอนล็อกเครื่อง ให้ใช้เว็บก่อนเข้า iLauncher หรือออกจาก iLauncher (รหัสผู้ดูแล) แล้วเสียบใหม่ ห้ามหาทางเลี่ยง ถ้าต้องใช้ระหว่างอยู่ใน iLauncher ให้ขอไอที Flash", "ถ้าหลุดเองบ่อยๆ: เปลี่ยนสาย หรือเสียบเข้าคอมตรงๆ"]],
+  DROPPED: ["เครื่องหลุดการเชื่อมต่อ", ["ถ้าถอดสายเอง: ไม่ต้องทำอะไร เสียบกลับเมื่อไหร่ เว็บจะต่อให้เอง", "ถ้าเครื่องใช้ iLauncher: iLauncher ปิด USB debugging ทันทีที่ออกจากหน้า Settings ให้เข้า Settings > เปิด USB debugging แล้วค้างไว้ที่หน้า Settings ระหว่างใช้เว็บ (อย่ากด Home/Back) · ห้ามหาทางเลี่ยงระบบบริษัท", "ถ้าหลุดเองบ่อยๆ: เปลี่ยนสาย หรือเสียบเข้าคอมตรงๆ"]],
   WIFI_MANUAL: ["เครื่องรุ่นนี้ต้องแตะเลือก Wi-Fi เอง 1 ครั้ง", ["Android ของเครื่องนี้ไม่ให้คอมสั่งต่อ Wi-Fi (ใช้ได้กับ Android 12 ขึ้นไป เช่น K3S) ไม่ใช่ระบบบริษัทบล็อก", "เว็บเปิดหน้า Wi-Fi ที่เครื่องให้แล้ว: แตะชื่อ Wi-Fi ที่ต้องการ (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "พอขึ้นช่องใส่รหัส กดปุ่ม พิมพ์รหัส... ด้านล่าง เว็บจะพิมพ์รหัสที่บันทึกไว้และกด Enter ให้", "ไม่อยากจับเครื่อง: ใช้ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกชื่อ Wi-Fi จากคอม"]],
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
@@ -602,6 +602,13 @@ function renderCard() {
   $("dcFlash").textContent = i.flash ? (i.flash.length ? i.flash.map((f) => f.ver || f.pkg).join(", ") + (fs === "old" ? " (เก่า)" : "") : "ไม่มี") : "-";
   $("dcScreen").textContent = i.screenOn === false ? "ดับอยู่" : i.screenOn ? "เปิดอยู่" : "-";
   $("dcSerial").textContent = d.serial;
+  if ($("dcKiosk")) $("dcKiosk").hidden = !i.kiosk;
+}
+/** Commands that bring another app to the front make iLauncher cut USB: warn first on those devices */
+async function kioskOk(ds, what) {
+  const k = ds.filter((d) => d.info.kiosk);
+  if (!k.length) return true;
+  return confirmBox(`${k.map(label).join(", ")} ใช้ iLauncher\n${what} จะพาเครื่องออกจากหน้า Settings ทำให้ USB หลุดทันที\n\nทำต่อไหม? (ทำเสร็จแล้วต้องเข้า Settings เปิด USB debugging ใหม่)`);
 }
 function renderDevCard() { renderCard(); }
 
@@ -997,6 +1004,10 @@ async function loadInfo(d) {
   const mv = (k) => { const m = mem.match(new RegExp(k + ":\\s*(\\d+)")); return m ? +m[1] : 0; };
   i.ram = { total: mv("MemTotal"), avail: mv("MemAvailable") };
   i.uptime = parseFloat((await d.sh("cat /proc/uptime")).out) || 0;
+  // Which app is the home screen? iLauncher (company kiosk) switches USB debugging off when you leave Settings
+  const home = (await d.sh("cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN 2>/dev/null | tail -1")).out.trim();
+  i.home = (home.match(/^([\w.]+)\//) || [])[1] || "";
+  i.kiosk = /ilauncher|kiosk/i.test(i.home);
   i.flash = [];
   for (const p of await flashPackages(d)) {
     const v = (await d.sh(`dumpsys package ${q(p)} | grep -m1 versionName`)).out.split("=")[1];
@@ -1457,6 +1468,7 @@ const actions = {
     const d = cur(); const pk = await flashPackages(d);
     if (!pk.length) throw new Error("NO_FLASH");
     if (!(await confirmBox(`ปิดแล้วเปิดแอป Flash ใหม่ที่ ${label(d)}?\nงานที่พิมพ์ค้างไว้แต่ยังไม่กดบันทึกอาจหาย`))) return false;
+    if (!(await kioskOk([d], "การเปิดแอป Flash"))) return false;
     for (const p of pk) { await d.sh(`am force-stop ${q(p)}`); await d.sh(`monkey -p ${q(p)} -c android.intent.category.LAUNCHER 1`); }
   }),
   reboot: () => run("รีสตาร์ทเครื่อง", async () => {
@@ -1696,6 +1708,7 @@ async function setWallpaper(file) {
   await run("ส่งรูปหน้าจอ", async () => {
     const ts = await pickDevices("ส่งรูปหน้าจอ " + file.name);
     if (!ts.length) return false;
+    if (!(await kioskOk(ts, "การเปิดหน้าตั้งวอลเปเปอร์"))) return false;
     const ext = ((file.name.match(/\.(\w+)$/) || [, "jpg"])[1]).toLowerCase();
     const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
     const fails = [];

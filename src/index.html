@@ -147,6 +147,7 @@ body.grouped #dcDetail .facts{grid-template-columns:1fr 1fr;font-size:15px}
 .facts{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:0}
 .facts div{min-width:0}.facts dt{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:13px;letter-spacing:.04em}.facts dd{margin:2px 0 0;font-weight:600;font-size:17px;overflow-wrap:anywhere;display:flex;align-items:center;gap:4px}
 .facts dd .bat{width:26px;color:var(--tx)}
+.kiosk-note{font-size:14px;line-height:1.45;color:#f7dc9c;background:var(--warnbg);border:1px solid rgba(242,193,78,.35);border-radius:10px;padding:8px 12px}
 #dcGroup{padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
 #dcGroup .gt{display:flex;justify-content:space-between;align-items:center;gap:8px;font:700 20px/1.2 var(--display);color:var(--gold-hi)}
 #dcGroup .gt button{min-height:36px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:var(--glass-2);color:var(--tx);font:600 14px/1 var(--body);cursor:pointer}
@@ -365,6 +366,7 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
           <div><dt><svg class="i"><use href="#i-android"/></svg>ระบบ</dt><dd id="dcAndroid">-</dd></div>
           <div><dt><svg class="i"><use href="#i-box"/></svg>Flash Kit</dt><dd id="dcFlash">-</dd></div>
           <div><dt>หน้าจอ</dt><dd id="dcScreen">-</dd></div>
+          <div id="dcKiosk" class="kiosk-note" hidden style="grid-column:1/-1">ใช้ iLauncher: ค้างไว้ที่หน้า Settings ระหว่างใช้เว็บ ออกจาก Settings แล้ว USB จะหลุด</div>
           <div><dt>รหัสเครื่อง</dt><dd id="dcSerial">-</dd></div>
         </dl>
         </div>
@@ -638,6 +640,11 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
 <div class="step"><div class="n">2</div><div class="t">กดวงกลม <b>เชื่อมต่อเครื่อง</b> กลางจอ</div></div>
 <div class="step"><div class="n">3</div><div class="t">หน้าต่างเล็กของ Chrome เด้งขึ้น: คลิกชื่อเครื่อง แล้วกด <b>Connect</b> (เชื่อมต่อ)</div></div>
 <div class="step"><div class="n">4</div><div class="t">ที่เครื่องขึ้น <b>Allow USB debugging?</b> (อนุญาตไหม): ติ๊ก <b>Always allow from this computer</b> (อนุญาตจากคอมนี้เสมอ) แล้วกด <b>Allow</b> (อนุญาต)</div></div><div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง</div></div>
+<div class="card" id="ilauncher"><div class="part">เครื่องที่อยู่ใน iLauncher</div>
+<div class="step"><div class="n">1</div><div class="t">ใน iLauncher กดเข้า <b>Settings</b> แล้วเปิด <b>USB debugging</b></div></div>
+<div class="step"><div class="n">2</div><div class="t"><b>ค้างไว้ที่หน้า Settings</b> อย่ากด Home หรือ Back แล้วใช้เว็บได้ตามปกติ<small>iLauncher ของบริษัทปิด USB ทันทีที่ออกจาก Settings: ตั้งใจไว้ ห้ามหาทางเลี่ยง</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">ให้จอเปิดค้าง: ตอนเว็บถาม "ให้จอเปิดค้างไว้ไหม" ตอบ ยืนยัน หรือเปิด <b>Stay awake</b> ใน Developer options<small>จอดับแล้วเครื่องอาจกลับหน้า iLauncher และหลุด</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ทำงานเสร็จค่อยออกจาก Settings<small>รีสตาร์ทแอป Flash และส่งรูปหน้าจอ จะพาเครื่องออกจาก Settings: เว็บจะเตือนก่อน</small></div></div></div>
 <div class="card" id="notFound"><div class="part">กดเชื่อมต่อแล้ว ไม่เห็นชื่อเครื่องในหน้าต่าง</div>
 <div class="step"><div class="n">1</div><div class="t">ดูที่ดาวกลางจอก่อน<small>ถ้าเครื่องขึ้นเป็นดาวอยู่แล้ว แปลว่าต่ออยู่แล้ว ไม่ต้องกดซ้ำ (Chrome จะไม่แสดงเครื่องที่เว็บนี้ใช้อยู่)</small></div></div>
 <div class="step"><div class="n">2</div><div class="t">รูดแถบแจ้งเตือนที่เครื่องลงมา ต้องเห็น <b>USB debugging connected</b> (เชื่อมต่อการแก้ไขข้อบกพร่อง USB แล้ว)<small>ถ้าไม่เห็น: USB debugging ปิดอยู่ (เช่นเพิ่งรีเซ็ต) ให้ทำส่วน B ใหม่ หรือสายเสีย/เป็นสายชาร์จอย่างเดียว ให้เปลี่ยนสาย</small></div></div>

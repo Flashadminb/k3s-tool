@@ -724,6 +724,15 @@ body:not(.role-admin) .owner-only{display:none!important}
 <div class="step"><div class="n">3</div><div class="t">ในแถบแจ้งเตือน แตะข้อความ USB แล้วเลือก <b>File transfer</b> (โอนไฟล์)<small>บางเครื่องโหมด Charging only (ชาร์จอย่างเดียว) จะไม่ให้คอมเห็นเครื่อง</small></div></div>
 <div class="step"><div class="n">4</div><div class="t">ปิดแท็บอื่นที่เปิดเว็บนี้ซ้ำ และปิดโปรแกรมอื่นที่ใช้มือถือ แล้วถอดสาย รอ 3 วินาที เสียบใหม่</div></div>
 <div class="step"><div class="n">5</div><div class="t">ยังไม่เจอ: เช็กด้วย adb ตามหัวข้อ <b>เช็กด้วย adb</b> ด้านล่าง</div></div></div>
+<div class="card" id="winDriver"><div class="part">คอมเครื่องใหม่: บางเครื่องขึ้น แต่รุ่นใหม่ไม่ขึ้นในหน้าต่าง (Windows)</div>
+<div class="mut" style="margin-bottom:8px">Chrome ต่อเครื่องได้เฉพาะเครื่องที่ Windows ลงไดรเวอร์แบบ <b>WinUSB</b> ไว้ รุ่นที่เคยเสียบคอมนี้แล้วมักมีอยู่แล้ว รุ่นใหม่ต้องลงครั้งเดียวต่อคอม</div>
+<div class="step"><div class="n">1</div><div class="t">เช็กที่เครื่องก่อน: รูดแถบแจ้งเตือน ต้องเห็น <b>USB debugging connected</b><small>ไม่เห็น = ทำส่วน B ด้านบนก่อน (เครื่องใหม่หรือเพิ่งรีเซ็ตยังไม่ได้เปิด)</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">ที่คอม กด <span class="kbd">⊞ Windows</span> พิมพ์ <code>Device Manager</code> (ตัวจัดการอุปกรณ์) กด <span class="kbd">Enter</span></div></div>
+<div class="step"><div class="n">3</div><div class="t">หา <b>ADB Interface</b> หรือชื่อรุ่นเครื่อง ที่มีเครื่องหมาย ⚠️ สีเหลือง (มักอยู่ใน <b>Other devices</b>)<small>ถ้าอยู่ใน <b>Universal Serial Bus devices</b> หรือ <b>Android Device</b> โดยไม่มี ⚠️ = ไดรเวอร์ปกติ ข้ามไปข้อ 6</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ลงไดรเวอร์ด้วยโปรแกรม <b>Zadig</b> (ฟรี ไม่ต้องติดตั้ง): โหลดจาก zadig.akeo.ie แล้วเปิด<small>เมนู <b>Options</b> &gt; ติ๊ก <b>List All Devices</b> · เลือกรายการที่เป็นเครื่อง PDA (มักชื่อ ADB Interface หรือชื่อรุ่น)</small></div></div>
+<div class="step"><div class="n">5</div><div class="t">ช่องขวาเลือก <b>WinUSB</b> แล้วกด <b>Install Driver</b> หรือ <b>Replace Driver</b> รอจนขึ้นว่าสำเร็จ<small>ระวังเลือกให้ถูกเครื่อง อย่าเลือกเมาส์ คีย์บอร์ด หรือกล้อง</small></div></div>
+<div class="step"><div class="n">6</div><div class="t">ปิดโปรแกรมอื่นที่ใช้มือถือ (adb, โปรแกรมโอนไฟล์ ฯลฯ) ถอดสาย รอ 3 วินาที เสียบใหม่ แล้วกดวงกลม <b>เชื่อมต่อเครื่อง</b></div></div>
+<div class="warnbox">ทำครั้งเดียวต่อคอมต่อรุ่นเครื่อง · คอมของบริษัทที่ลงโปรแกรมเองไม่ได้ ให้แจ้งไอที</div></div>
 <details><summary>ติดปัญหาอื่น? กดดูวิธีแก้</summary>
     <h3>เช็กด้วย adb (ใช้บอกว่าปัญหาอยู่ที่เครื่อง หรือที่เบราว์เซอร์)</h3>
     <ol><li>กดปุ่ม <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>

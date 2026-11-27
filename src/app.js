@@ -24,6 +24,7 @@ const HELP = {
   NO_WEBUSB: ["ใช้เบราว์เซอร์ไม่ถูก", ["เปิดหน้านี้ด้วย Google Chrome หรือ Microsoft Edge บนคอม (Firefox/Safari ใช้ไม่ได้)", "ต้องเปิดจากคอม ไม่ใช่จากมือถือ"]],
   NO_DEVICE_SELECTED: ["ยังไม่ได้เลือกเครื่อง", ["กด + เชื่อมต่อเครื่อง อีกครั้ง แล้วคลิกชื่อเครื่องในหน้าต่างที่เด้งขึ้น แล้วกด เชื่อมต่อ", "ถ้าไม่เห็นชื่อเครื่องในรายการ ให้ดูแท็บ คู่มือ หัวข้อ แก้ปัญหา: ไม่เห็นชื่อเครื่อง"]],
   BUSY: ["เครื่องถูกโปรแกรมอื่นใช้อยู่", ["กดปุ่ม Windows พิมพ์ cmd แล้วกด Enter", "พิมพ์ cd C:\\Users\\Flash\\Desktop\\Best\\platform-tools แล้วกด Enter", "พิมพ์ adb kill-server แล้วกด Enter", "ปิดแท็บอื่นที่เปิดหน้านี้ซ้ำ และปิดโปรแกรมอื่นที่ใช้มือถือ เช่น Android Studio, scrcpy", "ถอดสาย USB แล้วเสียบใหม่ แล้วกดเชื่อมต่ออีกครั้ง"], PT],
+  UNPLUGGED: ["สาย USB หลุด หรือเครื่องถูกถอด", ["เสียบสายกลับเข้าไป รอ 3 วินาที เว็บจะเชื่อมต่อให้เอง (ถ้าไม่ต่อ ให้กด + เชื่อมต่อเครื่อง)", "กดปุ่มเดิมอีกครั้งได้เลย ลบซ้ำได้ ไม่มีอะไรเสีย", "ถ้าหลุดบ่อย: เปลี่ยนสาย หรือเสียบเข้าคอมตรงๆ ไม่ผ่านสายต่อพ่วง"]],
   NOT_CONNECTED: ["ยังไม่ได้เชื่อมต่อ", ["กดปุ่ม + เชื่อมต่อเครื่อง ก่อน", "ถ้าเพิ่งถอดสาย ให้เสียบใหม่"]],
   AUTH: ["เครื่องยังไม่อนุญาต", ["ปลดล็อกหน้าจอเครื่อง จะมีหน้าต่าง อนุญาตการแก้ไขข้อบกพร่อง USB ให้ติ๊ก อนุญาตเสมอ แล้วกด อนุญาต", "ถ้าไม่เห็นหน้าต่าง ให้ถอดสายแล้วเสียบใหม่", "ถ้าเคยกดปฏิเสธ: ตัวเลือกสำหรับนักพัฒนา > เพิกถอนการให้สิทธิ์การแก้ไขข้อบกพร่อง USB แล้วลองใหม่"]],
   INSTALL: ["ติดตั้ง APK ไม่ได้", ["พื้นที่เครื่องอาจเต็ม: กด ลบขยะ และ ลบรูป success ก่อน", "ถ้าขึ้น INSTALL_FAILED_UPDATE_INCOMPATIBLE: ไฟล์มาจากคนละที่กับแอปเดิม ต้องถอนแอปเดิมก่อน (แท็บ แอป)", "ถ้าขึ้น INSTALL_FAILED_VERSION_DOWNGRADE: ไฟล์เก่ากว่าแอปที่มีอยู่", "ถ้าขึ้น USER_RESTRICTED หรือ blocked: ระบบบริษัทบล็อกการติดตั้ง ให้แจ้งไอที Flash"]],
@@ -45,7 +46,36 @@ function log(msg) {
   const t = new Date().toLocaleTimeString("th-TH");
   $("log").textContent = `[${t}] ${msg}\n` + $("log").textContent.slice(0, 20000);
 }
-function busyMsg(t) { const b = $("busy"); b.textContent = t || ""; b.hidden = !t; }
+// Progress toast at the bottom + tab title, with seconds counter for long jobs
+const busyState = { text: "", start: 0, timer: null };
+function busyMsg(t) {
+  const b = $("busy");
+  if (t && !busyState.text) busyState.start = Date.now();
+  busyState.text = t || "";
+  const paint = () => {
+    const sec = Math.round((Date.now() - busyState.start) / 1000);
+    b.textContent = busyState.text + (sec >= 3 ? ` · ${sec} วิ` : "");
+  };
+  if (t) {
+    paint(); b.hidden = false; document.title = "⏳ K3S Tool";
+    if (!busyState.timer) busyState.timer = setInterval(paint, 1000);
+  } else {
+    b.hidden = true; clearInterval(busyState.timer); busyState.timer = null;
+    const long = Date.now() - busyState.start > 8000;
+    document.title = long ? "✅ เสร็จแล้ว · K3S Tool" : "K3S Tool";
+    if (long) setTimeout(() => { if (!busyState.text) document.title = "K3S Tool"; }, 15000);
+  }
+}
+
+// Big card while waiting for someone to tap "Allow" on the device
+let authTimer = null;
+function authWait(on) {
+  const c = $("authWait");
+  clearTimeout(authTimer);
+  c.hidden = !on;
+  $("authMore").hidden = true;
+  if (on) { c.scrollIntoView({ behavior: "smooth", block: "nearest" }); authTimer = setTimeout(() => ($("authMore").hidden = false), 15000); }
+}
 
 function showHelp(code, detail, info) {
   const [title, steps, link] = HELP[HELP[code] ? code : "UNKNOWN"];
@@ -65,6 +95,7 @@ function codeOf(e) {
   const m = String((e && e.message) || e);
   if (HELP[m]) return m;
   if (/auth|unauthor/i.test(m)) return "AUTH";
+  if (/disconnect|closed|transfer|NetworkError|NotFoundError/i.test(m)) return "UNPLUGGED";
   return "UNKNOWN";
 }
 
@@ -174,8 +205,10 @@ async function addDevice(d) {
 
 async function connectNew() {
   log("รอเลือกเครื่องในหน้าต่างของเบราว์เซอร์ ...");
-  busyMsg("ถ้าเครื่องถาม ให้กด อนุญาต ที่หน้าจอเครื่อง");
-  const d = await adb.requestAndOpen();
+  let d;
+  try { d = await adb.requestAndOpen(() => { busyMsg("รอกด อนุญาต ที่หน้าจอเครื่อง"); authWait(true); }); }
+  finally { authWait(false); }
+  busyMsg("กำลังอ่านข้อมูลเครื่อง");
   await addDevice(d);
 }
 
@@ -187,8 +220,18 @@ async function autoConnect() {
   try {
     for (const usb of await adb.knownDevices()) {
       if (devices.has(usb.serial) && !devices.get(usb.serial).closed) continue;
-      try { log("พบเครื่องที่เคยอนุญาต " + usb.serial.slice(-6) + " กำลังเชื่อมต่อ ..."); await addDevice(await adb.openUsb(usb)); }
-      catch (e) { log("เชื่อมต่ออัตโนมัติไม่สำเร็จ (" + (e.message || e) + ") กด + เชื่อมต่อเครื่อง เอง"); if (e.message === "BUSY") showHelp("BUSY"); }
+      // Right after plug-in or reboot the device may not be ready yet: try a few times
+      for (let tryNo = 1; tryNo <= 5; tryNo++) {
+        try {
+          log("พบเครื่องที่เคยอนุญาต " + usb.serial.slice(-6) + " กำลังเชื่อมต่อ ...");
+          await addDevice(await adb.openUsb(usb, () => authWait(true)));
+          break;
+        } catch (e) {
+          if (e.message === "BUSY") { showHelp("BUSY"); break; }
+          if (tryNo === 5) { log("เชื่อมต่ออัตโนมัติไม่สำเร็จ (" + (e.message || e) + ") กด + เชื่อมต่อเครื่อง เอง"); break; }
+          await new Promise((r) => setTimeout(r, 3000));
+        } finally { authWait(false); }
+      }
     }
   } finally { autoConnecting = false; }
 }
@@ -707,6 +750,7 @@ const actions = {
     const ts = targets();
     if (!(await confirmBox(`รีสตาร์ท ${ts.length > 1 ? ts.length + " เครื่อง" : label(ts[0])}?\nหลังเปิดเครื่องเสร็จ ให้ปลดล็อกหน้าจอ เว็บจะเชื่อมต่อให้เอง`))) return false;
     for (const d of ts) await d.reboot().catch(() => {});
+    log("สั่งรีสตาร์ทแล้ว รอเครื่องเปิดเสร็จ (1-2 นาที) แล้วปลดล็อกหน้าจอ เว็บจะเชื่อมต่อให้เอง");
   }),
   logcat: () => run("บันทึก log", async () => {
     const d = cur();

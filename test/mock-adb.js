@@ -13,6 +13,6 @@ export class Device {
   async close() { this._bye(); }
 }
 let n = 0;
-export async function requestAndOpen() { n++; return new Device("TESTSERIAL00" + n); }
+export async function requestAndOpen(onAuth) { n++; onAuth && onAuth(); return new Device("TESTSERIAL00" + n); }
 export async function knownDevices() { return []; }
 export async function openUsb(u) { return new Device(u.serial); }

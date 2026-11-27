@@ -23,7 +23,11 @@ export class Device {
 
   /** Run a shell command. Returns { out, err, code } */
   async sh(cmd) {
-    if (this.closed) throw new Error("NOT_CONNECTED");
+    if (this.closed) throw new Error("UNPLUGGED");
+    try { return await this._sh(cmd); }
+    catch (e) { if (this.closed || /disconnect|closed|transfer|NetworkError|NotFoundError/i.test(String(e && (e.name + " " + e.message)))) throw new Error("UNPLUGGED"); throw e; }
+  }
+  async _sh(cmd) {
     const p = this.adb.subprocess.shellProtocol;
     if (p) {
       const r = await p.spawnWaitText(cmd);
@@ -83,25 +87,27 @@ async function readAll(stream) {
   return await stream.pipeThrough(new ConcatBufferStream());
 }
 
-async function open(usbDev) {
+async function open(usbDev, onAuth) {
   let conn;
   try { conn = await usbDev.connect(); }
   catch (e) {
     if (/busy|claim|access denied|in use/i.test(String(e && (e.name + " " + e.message)))) throw new Error("BUSY");
     throw e;
   }
+  // From here the device may show "Allow USB debugging?" and we wait until someone taps it
+  onAuth && onAuth();
   const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: store });
   return new Device(new Adb(transport), usbDev.serial);
 }
 
 /** Ask the user to pick a device in the browser popup */
-export async function requestAndOpen() {
+export async function requestAndOpen(onAuth) {
   if (!mgr) throw new Error("NO_WEBUSB");
   let dev;
   try { dev = await mgr.requestDevice(); }
   catch (e) { throw new Error("NO_DEVICE_SELECTED"); }
   if (!dev) throw new Error("NO_DEVICE_SELECTED");
-  return open(dev);
+  return open(dev, onAuth);
 }
 
 /** Devices this browser was already allowed to use (no popup needed) */

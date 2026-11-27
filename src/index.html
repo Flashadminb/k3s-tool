@@ -45,7 +45,7 @@ code{background:var(--soft);padding:2px 8px;border-radius:4px;font-size:14px}
 .tabs button{border:2px solid var(--bd);border-radius:12px;background:#fff;padding:10px 6px;font-size:17px;font-weight:600;line-height:1.3}
 .tabs button.on{border-color:var(--ac);background:var(--ac);color:#fff}
 .tab[hidden]{display:none}
-.nodev{background:var(--acbg);border-radius:12px;padding:14px;margin-bottom:12px}
+.waitcard{border:3px solid var(--ac);background:var(--acbg)}
 /* guide */
 details{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px 20px;margin-bottom:12px}
 summary{font-weight:700;cursor:pointer;font-size:19px}
@@ -96,10 +96,19 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
     <button data-tab="guide">📖 คู่มือ</button>
   </div>
 
-  <div class="nodev" id="nodev">
-    <b>ยังไม่ได้เชื่อมต่อเครื่อง</b><br>
-    ถ้าเครื่องนี้ยังไม่เคยเปิด USB debugging ให้ทำตาม <a href="#" data-goto="guide">คู่มือทำครั้งแรก</a> ก่อน
-    ถ้าเคยทำแล้ว เสียบสาย USB แล้วกดปุ่ม <b>+ เชื่อมต่อเครื่อง</b> ด้านบน
+  <div class="card waitcard" id="authWait" hidden>
+    <div class="part">📱 ดูที่หน้าจอเครื่อง</div>
+    <div class="step"><div class="n">1</div><div class="t">ปลดล็อกหน้าจอเครื่อง</div></div>
+    <div class="step"><div class="n">2</div><div class="t">ติ๊ก <b>อนุญาตจากคอมพิวเตอร์นี้เสมอ</b> (Always allow)</div></div>
+    <div class="step"><div class="n">3</div><div class="t">กด <b>อนุญาต</b> (Allow)</div></div>
+    <div id="authMore" class="warnbox" hidden>ยังไม่เห็นหน้าต่างที่เครื่อง? ถอดสาย รอ 3 วินาที เสียบใหม่ แล้วกด + เชื่อมต่อเครื่อง อีกครั้ง · ถ้าเคยกดปฏิเสธ ดูแท็บ คู่มือ &gt; ติดปัญหา</div>
+  </div>
+
+  <div class="card" id="nodev">
+    <div class="part">ยังไม่ได้เชื่อมต่อเครื่อง</div>
+    <div class="step"><div class="n">1</div><div class="t">เสียบสาย USB ระหว่างเครื่องกับคอม<small>ใช้สายที่ส่งข้อมูลได้ เสียบเข้าคอมตรงๆ</small></div></div>
+    <div class="step"><div class="n">2</div><div class="t">กดปุ่มสีฟ้า <b>+ เชื่อมต่อเครื่อง</b> ด้านบน<small>เครื่องที่เคยเชื่อมแล้ว แค่เสียบสาย เว็บจะต่อให้เอง</small></div></div>
+    <div class="step"><div class="n">3</div><div class="t">เครื่องใหม่ / เพิ่งรีเซ็ต ต้องเปิด USB debugging ก่อน<small><a href="#" data-goto="guide">ดูวิธีในแท็บ คู่มือ</a></small></div></div>
   </div>
 
   <!-- ================= TAB: DATA (main) ================= -->

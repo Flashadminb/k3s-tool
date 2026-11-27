@@ -1,5 +1,6 @@
 // Over USB Android only gives the technical package name. This maps common ones to the name people see.
 export const APP_NAMES = {
+  "com.flashexpress.express.courier": "Flash Kit (Flash Express)",
   "com.zhiliaoapp.musically": "TikTok",
   "com.ss.android.ugc.trill": "TikTok",
   "com.facebook.katana": "Facebook",

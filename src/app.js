@@ -29,11 +29,12 @@ const HELP = {
   INSTALL: ["ติดตั้ง APK ไม่ได้", ["พื้นที่เครื่องอาจเต็ม: กด ลบขยะ และ ลบรูป success ก่อน", "ถ้าขึ้น INSTALL_FAILED_UPDATE_INCOMPATIBLE: ไฟล์มาจากคนละที่กับแอปเดิม ต้องถอนแอปเดิมก่อน (แท็บ แอป)", "ถ้าขึ้น INSTALL_FAILED_VERSION_DOWNGRADE: ไฟล์เก่ากว่าแอปที่มีอยู่", "ถ้าขึ้น USER_RESTRICTED หรือ blocked: ระบบบริษัทบล็อกการติดตั้ง ให้แจ้งไอที Flash"]],
   UNINSTALL: ["ถอนแอปไม่ได้", ["ถ้าขึ้น DEVICE_POLICY_MANAGER หรือ blocked: แอปนี้ระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ลองโหลดรายชื่อแอปใหม่ แล้วกดอีกครั้ง"]],
   RESET: ["สั่งรีเซ็ตผ่านโปรแกรมไม่ได้", ["ทำมือที่เครื่อง: การตั้งค่า > ระบบ > ตัวเลือกการรีเซ็ต > ลบข้อมูลทั้งหมด (รีเซ็ตเป็นค่าเริ่มต้น)", "บางรุ่นเมนูชื่อไม่เหมือนกัน ลองค้นหาคำว่า รีเซ็ต หรือ Reset ในช่องค้นหาของการตั้งค่า", "ถ้าไม่มีเมนูนี้ ระบบบริษัทอาจล็อกไว้ ให้แจ้งไอที"]],
-  WALLPAPER: ["ตั้งรูปหน้าจออัตโนมัติไม่ได้", ["รูปถูกส่งเข้าเครื่องแล้วที่โฟลเดอร์ Download", "ทำมือ: เปิดแอป แกลเลอรี/Files > เปิดรูป > เมนู 3 จุด > ตั้งเป็นวอลเปเปอร์", "เลือกได้ว่าจะตั้งหน้าจอหลัก หรือหน้าจอล็อก"]],
+  WALLPAPER: ["เปิดหน้าตั้งวอลเปเปอร์ให้อัตโนมัติไม่ได้", ["รูปถูกส่งเข้าเครื่องแล้วที่โฟลเดอร์ Download", "ทำมือ: เปิดแอป แกลเลอรี/Files > เปิดรูป > เมนู 3 จุด > ตั้งเป็นวอลเปเปอร์", "เลือกได้ว่าจะตั้งหน้าจอหลัก หรือหน้าจอล็อก"]],
   NO_FLASH: ["ไม่เจอแอป Flash ในเครื่อง", ["เช็กว่าเครื่องนี้ติดตั้ง Flash Kit แล้ว", "ดูชื่อแอปในแท็บ แอป แล้วแจ้งผู้ดูแลเว็บให้เพิ่มชื่อ"]],
   NO_FS: ["เบราว์เซอร์นี้บันทึกลงโฟลเดอร์ไม่ได้", ["ใช้ Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุดบนคอม Windows", "ตอนหน้าต่างเลือกโฟลเดอร์เด้งขึ้น ให้เลือกโฟลเดอร์ แล้วกด อนุญาต/ดูไฟล์ และ บันทึกการเปลี่ยนแปลง"]],
   SETTINGS: ["ตั้งค่าบางข้อไม่สำเร็จ", ["ข้อที่ไม่สำเร็จอาจถูกระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ข้ออื่นที่สำเร็จแล้วใช้งานได้ตามปกติ"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
+  WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
 
@@ -46,9 +47,10 @@ function log(msg) {
 }
 function busyMsg(t) { const b = $("busy"); b.textContent = t || ""; b.hidden = !t; }
 
-function showHelp(code, detail) {
+function showHelp(code, detail, info) {
   const [title, steps, link] = HELP[HELP[code] ? code : "UNKNOWN"];
   const box = $("help");
+  box.classList.toggle("info", !!info);
   box.replaceChildren(
     el("div", { class: "help-title", text: title }),
     el("ol", {}, steps.map((s) => el("li", { text: s })))
@@ -91,6 +93,24 @@ function confirmBox(text, word) {
     $("dlgNo").onclick = () => done(false);
     $("dlgOk").onclick = ok;
     inp.onkeydown = (e) => { if (e.key === "Enter") ok(); };
+  });
+}
+
+/** Ask which plugged-in devices to use. One device = no question. Returns [] if cancelled */
+function pickDevices(title) {
+  const ds = all();
+  if (ds.length <= 1) return Promise.resolve(ds.length ? [cur()] : []);
+  return new Promise((resolve) => {
+    $("dlgText").textContent = title + "\nเลือกเครื่องที่ต้องการ:";
+    $("dlgInput").hidden = true;
+    const boxes = ds.map((d) => { const c = el("input", { type: "checkbox" }); c.checked = d.serial === selected; return [d, c]; });
+    const allBox = el("input", { type: "checkbox" });
+    allBox.addEventListener("change", () => boxes.forEach(([, c]) => (c.checked = allBox.checked)));
+    $("dlgList").replaceChildren(el("label", {}, allBox, el("b", { text: "เลือกทุกเครื่อง" })), ...boxes.map(([d, c]) => el("label", {}, c, label(d))));
+    $("dlg").hidden = false;
+    const done = (v) => { $("dlg").hidden = true; $("dlgList").replaceChildren(); $("dlgOk").onclick = $("dlgNo").onclick = null; resolve(v); };
+    $("dlgNo").onclick = () => done([]);
+    $("dlgOk").onclick = () => { const v = boxes.filter(([, c]) => c.checked).map(([d]) => d); if (v.length) done(v); };
   });
 }
 
@@ -747,8 +767,8 @@ const actions = {
 
 async function installApk(file) {
   await run("ติดตั้ง " + file.name, async () => {
-    const ts = targets();
-    if (ts.length > 1 && !(await confirmBox(`ติดตั้ง ${file.name} ให้ทุกเครื่อง ${ts.length} เครื่อง?\n(ถ้ามีแอปเดิมอยู่ จะอัปเดตทับ ข้อมูลในแอปยังอยู่)`))) return false;
+    const ts = await pickDevices(`ติดตั้ง ${file.name}\n(ถ้ามีแอปเดิมอยู่ จะอัปเดตทับ ข้อมูลในแอปยังอยู่)`);
+    if (!ts.length) return false;
     const fails = [];
     for (const d of ts) {
       const tmp = "/data/local/tmp/k3s-tool.apk";
@@ -764,16 +784,35 @@ async function installApk(file) {
 }
 
 async function setWallpaper(file) {
-  await run("ส่งรูปเข้าเครื่อง", async () => {
-    const d = cur();
-    const ext = (file.name.match(/\.(\w+)$/) || [, "jpg"])[1];
-    const dest = `/sdcard/Download/k3s-wallpaper-${Date.now()}.${ext}`;
-    await d.push(file, dest, (p) => busyMsg("ส่งรูป " + Math.round(p * 100) + "%"));
-    await d.sh(`am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${q("file://" + dest)}`);
-    // Best effort: opens the system "set as wallpaper" screen on the device. The user may still need to tap once.
-    const r = await d.sh(`am start -a android.intent.action.ATTACH_DATA -d ${q("file://" + dest)} -t 'image/*' --grant-read-uri-permission`);
-    log(r.out + r.err);
-    throw new Error("WALLPAPER");
+  await run("ส่งรูปหน้าจอ", async () => {
+    const ts = await pickDevices("ส่งรูปหน้าจอ " + file.name);
+    if (!ts.length) return false;
+    const ext = ((file.name.match(/\.(\w+)$/) || [, "jpg"])[1]).toLowerCase();
+    const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    const fails = [];
+    for (const d of ts) {
+      const name = `k3s-wallpaper-${Date.now()}.${ext}`;
+      const dest = "/sdcard/Pictures/" + name;
+      await d.sh("mkdir -p /sdcard/Pictures");
+      await d.push(file, dest, (p) => busyMsg(`ส่งรูป ${Math.round(p * 100)}% · ${label(d)}`));
+      // Let the media library index the file so the system wallpaper screen can open it as content://
+      await d.sh(`am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d ${q("file://" + dest)}`);
+      let id = "";
+      for (let i = 0; i < 10 && !id; i++) {
+        const r = await d.sh(`content query --uri content://media/external/images/media --projection _id --where ${q(`_display_name='${name}'`)}`);
+        id = ((r.out.match(/_id=(\d+)/) || [])[1]) || "";
+        if (!id) await new Promise((res) => setTimeout(res, 700));
+      }
+      if (!id) { fails.push(label(d) + ": หารูปในเครื่องไม่เจอ"); continue; }
+      const uri = q("content://media/external/images/media/" + id);
+      // Android's own "crop and set wallpaper" screen; falls back to "set as" chooser
+      let r = await d.sh(`am start -a android.service.wallpaper.CROP_AND_SET_WALLPAPER -d ${uri} -t ${mime} --grant-read-uri-permission`);
+      if (/Error|unable|not found|Exception/i.test(r.out + r.err)) r = await d.sh(`am start -a android.intent.action.ATTACH_DATA -d ${uri} -t ${mime} --grant-read-uri-permission`);
+      log(`${label(d)}: ${(r.out + r.err).trim()}`);
+      if (/Error|unable|not found|Exception/i.test(r.out + r.err)) fails.push(label(d) + ": เปิดหน้าตั้งวอลเปเปอร์ไม่ได้");
+    }
+    if (fails.length) throw new Error(fails.join("\n"));
+    showHelp("WALL_TAP", "", true);
   }, "WALLPAPER");
 }
 

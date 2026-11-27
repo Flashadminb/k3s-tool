@@ -55,7 +55,7 @@ ol,ul{padding-left:22px;margin:8px 0}li{margin:4px 0}
 .step .t{flex:1;font-size:19px}.step .t small{display:block;font-size:16px;color:var(--mut);margin-top:2px}
 .part{font-size:22px;font-weight:700;margin:0 0 4px}
 .warnbox{background:var(--warnbg);border:1px solid #e6cf9a;border-radius:12px;padding:12px 16px;margin:8px 0;color:#5a3d00}
-#help{background:var(--badbg);border:1px solid #e8b4ae;border-radius:12px;padding:12px 14px;margin-bottom:12px}.help-title{font-weight:600;color:var(--bad)}#help ol{padding-left:20px;margin:6px 0}.help-detail{font-size:12px;color:var(--mut);word-break:break-all}
+#help{background:var(--badbg);border:1px solid #e8b4ae;border-radius:12px;padding:12px 14px;margin-bottom:12px}.help-title{font-weight:600;color:var(--bad)}#help ol{padding-left:20px;margin:6px 0}#help.info{background:var(--okbg);border-color:#9fd0a3}#help.info .help-title{color:var(--ok)}.help-detail{font-size:14px;color:var(--mut);word-break:break-all}
 .btn-link{display:inline-block;margin-top:4px;color:var(--ac)}
 /* lists */
 .list{max-height:420px;overflow:auto;border:1px solid var(--bd);border-radius:8px}
@@ -73,6 +73,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
 #dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}#dlg[hidden]{display:none}
 .dlgbox{background:#fff;border-radius:14px;padding:22px;max-width:520px;font-size:19px;width:100%}.dlgbox input{width:100%;padding:8px;margin:8px 0}
 #dlgText{white-space:pre-line;margin-bottom:8px}
+#dlgList label{padding:8px 0;border-bottom:1px solid var(--bd)}#dlgList input{width:22px;height:22px}
 #busy{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111827;color:#fff;padding:12px 22px;border-radius:24px;font-size:18px;z-index:9}#busy[hidden]{display:none}
 .more{margin-top:4px}h2.sub{font-size:18px;margin:14px 0 6px}.more>summary{color:var(--ac)}
 .stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}@media (max-width:620px){.stat3{grid-template-columns:1fr}}
@@ -172,7 +173,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
           <button data-act="reboot">⏻ รีสตาร์ทเครื่อง</button>
           <button data-act="logcat">🧾 บันทึก log ส่งไอที</button>
           <button data-act="apk">📥 ติดตั้ง / อัปเดต APK</button>
-          <button data-act="wall">🖼️ ตั้งรูปหน้าจอ</button>
+          <button data-act="wall">🖼️ ส่งรูปหน้าจอ</button>
         </div>
         <div class="row" style="margin-top:8px"><label>ความยาววิดีโอ <select id="recSec"><option value="10">10 วินาที</option><option value="30" selected>30 วินาที</option><option value="60">1 นาที</option><option value="180">3 นาที (สูงสุด)</option></select></label></div>
         <input type="file" id="apkFile" accept=".apk" hidden>
@@ -290,7 +291,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
   <div class="card"><div class="mut" style="font-weight:600;margin-bottom:4px">Log</div><pre id="log"></pre></div>
 </div>
 <div id="busy" hidden></div>
-<div id="dlg" hidden><div class="dlgbox"><div id="dlgText"></div><input id="dlgInput" hidden><div class="row end"><button id="dlgNo">ยกเลิก</button><button id="dlgOk" class="red">ยืนยัน</button></div></div></div>
+<div id="dlg" hidden><div class="dlgbox"><div id="dlgText"></div><div id="dlgList"></div><input id="dlgInput" hidden><div class="row end"><button id="dlgNo">ยกเลิก</button><button id="dlgOk" class="red">ยืนยัน</button></div></div></div>
 <script>/*__BUNDLE__*/</script>
 </body>
 </html>

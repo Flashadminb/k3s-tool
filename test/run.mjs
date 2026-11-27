@@ -38,6 +38,7 @@ stub("cmd", `[ "$1" = package ] && [ "$2" = install-existing ] && { grep -vx "$3
 stub("screencap", `cp "${join(ROOT, "shot.png")}" "$2"`);
 stub("screenrecord", `echo fake > "$3"`);
 for (const c of ["am", "monkey", "settings", "input"]) stub(c, `echo "$0 $*" >> "${join(ROOT, "calls.log")}"`);
+stub("content", `echo "Row: 0 _id=42"`);
 stub("logcat", `echo "11-27 10:00:00.000 I/Test: hello"`);
 // 1x1 png
 writeFileSync(join(ROOT, "shot.png"), Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
@@ -155,6 +156,23 @@ await page.click("button[data-tab=data]");
 await click("connect"); await idle();
 ok(await page.isVisible("#allDevWrap"), "all-devices option appears with 2 devices");
 ok((await page.$$("#devices .dev")).length === 2, "2 device chips");
+
+console.log("wallpaper + APK: choose devices");
+await page.click("button[data-tab=device]");
+writeFileSync(join(ROOT, "w.jpg"), Buffer.alloc(2048, 7));
+await page.setInputFiles("#wallFile", join(ROOT, "w.jpg"));
+await page.waitForSelector("#dlgList label");
+ok((await page.$$("#dlgList input")).length === 3, "picker lists 'all' + 2 devices");
+await page.click("#dlgList label:first-child input"); await page.click("#dlgOk"); await idle();
+const wc = readFileSync(join(ROOT, "calls.log"), "utf8").split("CROP_AND_SET_WALLPAPER").length - 1;
+ok(wc === 2, "wallpaper screen opened on both devices: " + wc);
+ok(await page.isVisible("#help.info"), "green 'tap once' guide shown");
+ok(readdirSync(join(SD, "Pictures")).length === 2, "2 wallpapers pushed");
+writeFileSync(join(ROOT, "a.apk"), Buffer.alloc(1024, 1));
+await page.setInputFiles("#apkFile", join(ROOT, "a.apk"));
+await page.waitForSelector("#dlgList label");
+await page.click("#dlgOk"); await idle();
+ok((await page.textContent("#log")).includes("ติดตั้ง a.apk สำเร็จ") && !(await page.isVisible("#help:not(.info)")), "APK installed on the selected device");
 
 console.log("mobile width");
 await page.setViewportSize({ width: 375, height: 800 });

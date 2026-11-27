@@ -74,7 +74,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
 .dlgbox{background:#fff;border-radius:14px;padding:22px;max-width:520px;font-size:19px;width:100%}.dlgbox input{width:100%;padding:8px;margin:8px 0}
 #dlgText{white-space:pre-line;margin-bottom:8px}
 #busy{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111827;color:#fff;padding:12px 22px;border-radius:24px;font-size:18px;z-index:9}#busy[hidden]{display:none}
-.more{margin-top:4px}.more>summary{color:var(--ac)}
+.more{margin-top:4px}h2.sub{font-size:18px;margin:14px 0 6px}.more>summary{color:var(--ac)}
 .stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}@media (max-width:620px){.stat3{grid-template-columns:1fr}}
 </style>
 </head>
@@ -127,19 +127,19 @@ table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;p
 
       <details class="more card">
         <summary>ตัวเลือกเพิ่มเติม</summary>
-        <h3>รูปที่ยังไม่ส่ง (fail)</h3>
+        <h2 class="sub">รูปที่ยังไม่ส่ง (fail)</h2>
         <div class="grid">
           <button data-act="backupFail">💾 เก็บรูป fail ไว้ในคอมก่อน</button>
           <button class="red" data-act="fail">ลบรูป fail</button>
         </div>
-        <h3>ลบอัตโนมัติ</h3>
+        <h2 class="sub">ลบอัตโนมัติ</h2>
         <div class="mut">ลบรูปที่ส่งแล้ว + ถังขยะ ให้เองตามเวลา (ไม่ลบ fail) ต้องเปิดหน้านี้ค้างไว้</div>
         <div class="row" style="margin-top:8px">
           <label>ทุก <select id="autoEvery"><option value="0">ปิด</option><option value="15">15 นาที</option><option value="30">30 นาที</option><option value="60">1 ชั่วโมง</option><option value="120">2 ชั่วโมง</option></select></label>
           <label>เมื่อใช้พื้นที่เกิน <select id="autoPct"><option value="0">ทุกครั้ง</option><option value="50">50%</option><option value="70">70%</option><option value="85">85%</option></select></label>
         </div>
         <div class="mut" id="autoStatus" style="margin-top:6px">ปิดอยู่</div>
-        <h3>อื่นๆ</h3>
+        <h2 class="sub">อื่นๆ</h2>
         <div class="grid">
           <button data-act="cache">ล้างแคชแอป</button>
           <button data-act="bigFiles">🔍 หาไฟล์ใหญ่ที่สุด</button>

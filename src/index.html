@@ -5,68 +5,325 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>K3S Tool</title>
 <style>
-:root{--bg:#f5f4ef;--card:#fff;--tx:#1f1f1e;--mut:#6b6a66;--bd:#e0ded6;--ok:#2f7d32;--okbg:#e6f3e7;--bad:#b3261e;--badbg:#fbe9e7;--warn:#8a5a00;--warnbg:#fff4dc;--ac:#185fa5}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,"Noto Sans Thai",sans-serif}
-.wrap{max-width:520px;margin:0 auto;padding:16px}
-h1{font-size:20px;font-weight:500;margin:0}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.card{background:var(--card);border:.5px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
-.pill{font-size:12px;padding:3px 10px;border-radius:8px;background:var(--bd)}.pill.ok{background:var(--okbg);color:var(--ok)}
-button{font:inherit;padding:10px 12px;border-radius:8px;border:.5px solid #bbb;background:#fff;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
-.big{width:100%;padding:16px;font-weight:500;background:var(--ok);color:#fff;border:none;margin-bottom:8px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.red{color:var(--bad);border-color:var(--bad)}
-.mut{color:var(--mut);font-size:13px}.num{font-size:24px;font-weight:500}
-.barbox{height:8px;background:#eee;border-radius:4px;overflow:hidden;margin:8px 0}.bar{height:100%;background:var(--ok);width:0}.bar.warn{background:#e0a100}.bar.bad{background:var(--bad)}
-.stat{background:#f6f5f1;border-radius:8px;padding:8px 10px}.stat b{display:block;font-weight:500}
-details{background:var(--warnbg);border:.5px solid #e6cf9a;border-radius:12px;padding:10px 14px;margin-bottom:12px}summary{font-weight:500;color:var(--warn);cursor:pointer}
-details ol{padding-left:20px;margin:8px 0}
-#help{background:var(--badbg);border:.5px solid #e8b4ae;border-radius:12px;padding:12px 14px;margin-bottom:12px}.help-title{font-weight:500;color:var(--bad)}#help ol{padding-left:20px;margin:6px 0}.help-detail{font-size:12px;color:var(--mut);word-break:break-all}
+:root{--bg:#f5f4ef;--card:#fff;--tx:#1f1f1e;--mut:#6b6a66;--bd:#e0ded6;--soft:#f6f5f1;--ok:#2f7d32;--okbg:#e6f3e7;--bad:#b3261e;--badbg:#fbe9e7;--warn:#8a5a00;--warnbg:#fff4dc;--ac:#185fa5;--acbg:#e7f0fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,"Noto Sans Thai","Leelawadee UI",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:20px;font-weight:600;margin:0}
+h2{font-size:17px;font-weight:600;margin:0 0 8px}
+h3{font-size:15px;font-weight:600;margin:14px 0 6px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.pill{font-size:12px;padding:3px 10px;border-radius:8px;background:var(--bd);white-space:nowrap}.pill.ok{background:var(--okbg);color:var(--ok)}
+button,select,input,textarea{font:inherit;color:inherit}
+button{padding:10px 12px;border-radius:8px;border:1px solid #bbb;background:#fff;cursor:pointer;min-height:44px}
+button:hover{background:var(--soft)}button:disabled{opacity:.5;cursor:wait}
+.big{width:100%;padding:16px;font-weight:600;background:var(--ok);color:#fff;border:none;margin-bottom:8px;font-size:17px}.big:hover{background:#276a2a}
+.blue{background:var(--ac);color:#fff;border:none}.blue:hover{background:#124d87}
+.red{color:var(--bad);border-color:var(--bad)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:520px){.grid3{grid-template-columns:1fr 1fr}}
+.mut{color:var(--mut);font-size:13px}.num{font-size:24px;font-weight:600}
+.barbox{height:10px;background:#eee;border-radius:5px;overflow:hidden;margin:8px 0}.bar{height:100%;background:var(--ok);width:0}.bar.warn{background:#e0a100}.bar.bad{background:var(--bad)}
+.stat{background:var(--soft);border-radius:8px;padding:8px 10px}.stat b{display:block;font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row.end{justify-content:flex-end}
+label{display:flex;gap:6px;align-items:center}
+select,input[type=text],input[type=number],textarea{padding:8px;border:1px solid #bbb;border-radius:8px;background:#fff}
+textarea{width:100%;min-height:110px;font:13px/1.5 ui-monospace,monospace}
+code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:14px}
+.kbd{display:inline-block;background:#222;color:#fff;padding:0 6px;border-radius:4px;font-size:13px}
+/* devices */
+#devices{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.dev{border:2px solid var(--bd);background:#fff;border-radius:10px;padding:6px 10px;text-align:left;min-height:0;line-height:1.35}
+.dev.sel{border-color:var(--ac);background:var(--acbg)}
+.dev small{display:block;color:var(--mut);font-size:12px}
+/* tabs */
+.tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;border-bottom:1px solid var(--bd)}
+.tabs button{border:none;border-bottom:3px solid transparent;border-radius:0;background:none;white-space:nowrap;padding:10px 12px}
+.tabs button.on{border-bottom-color:var(--ac);color:var(--ac);font-weight:600}
+.tab[hidden]{display:none}
+.nodev{background:var(--acbg);border-radius:12px;padding:14px;margin-bottom:12px}
+/* guide */
+details{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 14px;margin-bottom:10px}
+summary{font-weight:600;cursor:pointer}
+ol,ul{padding-left:22px;margin:8px 0}li{margin:4px 0}
+.step{background:var(--soft);border-radius:8px;padding:8px 10px;margin:6px 0}
+.warnbox{background:var(--warnbg);border:1px solid #e6cf9a;border-radius:10px;padding:10px 12px;margin:8px 0;color:#5a3d00}
+#help{background:var(--badbg);border:1px solid #e8b4ae;border-radius:12px;padding:12px 14px;margin-bottom:12px}.help-title{font-weight:600;color:var(--bad)}#help ol{padding-left:20px;margin:6px 0}.help-detail{font-size:12px;color:var(--mut);word-break:break-all}
 .btn-link{display:inline-block;margin-top:4px;color:var(--ac)}
-#log{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:var(--mut);max-height:160px;overflow:auto;margin:0}
-#dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}#dlg[hidden]{display:none}
-.dlgbox{background:#fff;border-radius:12px;padding:16px;max-width:380px;width:100%}.dlgbox input{width:100%;padding:8px;margin:8px 0;font:inherit}.row{display:flex;gap:8px;justify-content:flex-end}
+/* lists */
+.list{max-height:420px;overflow:auto;border:1px solid var(--bd);border-radius:8px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--bd)}
+.item:last-child{border-bottom:none}
+.item .nm{min-width:0;overflow-wrap:anywhere}.item .nm small{display:block;color:var(--mut);font-size:12px}
+.item button{min-height:36px;padding:6px 10px;font-size:14px;flex-shrink:0}
+.tag{font-size:11px;padding:1px 6px;border-radius:6px;background:var(--badbg);color:var(--bad);margin-left:4px;white-space:nowrap}
+.tag.sys{background:var(--soft);color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px;border-bottom:1px solid var(--bd);vertical-align:top}
+.tblwrap{overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px}
+/* screen */
+#screenImg{max-width:100%;max-height:70vh;border:1px solid var(--bd);border-radius:8px;cursor:crosshair;display:block;margin:8px auto;user-select:none;-webkit-user-drag:none}
+#log{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:var(--mut);max-height:180px;overflow:auto;margin:0}
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}#dlg[hidden]{display:none}
+.dlgbox{background:#fff;border-radius:12px;padding:16px;max-width:420px;width:100%}.dlgbox input{width:100%;padding:8px;margin:8px 0}
+#dlgText{white-space:pre-line;margin-bottom:8px}
+#busy{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:20px;font-size:14px;z-index:9}#busy[hidden]{display:none}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top"><h1>K3S Tool</h1><span id="status" class="pill">ยังไม่เชื่อมต่อ</span></div>
 
-  <details open>
-    <summary>ทำครั้งแรก (เครื่องใหม่หรือเครื่องที่เพิ่งรีเซ็ต)</summary>
-    <ol>
-      <li>ที่เครื่อง: Settings > About phone > แตะ Build number 7 ครั้ง (เมนูชื่ออาจต่างกันตามรุ่น ลองค้นหา "Build number" ในช่อง Search)</li>
-      <li>Settings > System > Developer options > เปิด USB debugging (ถ้าไม่เจอ Developer options อาจถูกระบบบริษัทล็อก ให้แจ้งไอที)</li>
-      <li>บนคอม: ถ้าเคยเปิด adb ไว้ ให้พิมพ์ <code>adb kill-server</code> ก่อน</li>
-      <li>เสียบสาย USB แล้วกด เชื่อมต่อเครื่อง เลือกเครื่อง K3S</li>
-      <li>ที่เครื่องจะมี popup Allow USB debugging ให้ติ๊ก Always allow แล้วกด Allow</li>
-    </ol>
-    <a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">โหลด Platform-Tools (ใช้เฉพาะตอนต้องพิมพ์ adb kill-server)</a>
-  </details>
-
-  <button class="big" data-act="connect" style="background:#185fa5">เชื่อมต่อเครื่อง</button>
+  <button class="big blue" data-act="connect">+ เชื่อมต่อเครื่อง</button>
+  <div id="devices"></div>
   <div id="help" hidden></div>
 
-  <div id="app" hidden>
-    <div class="card">
-      <div class="mut"><span id="model">-</span> · พื้นที่ใช้ไป</div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="num" id="used">-</span><span class="mut" id="total"></span></div>
-      <div class="barbox"><div id="bar" class="bar"></div></div>
-      <div class="grid" style="margin-top:10px">
-        <div class="stat"><span class="mut">success</span><b id="cSuccess">-</b></div>
-        <div class="stat"><span class="mut">ขยะ .trashed</span><b id="cTrash">-</b></div>
-        <div class="stat"><span class="mut">fail</span><b id="cFail">-</b></div>
-        <button data-act="refresh">อัปเดตตัวเลข</button>
-      </div>
-    </div>
-    <button class="big" data-act="success">ลบรูป success (คลิกเดียว)</button>
-    <div class="grid"><button data-act="trash">ลบขยะ</button><button data-act="all">ลบทั้งหมด</button><button data-act="cache">ล้างแคชแอป</button><button data-act="apk">ติดตั้ง APK</button></div>
-    <div class="grid"><button data-act="wall">ตั้งรูปหน้าจอ</button><span></span><button class="red" data-act="fail">ลบ fail</button><button class="red" data-act="reset">รีเซ็ตเครื่อง</button></div>
-    <input type="file" id="apkFile" accept=".apk" hidden>
-    <input type="file" id="wallFile" accept="image/*" hidden>
+  <div class="tabs" id="tabs">
+    <button data-tab="data" class="on">🧹 ลบข้อมูล</button>
+    <button data-tab="device">📱 เครื่อง</button>
+    <button data-tab="apps">📦 แอป</button>
+    <button data-tab="setup">⚙️ ตั้งค่าเครื่อง</button>
+    <button data-tab="records">📋 ประวัติ / ทะเบียน</button>
+    <button data-tab="guide">📖 คู่มือ</button>
   </div>
 
-  <div class="card"><div class="mut" style="font-weight:500;margin-bottom:4px">Log</div><pre id="log"></pre></div>
+  <div class="nodev" id="nodev">
+    <b>ยังไม่ได้เชื่อมต่อเครื่อง</b><br>
+    ถ้าเครื่องนี้ยังไม่เคยเปิด USB debugging ให้ทำตาม <a href="#" data-goto="guide">คู่มือทำครั้งแรก</a> ก่อน
+    ถ้าเคยทำแล้ว เสียบสาย USB แล้วกดปุ่ม <b>+ เชื่อมต่อเครื่อง</b> ด้านบน
+  </div>
+
+  <!-- ================= TAB: DATA (main) ================= -->
+  <section class="tab" id="tab-data">
+    <div class="need-dev">
+      <div class="card">
+        <div class="mut"><span id="model">-</span> · พื้นที่ใช้ไป</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="num" id="used">-</span><span class="mut" id="total"></span></div>
+        <div class="barbox"><div id="bar" class="bar"></div></div>
+        <div class="grid" style="margin-top:10px">
+          <div class="stat"><span class="mut">รูป success (อัปโหลดแล้ว)</span><b id="cSuccess">-</b></div>
+          <div class="stat"><span class="mut">ขยะ .trashed (ถังขยะ)</span><b id="cTrash">-</b></div>
+          <div class="stat"><span class="mut">รูป fail (อาจยังไม่อัปโหลด)</span><b id="cFail">-</b></div>
+          <button data-act="refresh">🔄 อัปเดตตัวเลข</button>
+        </div>
+        <div class="mut" id="todayFreed"></div>
+      </div>
+
+      <label id="allDevWrap" class="card" hidden><input type="checkbox" id="allDev"> ทำกับ <b>ทุกเครื่อง</b> ที่เสียบอยู่ (<span id="devCount">0</span> เครื่อง)</label>
+
+      <button class="big" data-act="success">ลบรูป success (คลิกเดียว)</button>
+      <div class="grid">
+        <button data-act="trash">ลบขยะ .trashed</button>
+        <button data-act="all">ลบทั้งหมด (success + fail + ขยะ)</button>
+        <button data-act="backupFail">💾 สำรองรูป fail ลงคอม</button>
+        <button class="red" data-act="fail">ลบรูป fail</button>
+        <button data-act="cache">ล้างแคชแอป</button>
+        <button data-act="bigFiles">🔍 หาไฟล์ใหญ่ที่สุด</button>
+      </div>
+
+      <div class="card">
+        <h2>⏱️ ลบอัตโนมัติ</h2>
+        <div class="mut">ลบรูป success และขยะ .trashed ให้เองตามเวลา ทุกเครื่องที่เสียบอยู่ (ไม่ลบ fail) ทำงานเฉพาะตอนเปิดหน้านี้ค้างไว้</div>
+        <div class="row" style="margin-top:8px">
+          <label>ทุก <select id="autoEvery"><option value="0">ปิด</option><option value="15">15 นาที</option><option value="30">30 นาที</option><option value="60">1 ชั่วโมง</option><option value="120">2 ชั่วโมง</option></select></label>
+          <label>เมื่อใช้พื้นที่เกิน <select id="autoPct"><option value="0">ทุกครั้ง</option><option value="50">50%</option><option value="70">70%</option><option value="85">85%</option></select></label>
+        </div>
+        <div class="mut" id="autoStatus" style="margin-top:6px">ปิดอยู่</div>
+      </div>
+
+      <div class="card" id="bigCard" hidden>
+        <h2>🔍 ไฟล์ใหญ่ที่สุดในเครื่อง</h2>
+        <h3>โฟลเดอร์ใหญ่สุด</h3><div class="list" id="bigDirs"></div>
+        <h3>ไฟล์ใหญ่สุด 30 อันดับ (เกิน 1 MB)</h3><div class="list" id="bigList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: DEVICE ================= -->
+  <section class="tab" id="tab-device" hidden>
+    <div class="need-dev">
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">ข้อมูลเครื่อง</h2><button data-act="info">🔄 อัปเดต</button></div>
+        <div class="grid" style="margin-top:8px" id="infoGrid"></div>
+      </div>
+
+      <div class="card">
+        <h2>เครื่องมือ</h2>
+        <div class="grid3">
+          <button data-act="screenshot">📸 ภาพหน้าจอ</button>
+          <button data-act="record">🎥 อัดวิดีโอหน้าจอ</button>
+          <button data-act="live">🖥️ ดู/คุมหน้าจอสด</button>
+          <button data-act="restartFlash">🔁 รีสตาร์ทแอป Flash</button>
+          <button data-act="reboot">⏻ รีสตาร์ทเครื่อง</button>
+          <button data-act="logcat">🧾 บันทึก log ส่งไอที</button>
+          <button data-act="apk">📥 ติดตั้ง / อัปเดต APK</button>
+          <button data-act="wall">🖼️ ตั้งรูปหน้าจอ</button>
+        </div>
+        <div class="row" style="margin-top:8px"><label>ความยาววิดีโอ <select id="recSec"><option value="10">10 วินาที</option><option value="30" selected>30 วินาที</option><option value="60">1 นาที</option><option value="180">3 นาที (สูงสุด)</option></select></label></div>
+        <input type="file" id="apkFile" accept=".apk" hidden>
+        <input type="file" id="wallFile" accept="image/*" hidden>
+      </div>
+
+      <div class="card" id="liveCard" hidden>
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">หน้าจอสด</h2><button data-act="liveStop">ปิด</button></div>
+        <div class="mut">คลิกที่ภาพ = แตะ · ลากเมาส์ = ปัด · ภาพอัปเดตประมาณวินาทีละครั้ง</div>
+        <img id="screenImg" alt="หน้าจอเครื่อง" draggable="false">
+        <div class="grid3">
+          <button data-key="4">◀ ย้อนกลับ</button><button data-key="3">⬤ หน้าหลัก</button><button data-key="187">▢ แอปล่าสุด</button>
+        </div>
+        <div class="row" style="margin-top:8px"><input type="text" id="liveText" placeholder="พิมพ์ข้อความส่งเข้าเครื่อง (ภาษาอังกฤษ/ตัวเลข)" style="flex:1"><button data-act="liveType">ส่ง</button></div>
+      </div>
+
+      <div class="card" style="border-color:#e8b4ae">
+        <h2 style="color:var(--bad)">โซนอันตราย</h2>
+        <button class="red" data-act="reset">รีเซ็ตเครื่อง (ลบทุกอย่าง)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: APPS ================= -->
+  <section class="tab" id="tab-apps" hidden>
+    <div class="need-dev">
+      <div class="card" id="bannedCard">
+        <h2>🚫 แอปต้องห้ามที่เจอในเครื่อง</h2>
+        <div id="bannedFound" class="mut">กด โหลดรายชื่อแอป ด้านล่างเพื่อตรวจ</div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h2 style="margin:0">แอปในเครื่อง</h2><button data-act="apps">🔄 โหลดรายชื่อแอป</button></div>
+        <div class="row" style="margin:8px 0"><input type="text" id="appSearch" placeholder="ค้นหา เช่น tiktok, line, flash" style="flex:1"><label><input type="checkbox" id="showSys"> แสดงแอประบบ</label></div>
+        <div class="mut" style="margin-bottom:6px">แอปที่ไม่มีชื่อภาษาคน แสดงเป็นชื่อเทคนิค ถ้าไม่แน่ใจ ให้เปิดดูในเครื่องก่อนกดถอน</div>
+        <div class="list" id="appList"><div class="item mut">ยังไม่ได้โหลด</div></div>
+        <h3>แอประบบที่เคยถอน (กดคืนได้)</h3>
+        <div class="list" id="hiddenList"><div class="item mut">-</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>รายการแอปต้องห้าม</h2>
+      <div class="mut">ใส่ชื่อเทคนิคบรรทัดละ 1 แอป ระบบจะเตือนเมื่อเจอในเครื่อง กดปุ่ม 🚫 ข้างแอปในรายการด้านบนเพื่อเพิ่มได้เลย</div>
+      <textarea id="bannedText"></textarea>
+      <div class="row end"><button data-act="bannedReset">คืนค่าเริ่มต้น</button><button class="blue" data-act="bannedSave">บันทึกรายการ</button></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: SETUP ================= -->
+  <section class="tab" id="tab-setup" hidden>
+    <div class="card">
+      <h2>ตั้งค่าชุดมาตรฐานฮับ</h2>
+      <div class="mut">ตั้งค่าแบบเดียวกันทุกเครื่องในคลิกเดียว เหมาะกับเครื่องที่เพิ่งรีเซ็ต</div>
+      <div style="display:grid;gap:8px;margin-top:10px">
+        <label>ปิดหน้าจอเองเมื่อไม่ใช้ <select id="stdTimeout"><option value="1">1 นาที</option><option value="2">2 นาที</option><option value="5">5 นาที</option><option value="10">10 นาที</option><option value="30">30 นาที</option></select></label>
+        <label><input type="checkbox" id="stdAutoBright"> ปรับความสว่างอัตโนมัติ</label>
+        <label>ความสว่าง <input type="range" id="stdBright" min="10" max="100" step="5"> <span id="stdBrightV"></span>%</label>
+        <label><input type="checkbox" id="stdAutoTime"> ตั้งวันเวลาอัตโนมัติ (จากเครือข่าย)</label>
+        <label><input type="checkbox" id="stdNoAnim"> ปิดแอนิเมชัน (เครื่องลื่นขึ้น)</label>
+        <label><input type="checkbox" id="stdAwake"> หน้าจอไม่ดับตอนเสียบชาร์จ</label>
+      </div>
+      <div class="row end need-dev" style="margin-top:10px"><label><input type="checkbox" id="stdAll"> ทุกเครื่องที่เสียบ</label><button class="blue" data-act="stdApply">ตั้งค่าให้เครื่อง</button></div>
+    </div>
+    <div class="card">
+      <h2>รุ่นเครื่อง (ที่เก็บรูป)</h2>
+      <div class="mut">ถ้ามีรุ่นใหม่ที่เก็บรูปคนละที่ เพิ่มได้ที่นี่ ระบบจะเลือกตามชื่อรุ่นของเครื่องเอง ถ้าไม่ตรงรุ่นไหนจะใช้แบบ K3S</div>
+      <div class="mut need-dev" style="margin-top:6px">เครื่องที่เลือกอยู่: <b id="curModel">-</b> · ใช้ค่า: <b id="curProfile">-</b></div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>ชื่อ</th><th>ชื่อรุ่นมีคำว่า</th><th>โฟลเดอร์ success</th><th>โฟลเดอร์ fail</th><th></th></tr></thead><tbody id="profTable"></tbody></table></div>
+      <div class="row end" style="margin-top:8px"><button data-act="profAdd">+ เพิ่มรุ่น</button><button class="blue" data-act="profSave">บันทึก</button></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: RECORDS ================= -->
+  <section class="tab" id="tab-records" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">ทะเบียนเครื่อง</h2><button data-act="regCsv">⬇️ โหลดเป็น Excel (CSV)</button></div>
+      <div class="mut">ทุกเครื่องที่เคยเสียบกับคอมเครื่องนี้ บันทึกอัตโนมัติ</div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>รหัสเครื่อง</th><th>รุ่น</th><th>Android</th><th>แบต</th><th>พื้นที่</th><th>แอป Flash</th><th>เห็นล่าสุด</th><th></th></tr></thead><tbody id="regTable"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">ประวัติการลบ</h2><div class="row"><button data-act="histCsv">⬇️ CSV</button><button class="red" data-act="histClear">ล้างประวัติ</button></div></div>
+      <div class="mut" id="histSum"></div>
+      <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>เวลา</th><th>เครื่อง</th><th>ทำอะไร</th><th>ไฟล์</th><th>ได้พื้นที่คืน</th></tr></thead><tbody id="histTable"></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB: GUIDE ================= -->
+  <section class="tab" id="tab-guide" hidden>
+    <div class="warnbox">ทำครั้งเดียวต่อเครื่อง (และทำใหม่หลังรีเซ็ตเครื่องทุกครั้ง เพราะรีเซ็ตแล้วค่าจะหาย)</div>
+
+    <details open>
+      <summary>ขั้นที่ 1: เปิดโหมดนักพัฒนา (Developer options) ที่เครื่อง</summary>
+      <div class="step">1. เปิดแอป <b>การตั้งค่า</b> (Settings) ที่เครื่อง</div>
+      <div class="step">2. เลื่อนลงล่างสุด แตะ <b>เกี่ยวกับโทรศัพท์</b> (About phone)<br><span class="mut">บางรุ่นชื่อ "เกี่ยวกับอุปกรณ์" หรือ "ระบบ &gt; เกี่ยวกับ"</span></div>
+      <div class="step">3. หาบรรทัด <b>หมายเลขบิวด์</b> (Build number) แล้ว <b>แตะติดกัน 7 ครั้ง</b><br><span class="mut">ถ้าหาไม่เจอ ให้พิมพ์ "บิวด์" หรือ "Build number" ในช่องค้นหาบนสุดของหน้าตั้งค่า</span></div>
+      <div class="step">4. ถ้าเครื่องถามรหัส ให้ใส่รหัสปลดล็อกหน้าจอ</div>
+      <div class="step">5. จะขึ้นข้อความ <b>"คุณเป็นนักพัฒนาแล้ว"</b> (You are now a developer) แปลว่าสำเร็จ</div>
+    </details>
+
+    <details open>
+      <summary>ขั้นที่ 2: เปิด USB debugging</summary>
+      <div class="step">1. กลับไปหน้าแรกของ <b>การตั้งค่า</b> แตะ <b>ระบบ</b> (System)</div>
+      <div class="step">2. แตะ <b>ตัวเลือกสำหรับนักพัฒนา</b> (Developer options)<br><span class="mut">บางรุ่นอยู่ที่หน้าแรกของการตั้งค่าเลย หรือค้นหาคำว่า "นักพัฒนา"</span></div>
+      <div class="step">3. เลื่อนหา <b>การแก้ไขข้อบกพร่อง USB</b> (USB debugging) แล้ว <b>เปิดสวิตช์</b></div>
+      <div class="step">4. ขึ้นหน้าต่างถาม ให้กด <b>ตกลง</b> (OK)</div>
+      <div class="step">5. (แนะนำ) ในหน้าเดียวกัน ถ้ามี <b>ปิดการหมดเวลาการให้สิทธิ์ adb</b> (Disable adb authorization timeout) ให้เปิดด้วย จะได้ไม่ต้องกดอนุญาตใหม่ทุก 7 วัน</div>
+      <div class="warnbox">ถ้าไม่เจอ "ตัวเลือกสำหรับนักพัฒนา" หรือเปิดสวิตช์ไม่ได้ (เป็นสีเทา) แปลว่าระบบบริษัทล็อกไว้ <b>อย่าหาทางเลี่ยง</b> ให้แจ้งไอที Flash</div>
+    </details>
+
+    <details open>
+      <summary>ขั้นที่ 3: เตรียมคอม (ทำครั้งเดียว)</summary>
+      <div class="step">1. ใช้ <b>Google Chrome</b> หรือ <b>Microsoft Edge</b> เท่านั้น (Firefox ใช้ไม่ได้)</div>
+      <div class="step">2. ถ้าคอมเคยเปิดโปรแกรม adb ไว้ ต้องปิดก่อน ไม่งั้นเว็บจะต่อไม่ได้:
+        <ol>
+          <li>กดปุ่ม <span class="kbd">⊞ Windows</span> ที่คีย์บอร์ด</li>
+          <li>พิมพ์ <code>cmd</code> แล้วกด <span class="kbd">Enter</span> จะขึ้นหน้าจอดำ</li>
+          <li>พิมพ์บรรทัดนี้ (มีเว้นวรรค 1 ช่องหลังคำว่า cd) แล้วกด <span class="kbd">Enter</span><br><code>cd C:\Users\Flash\Desktop\Best\platform-tools</code></li>
+          <li>พิมพ์บรรทัดนี้ (มีเว้นวรรค 1 ช่องหลังคำว่า adb) แล้วกด <span class="kbd">Enter</span><br><code>adb kill-server</code></li>
+          <li>ปิดหน้าจอดำได้เลย</li>
+        </ol>
+        <span class="mut">ถ้าไม่เคยใช้ adb บนคอมนี้ ข้ามข้อนี้ได้</span>
+      </div>
+      <a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">⬇️ โหลด Platform-Tools (ต้องใช้เฉพาะคำสั่ง adb kill-server)</a>
+    </details>
+
+    <details open>
+      <summary>ขั้นที่ 4: เชื่อมต่อครั้งแรก</summary>
+      <div class="step">1. เสียบสาย USB ระหว่างเครื่องกับคอม <span class="mut">(ต้องเป็นสายที่ส่งข้อมูลได้ ไม่ใช่สายชาร์จอย่างเดียว)</span></div>
+      <div class="step">2. ปลดล็อกหน้าจอเครื่องไว้</div>
+      <div class="step">3. ที่หน้าเว็บนี้ กดปุ่มสีฟ้า <b>+ เชื่อมต่อเครื่อง</b></div>
+      <div class="step">4. จะมีหน้าต่างเล็กเด้งขึ้นบนเบราว์เซอร์ คลิกชื่อเครื่อง แล้วกด <b>เชื่อมต่อ</b> (Connect)</div>
+      <div class="step">5. ดูที่หน้าจอเครื่อง จะขึ้น <b>อนุญาตการแก้ไขข้อบกพร่อง USB?</b> (Allow USB debugging?)<br>ติ๊ก <b>อนุญาตจากคอมพิวเตอร์นี้เสมอ</b> (Always allow) แล้วกด <b>อนุญาต</b> (Allow)</div>
+      <div class="step">6. หน้าเว็บจะขึ้นชื่อเครื่องและพื้นที่ แปลว่าสำเร็จ</div>
+      <div class="mut">ครั้งต่อไป: แค่เสียบสาย หน้าเว็บจะเชื่อมต่อเครื่องที่เคยอนุญาตให้เอง ถ้าไม่ต่อเอง ให้กด + เชื่อมต่อเครื่อง</div>
+      <div class="mut">หลายเครื่อง: เสียบเพิ่มแล้วกด + เชื่อมต่อเครื่อง ทีละเครื่อง (แนะนำ USB hub ที่มีปลั๊กไฟของตัวเอง)</div>
+    </details>
+
+    <details>
+      <summary>แก้ปัญหา: กดเชื่อมต่อแล้วไม่เห็นชื่อเครื่องในหน้าต่าง</summary>
+      <ol>
+        <li>เช็กว่าเปิด USB debugging แล้วจริง (ขั้นที่ 2)</li>
+        <li>เปลี่ยนสาย USB หรือเปลี่ยนช่อง USB ที่คอม</li>
+        <li>รูดแถบแจ้งเตือนที่เครื่องลงมา แตะข้อความ USB แล้วเลือก <b>โอนไฟล์</b> (File transfer)</li>
+        <li>ถอดสาย รอ 3 วินาที เสียบใหม่</li>
+        <li>ถ้ายังไม่ได้ ปิด USB debugging แล้วเปิดใหม่</li>
+      </ol>
+    </details>
+    <details>
+      <summary>แก้ปัญหา: ขึ้นว่าเครื่องถูกโปรแกรมอื่นใช้อยู่</summary>
+      <ol><li>ทำขั้นที่ 3 ข้อ 2 (adb kill-server)</li><li>ปิดโปรแกรมอื่นที่ใช้กับมือถือ เช่น Android Studio, scrcpy, Vysor</li><li>ถ้าเปิดหน้าเว็บนี้ไว้หลายแท็บ ให้ปิดแท็บอื่นให้เหลือแท็บเดียว</li><li>ถอดสายแล้วเสียบใหม่</li></ol>
+    </details>
+    <details>
+      <summary>แก้ปัญหา: ไม่มีหน้าต่าง "อนุญาต" ขึ้นที่เครื่อง / เคยกดปฏิเสธไป</summary>
+      <ol><li>ปลดล็อกหน้าจอเครื่องไว้ระหว่างเชื่อมต่อ</li><li>ถอดสายแล้วเสียบใหม่ กดเชื่อมต่ออีกครั้ง</li><li>ถ้าเคยกดปฏิเสธ: ตัวเลือกสำหรับนักพัฒนา &gt; <b>เพิกถอนการให้สิทธิ์การแก้ไขข้อบกพร่อง USB</b> (Revoke USB debugging authorizations) แล้วลองใหม่</li></ol>
+    </details>
+    <details>
+      <summary>หลังใช้งาน ควรปิด USB debugging ไหม</summary>
+      <div>ถ้าใช้ทุกวัน เปิดค้างไว้ได้ แต่อย่าเสียบเครื่องกับคอมที่ไม่รู้จัก ถ้าบริษัทมีนโยบายให้ปิด ให้ปิดที่ ตัวเลือกสำหรับนักพัฒนา &gt; การแก้ไขข้อบกพร่อง USB</div>
+    </details>
+  </section>
+
+  <div class="card"><div class="mut" style="font-weight:600;margin-bottom:4px">Log</div><pre id="log"></pre></div>
 </div>
-<div id="dlg" hidden><div class="dlgbox"><div id="dlgText" style="white-space:pre-line"></div><input id="dlgInput" hidden><div class="row"><button id="dlgNo">ยกเลิก</button><button id="dlgOk" class="red">ยืนยัน</button></div></div></div>
+<div id="busy" hidden></div>
+<div id="dlg" hidden><div class="dlgbox"><div id="dlgText"></div><input id="dlgInput" hidden><div class="row end"><button id="dlgNo">ยกเลิก</button><button id="dlgOk" class="red">ยืนยัน</button></div></div></div>
 <script>/*__BUNDLE__*/</script>
 </body>
 </html>

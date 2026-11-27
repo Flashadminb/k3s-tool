@@ -93,6 +93,7 @@ await click("trash"); await page.waitForSelector("#dlg:not([hidden])"); await pa
 ok(count("DCIM") === "3", "trash kept after cancel");
 
 console.log("fail: confirm only, no typing");
+await page.click("details.more summary");
 await click("fail"); await page.waitForSelector("#dlg:not([hidden])");
 ok(await page.isHidden("#dlgInput"), "no DELETE text box");
 await page.click("#dlgOk"); await idle();

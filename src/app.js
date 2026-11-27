@@ -234,7 +234,7 @@ function renderStorage(d) {
   if (!s) { ["used", "total", "cSuccess", "cTrash", "cFail"].forEach((k) => ($(k).textContent = "-")); $("bar").style.width = 0; return; }
   const pct = s.total ? Math.round((s.used / s.total) * 100) : 0;
   $("used").textContent = human(s.used) + " (" + pct + "%)";
-  $("total").textContent = "จาก " + human(s.total) + " · ว่าง " + human(s.total - s.used);
+  $("total").textContent = "เหลือว่าง " + human(s.total - s.used) + " จาก " + human(s.total);
   $("bar").style.width = pct + "%"; $("bar").className = pct > 85 ? "bar bad" : pct > 70 ? "bar warn" : "bar";
   const f = (x) => (s.counting ? "กำลังนับ..." : x[0].toLocaleString() + " ไฟล์ · " + human(x[1]));
   $("cSuccess").textContent = f(s.success); $("cTrash").textContent = f(s.trash); $("cFail").textContent = f(s.fail);
@@ -634,8 +634,8 @@ const actions = {
 
   success: () => run("ลบรูป success", () => cleanupAction(["success"], "ลบรูปทั้งหมดในโฟลเดอร์ success (อัปโหลดแล้ว)\nลบถาวร ไม่เข้าถังขยะ")),
   trash: () => run("ลบขยะ", () => cleanupAction(["trash"], "ลบไฟล์ขยะ .trashed- ทั้งเครื่อง (ลบถาวร)")),
-  all: () => run("ลบทั้งหมด", () => cleanupAction(["success", "fail", "trash"], "ลบรูป success, รูป fail และไฟล์ขยะ .trashed- ทั้งหมด\nลบถาวร กู้คืนไม่ได้\n\n⚠️ คำเตือน: รูปใน fail อาจยังไม่ถูกอัปโหลด ถ้าไม่แน่ใจ ให้กด ยกเลิก แล้วกด สำรองรูป fail ลงคอม ก่อน")),
-  fail: () => run("ลบรูป fail", () => cleanupAction(["fail"], "⚠️ รูปใน fail อาจยังไม่ถูกอัปโหลด ลบแล้วกู้คืนไม่ได้\nตรวจกับหัวหน้าแล้วหรือยัง?\n\nถ้าไม่แน่ใจ ให้กด ยกเลิก แล้วกด สำรองรูป fail ลงคอม ก่อน")),
+  all: () => run("ลบทั้งหมด", () => cleanupAction(["success", "fail", "trash"], "ลบรูป success, รูป fail และไฟล์ขยะ .trashed- ทั้งหมด\nลบถาวร กู้คืนไม่ได้\n\n⚠️ คำเตือน: รูปใน fail อาจยังไม่ถูกอัปโหลด ถ้าไม่แน่ใจ ให้กด ยกเลิก แล้วไปที่ ตัวเลือกเพิ่มเติม > เก็บรูป fail ไว้ในคอมก่อน")),
+  fail: () => run("ลบรูป fail", () => cleanupAction(["fail"], "⚠️ รูปใน fail อาจยังไม่ถูกอัปโหลด ลบแล้วกู้คืนไม่ได้\nตรวจกับหัวหน้าแล้วหรือยัง?\n\nถ้าไม่แน่ใจ ให้กด ยกเลิก แล้วไปที่ ตัวเลือกเพิ่มเติม > เก็บรูป fail ไว้ในคอมก่อน")),
   backupFail: () => run("สำรองรูป fail", async () => {
     const ts = targets();
     log("เลือกโฟลเดอร์ในคอมที่จะเก็บรูป fail แล้วกด อนุญาต");

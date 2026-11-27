@@ -512,9 +512,13 @@ function renderAll() {
    Storage + cleanup (the main feature)
    ===================================================================== */
 const TRASH = "-name '.trashed-*'";
+// Every find uses -H: on Android /sdcard is a symlink, and find does not enter a symlinked start folder without it
 // One pass per folder: number of files and total KB. Missing folder -> 0 0
 const statCmd = (dir, filter = "") =>
-  `if [ -d ${q(dir)} ]; then find ${q(dir)} -type f ${filter} -exec du -k {} + 2>/dev/null | awk '{s+=$1;n++} END {print n+0, s+0}'; else echo 0 0; fi`;
+  `if [ -d ${q(dir)} ]; then find -H ${q(dir)} -type f ${filter} -exec du -k {} + 2>/dev/null | awk '{s+=$1;n++} END {print n+0, s+0}'; else echo 0 0; fi`;
+// Photos and videos outside Flash Kit's own folders (camera, screenshots, Pictures, other apps)
+const MEDIA = "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.heic' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.3gp' \\)";
+const OTHER_MEDIA = `find -H /sdcard -type f ${MEDIA} -not -path '/sdcard/Android/*' -not -path '*/imagePath/*' -not -name '.trashed-*'`;
 
 async function df(d) {
   const p = (await d.sh("df -k /sdcard | tail -1")).out.trim().split(/\s+/);
@@ -554,12 +558,44 @@ function renderToday() {
 const KIND = {
   success: { label: "รูป success", cmd: (p) => delCmd(p.success) },
   fail: { label: "รูป fail", cmd: (p) => delCmd(p.fail) },
-  trash: { label: "ขยะ .trashed", cmd: () => `n=$(find /sdcard -type f ${TRASH} 2>/dev/null | wc -l); find /sdcard -type f ${TRASH} -delete 2>/dev/null; echo $n` }
+  trash: { label: "ขยะ .trashed", cmd: () => `n=$(find -H /sdcard -type f ${TRASH} 2>/dev/null | wc -l); find -H /sdcard -type f ${TRASH} -delete 2>/dev/null; echo $n` }
 };
 // find -delete avoids "argument list too long" that rm -rf dir/* hits with tens of thousands of files.
 // Missing folder (fresh device) means nothing to delete, not an error.
 function delCmd(dir) {
-  return `[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(find ${q(dir)} -type f | wc -l); find ${q(dir)} -type f -delete; c=$?; echo $n; exit $c`;
+  return `[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(find -H ${q(dir)} -type f | wc -l); find -H ${q(dir)} -type f -delete; c=$?; echo $n; exit $c`;
+}
+
+/* ---------- Other photos (Camera, camera&muxer, Pictures, ...): grouped by folder, delete the folders ticked ---------- */
+let otherFolders = [];
+async function scanOther(ts) {
+  const merged = new Map();
+  for (const d of ts) {
+    busyMsg("กำลังหารูปอื่นในเครื่อง · " + label(d));
+    const out = (await d.sh(`${OTHER_MEDIA} -exec du -k {} + 2>/dev/null | awk '{s=$1; sub(/^[0-9]+[ \\t]+/, ""); p=$0; sub(/\\/[^\\/]*$/, "", p); n[p]++; k[p]+=s} END {for (x in n) print k[x] "\\t" n[x] "\\t" x}'`)).out;
+    for (const line of out.split("\n")) {
+      const [kb, n, dir] = line.split("\t");
+      if (!dir) continue;
+      const m = merged.get(dir) || { dir, kb: 0, n: 0, devs: 0 };
+      m.kb += +kb || 0; m.n += +n || 0; m.devs++;
+      merged.set(dir, m);
+    }
+  }
+  otherFolders = [...merged.values()].sort((a, b) => b.kb - a.kb);
+  renderOther(ts.length);
+}
+function renderOther(nDev) {
+  const box = $("otherList");
+  if (!box) return;
+  $("otherCard").hidden = false;
+  if (!otherFolders.length) { box.replaceChildren(el("div", { class: "item mut", text: "ไม่เจอรูปอื่นในเครื่อง" })); $("otherDel").hidden = true; return; }
+  $("otherDel").hidden = false;
+  box.replaceChildren(...otherFolders.map((f) => {
+    const name = f.dir.replace(/^\/(sdcard|storage\/emulated\/0)\/?/, "") || "(โฟลเดอร์หลัก)";
+    const c = el("input", { type: "checkbox", "data-dir": f.dir });
+    return el("label", { class: "item" }, el("span", { class: "row", style: "gap:10px;flex-wrap:nowrap;min-width:0" }, c,
+      el("span", { class: "nm" }, name, el("small", { text: `${f.n.toLocaleString()} ไฟล์ · ${human(f.kb)}` + (nDev > 1 ? ` · ใน ${f.devs} เครื่อง` : "") }))));
+  }));
 }
 
 /** Delete the given kinds on one device, record history, return KB freed */
@@ -596,7 +632,7 @@ async function pickBackupFolder() {
 }
 async function backupFail(d, root) {
   const dir = d.info.profile.fail;
-  const list = (await d.sh(`[ -d ${q(dir)} ] && find ${q(dir)} -type f`)).out.split("\n").map((s) => s.trim()).filter(Boolean);
+  const list = (await d.sh(`[ -d ${q(dir)} ] && find -H ${q(dir)} -type f`)).out.split("\n").map((s) => s.trim()).filter(Boolean);
   if (!list.length) { log(`${label(d)}: ไม่มีรูปใน fail ให้สำรอง`); return 0; }
   const top = await root.getDirectoryHandle(`fail-${d.serial.slice(-6)}-${stamp()}`, { create: true });
   const cache = new Map();
@@ -620,7 +656,7 @@ async function backupFail(d, root) {
 async function bigFiles(d) {
   busyMsg("กำลังค้นหาไฟล์ใหญ่ (อาจใช้เวลาเป็นนาที) ...");
   const dirs = (await d.sh("du -sk /sdcard/* 2>/dev/null | sort -rn | head -15")).out;
-  const files = (await d.sh("find /sdcard -type f -size +1024k -exec du -k {} + 2>/dev/null | sort -rn | head -30")).out;
+  const files = (await d.sh("find -H /sdcard -type f -size +1024k -exec du -k {} + 2>/dev/null | sort -rn | head -30")).out;
   const parse = (t) => t.split("\n").map((l) => l.match(/^(\d+)\s+(.+)$/)).filter(Boolean).map((m) => ({ kb: +m[1], path: m[2].trim() }));
   $("bigCard").hidden = false;
   $("bigDirs").replaceChildren(...parse(dirs).map((x) => el("div", { class: "item" }, el("div", { class: "nm", text: x.path }), el("b", { text: human(x.kb) }))));
@@ -1032,6 +1068,29 @@ const actions = {
     renderHistory(); renderToday();
   }),
   bigFiles: () => run("หาไฟล์ใหญ่", () => bigFiles(cur())),
+  otherScan: () => run("หารูปอื่นในเครื่อง", () => scanOther(targets())),
+  otherDelete: () => run("ลบรูปอื่น", async () => {
+    const dirs = [...document.querySelectorAll("#otherList input:checked")].map((c) => c.dataset.dir);
+    if (!dirs.length) { log("ติ๊กเลือกโฟลเดอร์ที่จะลบก่อน"); return false; }
+    const ts = targets();
+    const names = dirs.map((x) => "• " + (x.replace(/^\/sdcard\/?/, "") || "(โฟลเดอร์หลัก)")).join("\n");
+    if (!(await confirmBox(`ลบรูปและวิดีโอในโฟลเดอร์ต่อไปนี้ ${ts.length > 1 ? "จาก " + ts.length + " เครื่อง" : ""} (ลบถาวร ไม่เข้าถังขยะ)\n${names}\n\nไม่ลบรูปของ Flash Kit ใน success/fail`))) return false;
+    for (const d of ts) {
+      const before = (await df(d)).used;
+      let files = 0;
+      for (const dir of dirs) {
+        busyMsg("กำลังลบ " + dir.replace(/^\/sdcard\/?/, "") + " · " + label(d));
+        const r = await d.sh(`[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(find -H ${q(dir)} -maxdepth 1 -type f ${MEDIA} -not -name '.trashed-*' | wc -l); find -H ${q(dir)} -maxdepth 1 -type f ${MEDIA} -not -name '.trashed-*' -delete; echo $n`);
+        files += parseInt(r.out.trim().split(/\s+/).pop(), 10) || 0;
+      }
+      const freed = Math.max(0, before - (await df(d)).used);
+      st.addHistory({ serial: d.serial, model: d.info.model, action: "รูปอื่น (" + dirs.length + " โฟลเดอร์)", how: "กดเอง", files, freedKb: freed });
+      log(`${label(d)}: ลบรูปอื่น ${files.toLocaleString()} ไฟล์ ได้พื้นที่คืน ${human(freed)}`);
+      await refreshStorage(d);
+    }
+    renderHistory(); renderToday();
+    await scanOther(ts);
+  }),
 
   info: () => run("อ่านข้อมูลเครื่อง", async () => { const d = cur(); await loadInfo(d); renderInfo(d); }),
   screenshot: () => run("จับภาพหน้าจอ", async () => {

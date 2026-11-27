@@ -3,14 +3,20 @@
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("playwright"); // globally installed in CI image; or npm i -D playwright
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, chmodSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, chmodSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import http from "node:http";
 
 const ROOT = mkdtempSync(join(tmpdir(), "k3s-"));
 const SD = join(ROOT, "sdcard"), BIN = join(ROOT, "bin"), TMP = join(ROOT, "tmp");
+// Like Android, /sdcard is a symlink to the real storage folder (find must be told to follow it)
+mkdirSync(join(ROOT, "storage")); symlinkSync(join(ROOT, "storage"), SD);
 const put = (p, kb) => { mkdirSync(join(p, ".."), { recursive: true }); writeFileSync(p, Buffer.alloc(kb * 1024, 1)); };
+put(join(SD, "DCIM/Camera/IMG_001.jpg"), 200); put(join(SD, "DCIM/Camera/VID_002.mp4"), 900);
+put(join(SD, "camera&muxer/scan 1.jpg"), 180); put(join(SD, "camera&muxer/scan 2.JPG"), 180); put(join(SD, "camera&muxer/notes.txt"), 1);
+put(join(SD, "Pictures/Screenshots/s.png"), 50);
+put(join(SD, "Android/data/some.app/cache/thumb.jpg"), 10);
 for (let i = 0; i < 60; i++) put(join(SD, "imagePath/success", `2026112${i % 3}`, `img${i}.jpg`), 40);
 for (let i = 0; i < 5; i++) put(join(SD, "imagePath/fail", `bad ${i}'s.jpg`), 30);   // spaces + quote in names
 for (let i = 0; i < 3; i++) put(join(SD, "DCIM", `.trashed-1700-${i}.jpg`), 100);
@@ -81,6 +87,7 @@ const ok = (c, m) => { if (c) { pass++; console.log("  ok  " + m); } else { fail
 const idle = () => page.waitForFunction(() => document.getElementById("busy").hidden, null, { timeout: 30000 });
 const click = async (act) => { await page.click(`button[data-act=${act}]`); };
 const accept = async () => { await page.waitForSelector("#dlg:not([hidden])"); await page.click("#dlgOk"); };
+const trashCount = () => execFileSync("sh", ["-c", `find -H "${SD}" -type f -name '.trashed-*' | wc -l`]).toString().trim();
 const count = (d) => existsSync(join(SD, d)) ? execFileSync("sh", ["-c", `find "${join(SD, d)}" -type f | wc -l`]).toString().trim() : "missing";
 
 console.log("first visit");
@@ -114,7 +121,7 @@ ok(count("imagePath/fail") === "5", "fail untouched");
 
 console.log("cancel does nothing");
 await click("trash"); await page.waitForSelector("#dlg:not([hidden])"); await page.click("#dlgNo"); await idle();
-ok(count("DCIM") === "3", "trash kept after cancel");
+ok(trashCount() === "3", "trash kept after cancel");
 
 console.log("fail: confirm only, no typing");
 await click("fail"); await page.waitForSelector("#dlg:not([hidden])");
@@ -126,7 +133,8 @@ console.log("delete all on a fresh device (folders missing)");
 execFileSync("rm", ["-rf", join(SD, "imagePath")]);
 for (let i = 0; i < 2; i++) put(join(SD, "DCIM", `.trashed-x${i}.jpg`), 10);
 await click("all"); await accept(); await idle();
-ok(count("DCIM") === "0", "trash deleted by delete-all");
+ok(trashCount() === "0", "trash deleted by delete-all");
+ok(count("DCIM/Camera") === "2", "camera photos are not touched by delete-all");
 ok(!(await page.isVisible("#help")), "missing folders are not an error");
 
 console.log("history");
@@ -141,6 +149,16 @@ console.log("big files");
 await page.click("button[data-tab=data]");
 await click("bigFiles"); await idle();
 ok((await page.textContent("#bigList")).includes("big video.mp4"), "big file listed");
+
+console.log("other photos (Camera, camera&muxer, Pictures)");
+await click("otherScan"); await idle();
+const other = await page.textContent("#otherList");
+ok(other.includes("DCIM/Camera") && other.includes("camera&muxer") && other.includes("Pictures/Screenshots"), "media folders listed");
+ok(!other.includes("Android") && !other.includes("imagePath"), "Android/ and Flash Kit folders not listed");
+await page.check('#otherList input[data-dir$="camera&muxer"]');
+await click("otherDelete"); await accept(); await idle();
+ok(count("camera&muxer") === "1" && existsSync(join(SD, "camera&muxer/notes.txt")), "only photos removed from the ticked folder");
+ok(count("DCIM/Camera") === "2", "unticked folder kept");
 
 console.log("device info");
 await page.click("button[data-tab=device]");
@@ -196,7 +214,7 @@ await page.setInputFiles("#wallFile", join(ROOT, "w.jpg")); await idle();
 const wc = readFileSync(join(ROOT, "calls.log"), "utf8").split("CROP_AND_SET_WALLPAPER").length - 1;
 ok(wc === 2, "group: wallpaper screen opened on both devices without asking: " + wc);
 ok(await page.isVisible("#help.info"), "green 'tap once' guide shown");
-ok(readdirSync(join(SD, "Pictures")).length === 2, "2 wallpapers pushed");
+ok(readdirSync(join(SD, "Pictures")).filter((f) => f.startsWith("k3s-wallpaper")).length === 2, "2 wallpapers pushed");
 await page.click("#dcGroup button");
 ok(!(await page.textContent("#status")).includes("กลุ่ม"), "group cleared");
 writeFileSync(join(ROOT, "a.apk"), Buffer.alloc(1024, 1));

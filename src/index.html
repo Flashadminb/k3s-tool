@@ -391,6 +391,15 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.4
             <div class="mut" id="autoStatus" style="margin-top:8px">ปิดอยู่</div>
           </div>
           <div class="card">
+            <h2>รูปอื่นในเครื่อง</h2>
+            <div class="mut" style="margin-bottom:10px">รูปและวิดีโอนอก Flash Kit เช่น Camera, camera&amp;muxer, Pictures, Screenshots (ที่เห็นใน Files &gt; Recents) แยกตามโฟลเดอร์ ติ๊กโฟลเดอร์ที่จะลบ</div>
+            <button data-act="otherScan">หารูปอื่นในเครื่อง</button>
+            <div id="otherCard" hidden style="margin-top:10px">
+              <div class="list" id="otherList"></div>
+              <div class="row end" style="margin-top:10px"><button class="red" id="otherDel" data-act="otherDelete">ลบโฟลเดอร์ที่ติ๊ก</button></div>
+            </div>
+          </div>
+          <div class="card">
             <h2>อื่นๆ</h2>
             <div class="grid"><button data-act="cache">ล้างแคชแอป</button><button data-act="bigFiles">หาไฟล์ใหญ่ที่สุด</button></div>
           </div>

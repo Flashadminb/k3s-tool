@@ -296,7 +296,7 @@ function orbitSlots(box, n, size, tagRows) {
   const br = box.getBoundingClientRect();
   const avoid = [];
   const addRect = (e, pad) => { if (!e || e.hidden || !e.offsetParent) return; const r = e.getBoundingClientRect(); if (r.width) avoid.push({ x1: r.left - br.left - pad, y1: r.top - br.top - pad, x2: r.right - br.left + pad, y2: r.bottom - br.top + pad }); };
-  addRect($("devCard"), 12); addRect(document.querySelector(".hubwrap"), 10); addRect($("selBar"), 6);
+  addRect($("devCard"), 12); addRect(document.querySelector(".hubwrap"), 10); addRect($("selBar"), 6); addRect($("flashNeed"), 6);
   const tagH = tagRows * 24;
   const sx = size * 1.3, sy = size + tagH + 22;
   const R = size / 2 + 8;
@@ -340,7 +340,9 @@ function verLess(a, b) {
 function renderOrbit(box) {
   const ds = all();
   const narrow = innerWidth <= 980;
-  const tagRows = Math.min(2, Math.max(0, ...ds.map((d) => (d.info.screenOn === false) + (["missing", "old"].includes(flashState(d)) || (d.info.bannedFound || []).length ? 1 : 0))));
+  // rows of tags under the busiest device (same rules as the tags drawn below: at most two)
+  const tagCount = (d) => Math.min(2, (d.info.screenOn === false ? 1 : 0) + (["missing", "old"].includes(flashState(d)) ? 1 : 0) + ((d.info.bannedFound || []).length ? 1 : 0));
+  const tagRows = Math.max(0, ...ds.map(tagCount));
   const fit = (rows) => {
     let s = satSizeFor(ds.length, narrow), l;
     for (;;) { l = orbitSlots(box, ds.length, s, rows); if (l.slots.length >= ds.length || s <= 56) return [s, l]; s = Math.round(s * 0.92); }
@@ -348,7 +350,7 @@ function renderOrbit(box) {
   // With many devices the tags shrink into short labels on the ring itself, which frees a whole row of space
   let [size, lay] = fit(tagRows);
   const compact = tagRows > 0 && (size < 92 || lay.slots.length < ds.length);
-  if (compact) [size, lay] = fit(0);
+  if (compact) [size, lay] = fit(0.75); // short labels still hang a little below the ring
   box.style.setProperty("--s", size + "px");
   const pos = new Map();
   box.replaceChildren(...ds.map((d, i) => {

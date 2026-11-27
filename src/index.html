@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K3S Tool</title>
+<style>
+:root{--bg:#f5f4ef;--card:#fff;--tx:#1f1f1e;--mut:#6b6a66;--bd:#e0ded6;--ok:#2f7d32;--okbg:#e6f3e7;--bad:#b3261e;--badbg:#fbe9e7;--warn:#8a5a00;--warnbg:#fff4dc;--ac:#185fa5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,"Noto Sans Thai",sans-serif}
+.wrap{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:20px;font-weight:500;margin:0}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card{background:var(--card);border:.5px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.pill{font-size:12px;padding:3px 10px;border-radius:8px;background:var(--bd)}.pill.ok{background:var(--okbg);color:var(--ok)}
+button{font:inherit;padding:10px 12px;border-radius:8px;border:.5px solid #bbb;background:#fff;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+.big{width:100%;padding:16px;font-weight:500;background:var(--ok);color:#fff;border:none;margin-bottom:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.red{color:var(--bad);border-color:var(--bad)}
+.mut{color:var(--mut);font-size:13px}.num{font-size:24px;font-weight:500}
+.barbox{height:8px;background:#eee;border-radius:4px;overflow:hidden;margin:8px 0}.bar{height:100%;background:var(--ok);width:0}.bar.warn{background:#e0a100}.bar.bad{background:var(--bad)}
+.stat{background:#f6f5f1;border-radius:8px;padding:8px 10px}.stat b{display:block;font-weight:500}
+details{background:var(--warnbg);border:.5px solid #e6cf9a;border-radius:12px;padding:10px 14px;margin-bottom:12px}summary{font-weight:500;color:var(--warn);cursor:pointer}
+details ol{padding-left:20px;margin:8px 0}
+#help{background:var(--badbg);border:.5px solid #e8b4ae;border-radius:12px;padding:12px 14px;margin-bottom:12px}.help-title{font-weight:500;color:var(--bad)}#help ol{padding-left:20px;margin:6px 0}.help-detail{font-size:12px;color:var(--mut);word-break:break-all}
+.btn-link{display:inline-block;margin-top:4px;color:var(--ac)}
+#log{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:var(--mut);max-height:160px;overflow:auto;margin:0}
+#dlg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}#dlg[hidden]{display:none}
+.dlgbox{background:#fff;border-radius:12px;padding:16px;max-width:380px;width:100%}.dlgbox input{width:100%;padding:8px;margin:8px 0;font:inherit}.row{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>K3S Tool</h1><span id="status" class="pill">ยังไม่เชื่อมต่อ</span></div>
+
+  <details open>
+    <summary>ทำครั้งแรก (เครื่องใหม่หรือเครื่องที่เพิ่งรีเซ็ต)</summary>
+    <ol>
+      <li>ที่เครื่อง: Settings > About phone > แตะ Build number 7 ครั้ง (เมนูชื่ออาจต่างกันตามรุ่น ลองค้นหา "Build number" ในช่อง Search)</li>
+      <li>Settings > System > Developer options > เปิด USB debugging (ถ้าไม่เจอ Developer options อาจถูกระบบบริษัทล็อก ให้แจ้งไอที)</li>
+      <li>บนคอม: ถ้าเคยเปิด adb ไว้ ให้พิมพ์ <code>adb kill-server</code> ก่อน</li>
+      <li>เสียบสาย USB แล้วกด เชื่อมต่อเครื่อง เลือกเครื่อง K3S</li>
+      <li>ที่เครื่องจะมี popup Allow USB debugging ให้ติ๊ก Always allow แล้วกด Allow</li>
+    </ol>
+    <a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">โหลด Platform-Tools (ใช้เฉพาะตอนต้องพิมพ์ adb kill-server)</a>
+  </details>
+
+  <button class="big" data-act="connect" style="background:#185fa5">เชื่อมต่อเครื่อง</button>
+  <div id="help" hidden></div>
+
+  <div id="app" hidden>
+    <div class="card">
+      <div class="mut"><span id="model">-</span> · พื้นที่ใช้ไป</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="num" id="used">-</span><span class="mut" id="total"></span></div>
+      <div class="barbox"><div id="bar" class="bar"></div></div>
+      <div class="grid" style="margin-top:10px">
+        <div class="stat"><span class="mut">success</span><b id="cSuccess">-</b></div>
+        <div class="stat"><span class="mut">ขยะ .trashed</span><b id="cTrash">-</b></div>
+        <div class="stat"><span class="mut">fail</span><b id="cFail">-</b></div>
+        <button data-act="refresh">อัปเดตตัวเลข</button>
+      </div>
+    </div>
+    <button class="big" data-act="success">ลบรูป success (คลิกเดียว)</button>
+    <div class="grid"><button data-act="trash">ลบขยะ</button><button data-act="all">ลบทั้งหมด</button><button data-act="cache">ล้างแคชแอป</button><button data-act="apk">ติดตั้ง APK</button></div>
+    <div class="grid"><button data-act="wall">ตั้งรูปหน้าจอ</button><span></span><button class="red" data-act="fail">ลบ fail</button><button class="red" data-act="reset">รีเซ็ตเครื่อง</button></div>
+    <input type="file" id="apkFile" accept=".apk" hidden>
+    <input type="file" id="wallFile" accept="image/*" hidden>
+  </div>
+
+  <div class="card"><div class="mut" style="font-weight:500;margin-bottom:4px">Log</div><pre id="log"></pre></div>
+</div>
+<div id="dlg" hidden><div class="dlgbox"><div id="dlgText"></div><input id="dlgInput" hidden><div class="row"><button id="dlgNo">ยกเลิก</button><button id="dlgOk" class="red">ยืนยัน</button></div></div></div>
+<script>/*__BUNDLE__*/</script>
+</body>
+</html>

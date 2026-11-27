@@ -5,6 +5,11 @@ export const hasWebUsb = () => true;
 export class Device {
   constructor(serial) { this.serial = serial; this.info = {}; this.closed = false; this.disconnected = new Promise((r) => (this._bye = r)).then(() => { this.closed = true; }); }
   async sh(cmd) { return await window.__sh(this.serial, cmd); }
+  async shStream(cmd, onLine) {
+    const r = await this.sh(cmd);
+    for (const l of r.out.split("\n")) { if (!l) continue; if (window.__lineDelay) await new Promise((res) => setTimeout(res, window.__lineDelay)); onLine(l); }
+    return r;
+  }
   async shOk(cmd) { const r = await this.sh(cmd); if (r.code) throw new Error((r.err || r.out).trim()); return r.out; }
   async push(blob, path, onProgress) { const b = blob instanceof Uint8Array ? blob : new Uint8Array(await blob.arrayBuffer()); await window.__push(this.serial, path, Array.from(b)); onProgress && onProgress(1); }
   async pull(path) { return new Uint8Array(await window.__pull(this.serial, path)); }

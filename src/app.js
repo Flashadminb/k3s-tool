@@ -62,7 +62,7 @@ function busyMsg(t) {
     paint(); b.hidden = false; document.title = "⏳ K3S Tool";
     if (!busyState.timer) busyState.timer = setInterval(paint, 1000);
   } else {
-    b.hidden = true; clearInterval(busyState.timer); busyState.timer = null;
+    b.hidden = true; b.classList.remove("prog"); clearInterval(busyState.timer); busyState.timer = null;
     const long = Date.now() - busyState.start > 8000;
     document.title = long ? "✅ เสร็จแล้ว · K3S Tool" : "K3S Tool";
     if (long) setTimeout(() => { if (!busyState.text) document.title = "K3S Tool"; }, 15000);
@@ -215,11 +215,16 @@ async function addDevice(d) {
   // First visit opens the guide; once a device is connected, jump to the main delete tab
   if (document.querySelector(".tabs .on").dataset.tab === "guide") showTab("data");
   renderAll();
-  // Fill in numbers in the background-ish order: storage first (main feature), then info, then banned check
-  await refreshStorage(d);
-  await loadInfo(d).catch((e) => log("อ่านข้อมูลเครื่องไม่ครบ: " + e.message));
-  await checkBanned(d).catch(() => {});
-  await pollStatus(d).catch(() => {});
+  // Quick facts (battery, screen, Flash Kit) and the slower file counts load side by side
+  await Promise.all([
+    (async () => {
+      await loadInfo(d).catch((e) => log("อ่านข้อมูลเครื่องไม่ครบ: " + e.message));
+      await pollStatus(d).catch(() => {});
+      renderDevices(); renderCard();
+      await checkBanned(d).catch(() => {});
+    })(),
+    refreshStorage(d)
+  ]);
   renderAll();
   return d;
 }
@@ -260,6 +265,7 @@ async function autoConnect() {
 
 /* ---------- Group selection: actions apply to every linked device until the group is cleared ---------- */
 const group = new Set();
+const draining = new Set();   // devices deleting right now (files are drawn flowing into the hub)
 let selectMode = false, hoverSerial = null, groupPin = null, pendingInstall = null, cardDev = null;
 const groupDevs = () => [...group].map((s) => devices.get(s)).filter((d) => d && !d.closed);
 
@@ -395,10 +401,12 @@ function renderOrbit(box) {
     if (fs === "missing") tags.push(el("span", { class: "sat-tag bad", text: compact ? "ไม่มี Flash" : "ไม่มี Flash Kit" }));
     else if (fs === "old") tags.push(el("span", { class: "sat-tag warn", text: compact ? "Flash เก่า" : "Flash Kit เก่า" }));
     if (ban && tags.length < 2) tags.push(el("span", { class: "sat-tag bad", text: compact ? "แอปห้าม" : "แอปต้องห้าม " + ban }));
+    const drain = draining.has(d.serial);
     const w = el("div", {
-      class: "satw" + (inGroup ? " in-group" : ""), "data-serial": d.serial,
-      style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s`
-    }, sat, tags.length ? el("div", { class: "sat-tags" + (compact ? " compact" : "") }, tags) : null);
+      class: "satw" + (inGroup ? " in-group" : "") + (drain ? " draining" : ""), "data-serial": d.serial,
+      style: `left:${p.x.toFixed(0)}px;top:${p.y.toFixed(0)}px;--p:${pct};--tint:${tintOf(d.serial)};--delay:${(i * -2.3).toFixed(1)}s;--dx:${(lay.cx - p.x).toFixed(0)}px;--dy:${(lay.cy - p.y).toFixed(0)}px`
+    }, drain ? el("div", { class: "drops", "aria-hidden": "true" }, [0, 1, 2, 3, 4, 5].map((k) => el("i", { style: `--k:${k}` }))) : null,
+      sat, tags.length ? el("div", { class: "sat-tags" + (compact ? " compact" : "") }, tags) : null);
     return w;
   }), ...ghosts.map((serial, j) => {
     const p = lay.slots[ds.length + j] || { x: lay.cx, y: lay.cy + 160 };
@@ -533,8 +541,17 @@ function renderAll() {
 const TRASH = "-name '.trashed-*'";
 // Every find uses -H: on Android /sdcard is a symlink, and find does not enter a symlinked start folder without it
 // One pass per folder: number of files and total KB. Missing folder -> 0 0
-const statCmd = (dir, filter = "") =>
-  `if [ -d ${q(dir)} ]; then find -H ${q(dir)} -type f ${filter} -exec du -k {} + 2>/dev/null | awk '{s+=$1;n++} END {print n+0, s+0}'; else echo 0 0; fi`;
+// Fast: list names (readdir only) for the count and one `du -sk` for the size, instead of a stat per file
+const statCmd = (dir) =>
+  `if [ -d ${q(dir)} ]; then echo $(find -H ${q(dir)} -type f 2>/dev/null | wc -l) $(du -sk ${q(dir)} 2>/dev/null | cut -f1); else echo 0 0; fi`;
+// Trash lives next to the photos; Android/ (every app's private data, huge) is skipped instead of searched
+const TRASH_FIND = `find -H /sdcard -path /sdcard/Android -prune -o -type f ${TRASH}`;
+const trashStatCmd = `${TRASH_FIND} -exec du -k {} + 2>/dev/null | awk '{s+=$1;n++} END {print n+0, s+0}'`;
+// Delete in batches of 300, up to 4 at a time (xargs -P), and print how many each batch removed so the page can
+// show progress. Phones whose xargs has no -P fall back to one batch at a time.
+// (the -P check runs before the pipeline: put inside it, it would swallow the file list)
+const PAR_CHECK = `if echo | xargs -P 2 true 2>/dev/null; then P="-P 4"; else P=""; fi;`;
+const BATCH_DEL = `xargs -0 -n 300 $P sh -c 'rm -f "$@"; echo $#' _`;
 // Photos and videos outside Flash Kit's own folders (camera, screenshots, Pictures, other apps)
 const MEDIA = "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.heic' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.3gp' \\)";
 const OTHER_MEDIA = `find -H /sdcard -type f ${MEDIA} -not -path '/sdcard/Android/*' -not -path '*/imagePath/*' -not -name '.trashed-*'`;
@@ -549,8 +566,10 @@ async function refreshStorage(d) {
   const s = await df(d);
   d.info.storage = { ...s, counting: true };
   if (d.serial === selected) renderStorage(d);
-  const r = (await d.sh(`${statCmd(p.success)}; ${statCmd(p.fail)}; ${statCmd("/sdcard", TRASH)}`)).out.trim().split(/\n/).map((l) => l.trim().split(/\s+/).map((x) => parseInt(x, 10) || 0));
-  d.info.storage = { ...s, success: r[0] || [0, 0], fail: r[1] || [0, 0], trash: r[2] || [0, 0], at: Date.now() };
+  // the three counts run side by side over separate ADB streams
+  const num = (r) => { const v = r.out.trim().split(/\s+/).map((x) => parseInt(x, 10) || 0); return [v[0] || 0, v[1] || 0]; };
+  const [sc, fc, tc] = await Promise.all([d.sh(statCmd(p.success)), d.sh(statCmd(p.fail)), d.sh(trashStatCmd)]);
+  d.info.storage = { ...s, success: num(sc), fail: num(fc), trash: num(tc), at: Date.now() };
   st.updateRegistry(d.serial, { model: d.info.model, storage: `${human(s.used)} / ${human(s.total)}` });
   renderStorage(devices.get(selected)); renderDevices();
 }
@@ -577,12 +596,12 @@ function renderToday() {
 const KIND = {
   success: { label: "รูป success", cmd: (p) => delCmd(p.success) },
   fail: { label: "รูป fail", cmd: (p) => delCmd(p.fail) },
-  trash: { label: "ขยะ .trashed", cmd: () => `n=$(find -H /sdcard -type f ${TRASH} 2>/dev/null | wc -l); find -H /sdcard -type f ${TRASH} -delete 2>/dev/null; echo $n` }
+  trash: { label: "ขยะ .trashed", cmd: () => `${PAR_CHECK} ${TRASH_FIND} -print0 2>/dev/null | ${BATCH_DEL}` }
 };
-// find -delete avoids "argument list too long" that rm -rf dir/* hits with tens of thousands of files.
-// Missing folder (fresh device) means nothing to delete, not an error.
+// Files go through find -print0 | xargs (never `rm -rf dir/*`, which fails with "argument list too long").
+// Missing folder (fresh device) means nothing to delete, not an error. Each output line = files removed by one batch.
 function delCmd(dir) {
-  return `[ -d ${q(dir)} ] || { echo 0; exit 0; }; n=$(find -H ${q(dir)} -type f | wc -l); find -H ${q(dir)} -type f -delete; c=$?; echo $n; exit $c`;
+  return `${PAR_CHECK} [ -d ${q(dir)} ] || exit 0; find -H ${q(dir)} -type f -print0 | ${BATCH_DEL}`;
 }
 
 /* ---------- File manager: every file and folder in the phone storage, biggest first, delete what is ticked ---------- */
@@ -655,30 +674,64 @@ function renderOther(nDev) {
   }));
 }
 
+/* ---------- Live progress while deleting: shared by every device being cleaned at the same time ---------- */
+const prog = { jobs: new Map(), start: 0 };
+function progStart() { prog.jobs.clear(); prog.start = Date.now(); }
+function progUpdate(serial, done, total, what) {
+  prog.jobs.set(serial, { done, total, what });
+  let D = 0, T = 0; for (const j of prog.jobs.values()) { D += j.done; T += j.total; }
+  const sec = Math.round((Date.now() - prog.start) / 1000);
+  const rate = sec ? Math.round(D / sec) : 0;
+  const many = prog.jobs.size > 1 ? ` · ${prog.jobs.size} เครื่อง` : "";
+  const pct = T ? Math.min(100, Math.round((D / T) * 100)) : 0;
+  busyMsg(`กำลังลบ${what}${many} · ${D.toLocaleString()}${T ? " / " + T.toLocaleString() : ""} ไฟล์${T ? ` (${pct}%)` : ""}${rate ? ` · ${rate.toLocaleString()} ไฟล์/วิ` : ""}`);
+  const b = $("busy"); b.classList.toggle("prog", !!T); b.style.setProperty("--pg", pct + "%");
+}
+
 /** Delete the given kinds on one device, record history, return KB freed */
 async function cleanup(d, kinds, how = "กดเอง") {
   const before = (await df(d)).used;
-  let files = 0;
-  for (const k of kinds) {
-    busyMsg(`กำลังลบ${KIND[k].label} · ${label(d)}`);
-    const r = await d.sh(KIND[k].cmd(d.info.profile));
-    files += parseInt(r.out.trim().split(/\s+/).pop(), 10) || 0;
-    if (r.code) throw new Error(`ลบ${KIND[k].label}ไม่ครบ: ` + (r.err || r.out).trim());
-  }
+  let files = 0, partial = false;
+  draining.add(d.serial); renderDevices();
+  try {
+    for (const k of kinds) {
+      const s = d.info.storage && !d.info.storage.counting ? d.info.storage : null;
+      const total = s && s[k] ? s[k][0] : 0, kb = s && s[k] ? s[k][1] : 0;
+      let done = 0, lastPaint = 0;
+      progUpdate(d.serial, 0, total, KIND[k].label);
+      const r = await d.shStream(KIND[k].cmd(d.info.profile), (line) => {
+        const n = parseInt(line, 10);
+        if (!n) return;
+        done += n; files += n;
+        // count down the numbers on screen as the files go
+        if (s && s[k]) s[k] = [Math.max(0, total - done), total ? Math.round(kb * Math.max(0, total - done) / total) : 0];
+        if (Date.now() - lastPaint > 250) { lastPaint = Date.now(); progUpdate(d.serial, done, Math.max(total, done), KIND[k].label); renderDock(); }
+      });
+      progUpdate(d.serial, done, Math.max(total, done), KIND[k].label);
+      if (r.code && r.code !== 123) throw new Error(`ลบ${KIND[k].label}ไม่ครบ: ` + (r.err || r.out).trim().slice(-200));
+      if (r.code) partial = true;   // xargs 123 = some file could not be removed; the recount below shows what is left
+    }
+  } finally { draining.delete(d.serial); renderDevices(); }
   const after = (await df(d)).used;
   const freed = Math.max(0, before - after);
   st.addHistory({ serial: d.serial, model: d.info.model, action: kinds.map((k) => KIND[k].label).join(" + "), how, files, freedKb: freed });
-  log(`${label(d)}: ลบ ${files.toLocaleString()} ไฟล์ ได้พื้นที่คืน ${human(freed)}`);
-  await refreshStorage(d);
+  log(`${label(d)}: ลบ ${files.toLocaleString()} ไฟล์ ได้พื้นที่คืน ${human(freed)}${partial ? " (มีบางไฟล์ลบไม่ได้)" : ""}`);
+  // No full recount: what was deleted is now empty, only the free space is read again
+  if (partial || !d.info.storage || d.info.storage.counting) await refreshStorage(d);
+  else { const s = d.info.storage; kinds.forEach((k) => (s[k] = [0, 0])); s.used = after; renderStorage(devices.get(selected)); renderDevices(); }
   renderToday(); renderHistory();
   return freed;
 }
 
 async function cleanupAction(kinds, text) {
   const ts = targets();
-  const who = ts.length > 1 ? `\n\nจะทำกับทุกเครื่อง ${ts.length} เครื่อง` : `\n\nเครื่อง: ${label(ts[0])}`;
+  const who = ts.length > 1 ? `\n\nจะทำกับทุกเครื่อง ${ts.length} เครื่อง พร้อมกัน` : `\n\nเครื่อง: ${label(ts[0])}`;
   if (!(await confirmBox(text + who))) return false;
-  for (const d of ts) await cleanup(d, kinds);
+  progStart();
+  // every device works at the same time; one failing does not stop the others
+  const res = await Promise.allSettled(ts.map((d) => cleanup(d, kinds)));
+  const bad = res.map((r, i) => (r.status === "rejected" ? `${label(ts[i])}: ${r.reason && r.reason.message}` : "")).filter(Boolean);
+  if (bad.length) throw new Error(bad.join(" / "));
 }
 
 /* ---------- Back up fail photos to the computer ---------- */

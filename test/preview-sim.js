@@ -2,6 +2,7 @@
 // 15 serials so the orbit layout can be tried with a full USB hub.
 window.__serials = Array.from({ length: 15 }, (_, i) => String(4660067 + i * 97));
 window.__authDelay = 1800;   // pretend someone takes a moment to tap "Allow"
+window.__lineDelay = 25;     // batches of deleted files arrive one by one, like on a real device
 const state = {};
 let made = 0;
 const st = (s) => (state[s] ||= (() => {
@@ -26,12 +27,14 @@ window.__sh = async (serial, cmd) => {
   if (cmd.includes("ro.build.version.release")) return R("12\n");
   if (cmd.includes("ro.build.version.sdk")) return R("31\n");
   if (cmd.startsWith("df")) return R(`/dev/fuse ${o.total} ${used(o)} ${o.total - used(o)} 0% /storage/emulated\n`);
-  if (cmd.includes("-delete")) {
-    await wait(1200);
+  if (cmd.includes("xargs -0")) {   // batch delete: one line per 300 files removed
     const k = cmd.includes(".trashed") ? "trash" : cmd.includes("/fail") ? "fail" : "success";
-    const n = o[k][0]; o[k][0] = 0; return R(n + "\n");
+    const n = o[k][0]; o[k][0] = 0;
+    const lines = []; for (let left = n; left > 0; left -= 300) lines.push(Math.min(300, left));
+    return R(lines.join("\n") + "\n");
   }
-  if (cmd.includes("awk")) { await wait(500); kb(o); return R(`${o.success[0]} ${o.success[1]}\n${o.fail[0]} ${o.fail[1]}\n${o.trash[0]} ${o.trash[1]}\n`); }
+  if (cmd.includes("| wc -l) $(du -sk")) { await wait(400); kb(o); const k = cmd.includes("/fail") ? "fail" : "success"; return R(`${o[k][0]} ${o[k][1]}\n`); }
+  if (cmd.includes(".trashed") && cmd.includes("awk")) { await wait(600); kb(o); return R(`${o.trash[0]} ${o.trash[1]}\n`); }
   if (cmd.includes("dumpsys power")) return R(`  mWakefulness=${o.awake ? "Awake" : "Asleep"}\n  level: ${o.level}\n`);
   if (cmd.includes("input keyevent 224")) { o.awake = true; return R(""); }
   if (cmd.includes("dumpsys battery")) return R(`  status: 2\n  health: 2\n  level: ${o.level}\n  temperature: 336\n`);

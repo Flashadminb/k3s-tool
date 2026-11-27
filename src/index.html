@@ -160,6 +160,16 @@ body.grouped #dcDetail .facts{grid-template-columns:1fr 1fr;font-size:15px}
 .stagenote .part{font:700 20px/1.3 var(--body);margin-bottom:6px}
 #authWait{border:2px solid var(--gold)}
 /* A device is already on the stage: the "tap Allow" card floats over the right panel instead of covering the devices */
+/* files flowing from a device into the hub while it is being cleaned */
+.drops{position:absolute;left:50%;top:50%;width:0;height:0;z-index:1;pointer-events:none}
+.drops i{position:absolute;left:-6px;top:-7px;width:12px;height:14px;border-radius:2px;background:var(--gold-hi);opacity:0;
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);animation:flow 1.2s cubic-bezier(.5,0,.75,0) infinite;animation-delay:calc(var(--k) * .2s)}
+.drops i:nth-child(even){background:#dfe6f5}
+@keyframes flow{0%{transform:translate(0,0) scale(1) rotate(0);opacity:0}12%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2) rotate(140deg);opacity:0}}
+.satw.draining{animation:none}
+.satw.draining .sat-ring{animation:spin 2.4s linear infinite}
+body.eco .drops i{animation-duration:2s}
+#busy.prog{background:linear-gradient(90deg,rgba(227,180,106,.38) var(--pg),rgba(10,14,26,.94) var(--pg));min-width:min(560px,90vw);text-align:center}
 .satw.ghost{animation:none;opacity:.85}
 .satw.ghost .sat{cursor:default}
 .satw.ghost .sat-ring{background:none;border:2px dashed var(--gold);-webkit-mask:none;mask:none;animation:spin 8s linear infinite}

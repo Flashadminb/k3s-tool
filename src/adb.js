@@ -1,7 +1,7 @@
 import { Adb, AdbDaemonTransport } from "@yume-chan/adb";
 import { AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
-import { ReadableStream, ConcatBufferStream } from "@yume-chan/stream-extra";
+import { ReadableStream, ConcatBufferStream, ConcatStringStream, TextDecoderStream } from "@yume-chan/stream-extra";
 
 const store = new AdbWebCredentialStore("K3S Tool");
 const mgr = AdbDaemonWebUsbDeviceManager.BROWSER;
@@ -37,6 +37,34 @@ export class Device {
     const raw = await this.adb.subprocess.noneProtocol.spawnWaitText(`sh -c ${q(cmd)}; echo __EXIT:$?`);
     const m = raw.match(/__EXIT:(\d+)\s*$/);
     return { out: m ? raw.slice(0, m.index) : raw, err: "", code: m ? +m[1] : 0 };
+  }
+
+  /** Like sh(), but hands each output line to onLine as soon as the device prints it (for live progress) */
+  async shStream(cmd, onLine) {
+    if (this.closed) throw new Error("UNPLUGGED");
+    const p = this.adb.subprocess.shellProtocol;
+    if (!p) { const r = await this.sh(cmd); r.out.split("\n").forEach((l) => l && onLine(l)); return r; }
+    try {
+      const proc = await p.spawn(cmd);
+      const errText = proc.stderr.pipeThrough(new TextDecoderStream()).pipeThrough(new ConcatStringStream());
+      const reader = proc.stdout.getReader();
+      const dec = new TextDecoder();
+      let buf = "", out = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const t = dec.decode(value, { stream: true });
+        out += t; buf += t;
+        let i;
+        while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (line) onLine(line); }
+      }
+      if (buf) onLine(buf);
+      const [err, code] = await Promise.all([errText, proc.exited]);
+      return { out, err, code };
+    } catch (e) {
+      if (this.closed || /disconnect|closed|transfer|NetworkError|NotFoundError/i.test(String(e && (e.name + " " + e.message)))) throw new Error("UNPLUGGED");
+      throw e;
+    }
   }
 
   /** Shell command, throws if exit code != 0 */

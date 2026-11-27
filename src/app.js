@@ -40,7 +40,7 @@ const HELP = {
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
   WALL_TAP: ["ส่งรูปแล้ว เหลือกดยืนยันที่เครื่อง 1 ครั้ง", ["ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
-  FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกโฟลเดอร์: คลิก Downloads ทางซ้าย แล้วกดปุ่ม Select Folder ด้านล่าง (หน้าต่างนั้นไม่โชว์ไฟล์ เป็นปกติ)", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
+  FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
 };
@@ -1846,13 +1846,31 @@ async function flashDirect(url) {
 // Ask for an APK file directly (the confirm click is the gesture the file window needs)
 async function pickApkFile(text) {
   if (!(await confirmBox(text))) return null;
-  const inp = el("input", { type: "file", accept: ".apk,application/vnd.android.package-archive" });
-  const f = await new Promise((res) => { inp.onchange = () => res(inp.files[0] || null); inp.oncancel = () => res(null); inp.click(); });
+  let f = null;
+  if (window.showOpenFilePicker) {
+    // opens straight in Downloads, newest files are easy to spot
+    try { [f] = await window.showOpenFilePicker({ id: "flashapk", startIn: "downloads", types: [{ description: "Android app (.apk)", accept: { "application/vnd.android.package-archive": [".apk"] } }] }); f = await f.getFile(); }
+    catch (e) { if (e && e.name === "AbortError") return null; f = null; }
+  }
+  if (!f) f = await pickApkInput();
   if (f && !(await isApk(f))) { showHelp("FLASH_DL", "ไฟล์ที่เลือกไม่ใช่ APK"); return null; }
   return f;
 }
+async function pickApkInput() {
+  const inp = el("input", { type: "file", accept: ".apk,application/vnd.android.package-archive" });
+  return await new Promise((res) => { inp.onchange = () => res(inp.files[0] || null); inp.oncancel = () => res(null); inp.click(); });
+}
+async function flashViaFilePick(url) {
+  const win = window.open(url, "_blank");
+  if (!win) $("dlgList").replaceChildren(el("a", { href: url, target: "_blank", rel: "noopener", class: "dl-link", text: "กดตรงนี้เพื่อเริ่มโหลด Flash Kit" }));
+  const f = await pickApkFile((win ? "Chrome กำลังโหลด Flash Kit ในแท็บใหม่" : "กดลิงก์ด้านบนเพื่อเริ่มโหลด Flash Kit") +
+    "\n\nรอให้โหลดเสร็จ (ดูไอคอนดาวน์โหลดมุมขวาบนของ Chrome) แล้วกลับมาที่หน้านี้ กด ยืนยัน\nจะมีหน้าต่างเปิดที่ Downloads ให้คลิกไฟล์ .apk ที่ใหม่สุด แล้วกด Open\nเว็บจะติดตั้งให้ทุกเครื่องเอง");
+  $("dlgList").replaceChildren();
+  if (!f) throw new Error("ยกเลิกการเลือกไฟล์");
+  return f;
+}
 async function flashViaDownloads(url) {
-  if (!window.showDirectoryPicker) throw new Error("NO_FS");
+  if (!window.showDirectoryPicker) return flashViaFilePick(url);
   let dir = await kvGet("dlDir");
   const askGesture = (text) => confirmBox(text);   // the click on ยืนยัน counts as the user gesture the browser wants
   if (dir) {
@@ -1860,19 +1878,9 @@ async function flashViaDownloads(url) {
     if (p !== "granted") { try { p = await dir.requestPermission({ mode: "read" }); } catch (e) { if (await askGesture("กด ยืนยัน เพื่ออนุญาตให้เว็บดูโฟลเดอร์ Downloads")) p = await dir.requestPermission({ mode: "read" }); } }
     if (p !== "granted") dir = null;
   }
-  if (!dir) {
-    // The folder window shows folders only, never files: people look for the APK there and get stuck. Say so first.
-    if (!(await askGesture("ครั้งแรกครั้งเดียว: เว็บจะเปิดหน้าต่างเลือกโฟลเดอร์\n\n1. คลิก Downloads ทางซ้าย\n2. กดปุ่ม Select Folder (เลือกโฟลเดอร์) ด้านล่างขวา แล้วกด View files / อนุญาต\n\nในหน้าต่างนั้นจะเห็นแต่โฟลเดอร์ ไม่เห็นไฟล์ เป็นเรื่องปกติ ไม่ต้องหาไฟล์ Flash Kit\nเว็บจะหยิบไฟล์ที่โหลดเสร็จไปติดตั้งให้เอง"))) throw new Error("ยกเลิก");
-    try { dir = await window.showDirectoryPicker({ id: "downloads", startIn: "downloads", mode: "read" }); }
-    catch (e) {
-      if (e && e.name !== "AbortError") throw e;
-      // gave up on the folder window: let them pick the downloaded APK file itself instead
-      const f = await pickApkFile("ไม่เลือกโฟลเดอร์ก็ได้: ถ้าโหลด Flash Kit ไว้แล้ว กด ยืนยัน แล้วเลือกไฟล์ .apk เอง");
-      if (f) return f;
-      throw new Error("ยกเลิกการเลือกโฟลเดอร์");
-    }
-    await kvSet("dlDir", dir);
-  }
+  // No folder saved: the folder window confuses people (it shows no files), so use a file window instead:
+  // Chrome downloads the link, then they pick the newest .apk from Downloads
+  if (!dir) return flashViaFilePick(url);
   const snap = new Map();
   for await (const [n, h] of dir.entries()) if (h.kind === "file" && /\.apk$/i.test(n)) snap.set(n, (await h.getFile()).lastModified);
   const win = window.open(url, "_blank");

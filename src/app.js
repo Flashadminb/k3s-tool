@@ -1638,6 +1638,34 @@ function renderWifiSaved() {
   )) : [el("div", { class: "item mut", text: "ยังไม่มี เพิ่มได้ด้านล่าง" })]));
   box.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !all().length));
 }
+/** Networks the device sees: saved ones connect at once, new ones ask for the password right in the row */
+function renderScan(nets) {
+  const saved = new Map(st.wifiList().map((w) => [w.ssid, w]));
+  const canSave = auth.me.role !== "staff";
+  $("wifiScanList").replaceChildren(el("div", { class: "mut", text: nets.length ? "Wi-Fi ที่เครื่องเห็น" : "ไม่เจอ Wi-Fi (หรือเครื่องไม่ยอมให้ค้นหา)" }), ...nets.map((n) => {
+    const known = saved.get(n.ssid);
+    const pw = el("div", { class: "pw", hidden: "" });
+    const row = el("div", { class: "item wifi-row", style: "flex-wrap:wrap" },
+      el("div", { class: "nm" }, n.ssid, el("small", { text: (n.sec === "open" ? "ไม่มีรหัส" : n.sec.toUpperCase()) + (known ? " · บันทึกไว้แล้ว" : "") })),
+      el("div", { class: "row" }, el("span", { class: "sig", text: n.rssi > -60 ? "แรง" : n.rssi > -75 ? "พอใช้" : "อ่อน" }),
+        el("button", { class: "blue", text: known || n.sec === "open" ? "เชื่อมต่อ" : "ใส่รหัส", onclick: () => {
+          if (known) return wifiConnect(known);
+          if (n.sec === "open") return wifiConnect({ ssid: n.ssid, sec: "open", pass: "" });
+          pw.hidden = !pw.hidden; if (!pw.hidden) pw.querySelector("input").focus();
+        } })),
+      pw);
+    const inp = el("input", { type: "password", placeholder: "รหัส Wi-Fi " + n.ssid, autocomplete: "new-password" });
+    const go = () => {
+      if (inp.value.length < 8) { showHelp("WIFI", "รหัส Wi-Fi ต้องยาวอย่างน้อย 8 ตัว"); return; }
+      const w = { ssid: n.ssid, pass: inp.value, sec: n.sec };
+      if (canSave) { st.saveWifiList([w, ...st.wifiList().filter((x) => x.ssid !== n.ssid)]); renderWifiSaved(); log(`บันทึก Wi-Fi ${n.ssid} แล้ว`); }
+      wifiConnect(w);
+    };
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+    pw.append(inp, el("button", { class: "blue", text: canSave ? "บันทึกและเชื่อมต่อ" : "เชื่อมต่อ", onclick: go }));
+    return row;
+  }));
+}
 function wifiConnect(w) {
   run(`ต่อ Wi-Fi ${w.ssid}`, async () => {
     const ts = targets();
@@ -1748,21 +1776,47 @@ async function portalFill(d, acc) {
   }
   if (!f.user || !f.pass) throw new Error("PORTAL_NOFORM");
   const clear = "input keyevent 123 " + Array(40).fill(67).join(" ");
+  // the screen is read again before every tap: the keyboard pops up after the first tap and pushes the page up,
+  // so where the Password box was a moment ago is no longer where it is
+  const fresh = async () => { const n = await readScreen(d); return { ...portalFields(n), foc: n.find((x) => /EditText/.test(x.cls) && x.focus) }; };
+  const same = (a, b) => a && b && Math.abs(a.x - b.x) < 8 && Math.abs(a.y - b.y) < 8;
+  const userText = (x) => (x && x.user && !x.user.pass && !/^(user(name)?|id|ชื่อผู้ใช้)$/i.test(x.user.text) ? x.user.text : "");
+  async function typeUser() {
+    const x = await fresh();
+    await d.sh(`input tap ${x.user.x} ${x.user.y}`); await sleep(600);
+    await d.sh(clear);
+    await d.shOk(`input text ${q(typeable(acc.user))}`);
+  }
+  async function typePass(useTab) {
+    if (useTab) { await d.sh("input keyevent 61"); await sleep(600); }   // Tab: from User to Password
+    let x = await fresh();
+    if (!(x.foc && same(x.foc, x.pass))) { await d.sh(`input tap ${x.pass.x} ${x.pass.y}`); await sleep(600); x = await fresh(); }
+    // clear unless the screen says another box has the focus (clearing the wrong one would wipe the User)
+    if (!x.foc || same(x.foc, x.pass)) await d.sh(clear);
+    await d.shOk(`input text ${q(typeable(acc.pass))}`);
+  }
   setStatus(d, { title: "ใส่ User", big: "1/3", ring: 33 });
-  await d.sh(`input tap ${f.user.x} ${f.user.y}`); await sleep(500);
-  await d.sh(clear);
-  await d.shOk(`input text ${q(typeable(acc.user))}`);
+  await typeUser();
   setStatus(d, { title: "ใส่ Password", big: "2/3", ring: 66 });
-  await d.sh(`input tap ${f.pass.x} ${f.pass.y}`); await sleep(500);
-  await d.sh(clear);
-  await d.shOk(`input text ${q(typeable(acc.pass))}`);
+  await typePass(true);
+  // check: the User box must hold exactly the user name (a password that landed there shows up in it)
+  let chk = await fresh(), ut = userText(chk);
+  if (ut && ut !== acc.user) {
+    setStatus(d, { title: "แก้ช่อง User/Password", big: "2/3", ring: 70 });
+    await typeUser();
+    await typePass(false);
+    chk = await fresh(); ut = userText(chk);
+    if (ut && ut !== acc.user) throw new Error("PORTAL_NOFORM");
+  }
   // close the keyboard (Esc, not Back: Back would close the login page) so LOGIN is not hidden under it
   await d.sh("input keyevent 111"); await sleep(800);
   setStatus(d, { title: "กด LOGIN", big: "3/3", ring: 85 });
-  const after = await readScreen(d);
-  const btn = after.filter((n) => P_BTN.test(btnText(n)) && n.w > 0 && n.y > f.pass.y).sort((a, b) => a.y - b.y)[0];
+  const after = await readScreen(d), fa = portalFields(after);
+  const below = fa.pass ? fa.pass.y : 0;
+  const btn = after.filter((n) => P_BTN.test(btnText(n)) && n.w > 0 && n.y > below).sort((a, b) => a.y - b.y)[0];
   if (btn) await d.sh(`input tap ${btn.x} ${btn.y}`);
-  else { await d.sh(`input tap ${f.pass.x} ${f.pass.y}`); await sleep(300); await d.sh("input keyevent 66"); }
+  else if (fa.pass) { await d.sh(`input tap ${fa.pass.x} ${fa.pass.y}`); await sleep(300); await d.sh("input keyevent 66"); }
+  else await d.sh("input keyevent 66");
   // done when Android sees the internet (or the login page closes by itself); an error on the page means a bad account
   for (let i = 0; i < 20; i++) {
     await sleep(1500);
@@ -1777,7 +1831,8 @@ async function portalFill(d, acc) {
 
 function portalRecord(acc, d, ok, why) {
   const l = portalLog();
-  l.push({ u: acc.user, s: d.serial, n: shortName(d), t: Date.now(), ok, why: why || "" });
+  // who did it: the person logged in to the website (each account keeps its own record)
+  l.push({ u: acc.user, s: d.serial, n: shortName(d), t: Date.now(), ok, why: why || "", by: auth.me.role === "local" ? "" : auth.me.name || auth.me.username || "" });
   st.save("portalLog", l.slice(-3000));
 }
 /** Accounts in the order to try: the chosen one, or (auto) the least used today first */
@@ -1850,6 +1905,10 @@ function renderPortal() {
   sel.replaceChildren(el("option", { value: "auto", text: "อัตโนมัติ (ใช้รหัสที่วันนี้ใช้น้อยสุด ไม่ผ่านลองรหัสถัดไป)" }), ...list.map((a) => el("option", { value: a.user, text: a.user })));
   sel.value = [...sel.options].some((o) => o.value === was) ? was : "auto";
   $("ptAuto").checked = !!st.load("portalAuto", true);
+  if ($("ptToday")) $("ptToday").textContent = list.length ? "วันนี้: " + list.map((a) => {
+    const td = lg.filter((x) => x.u === a.user && x.ok && dayKey(x.t) === today);
+    return `${a.user} ${td.length} ครั้ง${td.length ? " (ตั้งแต่ " + hhmm(td[0].t) + ")" : ""}`;
+  }).join(" · ") : "ยังไม่มีรหัส: กด จัดการรหัส ด้านล่างเพื่อเพิ่ม";
   if (!list.length) { box.replaceChildren(el("div", { class: "item mut", text: "ยังไม่มีรหัส เพิ่มได้ด้านล่าง" })); return; }
   box.replaceChildren(...list.map((a, i) => {
     const mine = lg.filter((x) => x.u === a.user);
@@ -1870,7 +1929,8 @@ function renderPortal() {
             el("b", { text: `${dn}/${m}/${+y + 543}: ${good.length} ครั้ง` }),
             good.length ? ` · ${hhmm(good[0].t)} ถึง ${hhmm(good[good.length - 1].t)}` : "",
             bad ? ` · ไม่ผ่าน ${bad}` : "",
-            ` · เครื่อง: ${[...new Set(dd.map((x) => x.n))].join(", ")}`);
+            ` · เครื่อง: ${[...new Set(dd.map((x) => x.n))].join(", ")}`,
+            dd.some((x) => x.by) ? ` · โดย: ${[...new Set(dd.map((x) => x.by).filter(Boolean))].join(", ")}` : "");
         })) : null);
   }));
   box.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !all().length));
@@ -1944,7 +2004,7 @@ async function readScreen(d) {
   return [...doc.querySelectorAll("node")].map((n) => {
     const b = (n.getAttribute("bounds") || "").match(/\d+/g) || [0, 0, 0, 0];
     return { text: (n.getAttribute("text") || "").trim(), desc: (n.getAttribute("content-desc") || "").trim(), id: n.getAttribute("resource-id") || "", cls: n.getAttribute("class") || "",
-      pass: n.getAttribute("password") === "true", click: n.getAttribute("clickable") === "true", x: Math.round((+b[0] + +b[2]) / 2), y: Math.round((+b[1] + +b[3]) / 2), w: b[2] - b[0], h: b[3] - b[1] };
+      pass: n.getAttribute("password") === "true", focus: n.getAttribute("focused") === "true", click: n.getAttribute("clickable") === "true", x: Math.round((+b[0] + +b[2]) / 2), y: Math.round((+b[1] + +b[3]) / 2), w: b[2] - b[0], h: b[3] - b[1] };
   });
 }
 const typeable = (s) => s.replace(/ /g, "%s");
@@ -2427,11 +2487,7 @@ const actions = {
     await new Promise((res) => setTimeout(res, 4000));
     const r = await d.sh("cmd wifi list-scan-results");
     const nets = parseScan(r.out);
-    $("wifiScanList").replaceChildren(...(nets.length ? nets.map((n) => el("div", { class: "item wifi-row" },
-      el("div", { class: "nm" }, n.ssid, el("small", { text: n.sec === "open" ? "ไม่มีรหัส" : n.sec.toUpperCase() })),
-      el("div", { class: "row" }, el("span", { class: "sig", text: n.rssi > -60 ? "แรง" : n.rssi > -75 ? "พอใช้" : "อ่อน" }),
-        el("button", { text: "ใช้ชื่อนี้", onclick: () => { $("wfSsid").value = n.ssid; $("wfSec").value = n.sec; $("wfPass").focus(); } }))
-    )) : [el("div", { class: "item mut", text: "ไม่เจอ Wi-Fi (หรือเครื่องไม่ยอมให้ค้นหา)" })]));
+    renderScan(nets);
   }, "WIFI"),
   regCsv: () => {
     const r = Object.values(st.registry());

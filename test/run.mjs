@@ -87,9 +87,21 @@ G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null)
 W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
 P="${join(ROOT, "p-")}$SERIAL"; ps=$(cat "$P" 2>/dev/null)
 if [ -n "$ps" ] && [ "$ps" != done ]; then
-  [ "$1" = text ] && echo "$2" >> "$P.typed"
-  [ "$1" = tap ] && [ "$ps" = shade ] && [ "$3" = 150 ] && echo open > "$P"
-  [ "$1" = tap ] && [ "$3" = 860 ] && { grep -qx goodpass "$P.typed" && echo done > "$P" || echo err > "$P"; rm -f "$P.typed"; }
+  # the login page: tapping a box focuses it and opens the keyboard, which pushes the page up 200 px
+  K=0; [ -f "$P.kb" ] && K=200; f=$(cat "$P.focus" 2>/dev/null)
+  case "$1" in
+   tap) [ "$ps" = shade ] && [ "$3" = 150 ] && echo open > "$P"
+     if [ "$ps" = open ] || [ "$ps" = err ]; then
+       [ "$3" = $((640-K)) ] && { echo user > "$P.focus"; touch "$P.kb"; }
+       [ "$3" = $((740-K)) ] && { echo pass > "$P.focus"; touch "$P.kb"; }
+       if [ "$3" = $((860-K)) ]; then { [ "$(cat "$P.user" 2>/dev/null)" = hub1 ] && [ "$(cat "$P.pass" 2>/dev/null)" = goodpass ]; } && echo done > "$P" || echo err > "$P"; cp "$P.user" "$P.lastuser" 2>/dev/null; rm -f "$P.user" "$P.pass" "$P.focus" "$P.kb"; fi
+     fi;;
+   text) [ -n "$f" ] && printf '%s' "$2" >> "$P.$f";;
+   keyevent) case " $* " in *" 67 "*) [ -n "$f" ] && : > "$P.$f";; esac
+     # Tab moves User -> Password (TESTSERIAL002's page ignores Tab: the box must be tapped)
+     case " $* " in *" 61 "*) [ "$f" = user ] && [ "$SERIAL" != TESTSERIAL002 ] && echo pass > "$P.focus";; esac
+     case " $* " in *" 111 "*) rm -f "$P.kb";; esac;;
+  esac
   exit 0
 fi
 case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G"; [ "$ws" = set ] && [ "$3" = 1050 ] && echo both > "$W"; [ "$ws" = both ] && [ "$3" = 650 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; }; [ "$ws" = custom ] && [ "$3" = 1250 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; };; esac; true`);
@@ -99,7 +111,9 @@ W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
 [ "$ws" = set ] && gs=wset; [ "$ws" = both ] && gs=wboth; [ "$ws" = custom ] && gs=wcustom
 P="${join(ROOT, "p-")}$SERIAL"; case "$(cat "$P" 2>/dev/null)" in
  shade) gs=pshade;; open) gs=pform;; err) gs=perr;; esac
-F='<node text="User" class="android.widget.EditText" bounds="[40,600][680,680]" /><node text="" class="android.widget.EditText" password="true" bounds="[40,700][680,780]" /><node text="" content-desc="LOGIN" class="android.widget.Button" bounds="[40,820][680,900]" />'
+K=0; [ -f "$P.kb" ] && K=200; fo=$(cat "$P.focus" 2>/dev/null); ut=$(cat "$P.user" 2>/dev/null); [ -z "$ut" ] && ut=User
+uf=false; [ "$fo" = user ] && uf=true; pf=false; [ "$fo" = pass ] && pf=true
+F="<node text=\\"$ut\\" class=\\"android.widget.EditText\\" focused=\\"$uf\\" bounds=\\"[40,$((600-K))][680,$((680-K))]\\" /><node text=\\"\\" class=\\"android.widget.EditText\\" password=\\"true\\" focused=\\"$pf\\" bounds=\\"[40,$((700-K))][680,$((780-K))]\\" /><node text=\\"\\" content-desc=\\"LOGIN\\" class=\\"android.widget.Button\\" bounds=\\"[40,$((820-K))][680,$((900-K))]\\" />"
 case "$gs" in
  pshade) n='<node text="BPLBHUB#Warehouse5G" bounds="[0,40][720,90]" /><node text="Sign in to Wi-Fi network" bounds="[0,100][720,200]" />';;
  pform) n="$F";;
@@ -450,12 +464,16 @@ console.log("Wi-Fi");
 await page.click("button[data-tab=wifi]");
 await click("wifiScan"); await idle();
 ok((await page.textContent("#wifiScanList")).includes("Guest Room"), "scan lists networks (SSID with a space)");
-await page.fill("#wfSsid", "Flash-BPL"); await page.fill("#wfPass", "pass word1"); await click("wifiAdd");
-ok((await page.textContent("#wifiSaved")).includes("Flash-BPL"), "network saved");
+// a network from the scan: password typed right in its row, saved and connected in one click
+await page.click('#wifiScanList .item:has-text("Flash-BPL") button:has-text("ใส่รหัส")');
+await page.fill('#wifiScanList .item:has-text("Flash-BPL") input', "pass word1");
+await page.click('#wifiScanList .item:has-text("Flash-BPL") button:has-text("บันทึกและเชื่อมต่อ")'); await idle();
+ok((await page.textContent("#wifiSaved")).includes("Flash-BPL"), "network saved from the scan list");
 await page.click("#wifiSaved button.blue"); await idle();
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("connect-network Flash-BPL wpa2 pass word1"), "connect sent with the password");
 ok((await page.textContent("#wifiNow")).includes("ต่ออยู่กับ Flash-BPL"), "status shows the new Wi-Fi");
 // older Android: Wi-Fi commands are root-only, so the Wi-Fi screen is opened and the password typed on request
+await page.click('details.fold:has(#wfSsid) > summary');
 await page.fill("#wfSsid", "OldAndroid"); await page.fill("#wfPass", "abcdefgh"); await click("wifiAdd");
 await page.click('#wifiSaved .item:has-text("OldAndroid") button.blue'); await idle();
 ok(await page.isVisible("#help.info") && (await page.textContent("#help")).includes("แตะเลือก Wi-Fi เอง"), "older Android: guide instead of an error");
@@ -466,6 +484,8 @@ ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("input text abcdefgh")
 console.log("Wi-Fi login page (User / Password): auto picks an account, tries the next when one is refused");
 await page.evaluate(() => { document.getElementById("help").hidden = true; });
 for (const sr of ["TESTSERIAL001", "TESTSERIAL002"]) writeFileSync(join(ROOT, "p-" + sr), "need\n");
+ok(await page.isHidden("#ptUser"), "code add/delete hidden until 'manage codes' is opened");
+await page.click("#ptManage > summary");
 await page.fill("#ptUser", "bad1"); await page.fill("#ptPass", "nope"); await click("portalAdd");
 await page.fill("#ptUser", "hub1"); await page.fill("#ptPass", "goodpass"); await click("portalAdd");
 ok((await page.textContent("#ptList")).includes("hub1") && !(await page.textContent("#ptList")).includes("goodpass"), "login accounts saved, password not shown");
@@ -474,11 +494,13 @@ await page.waitForFunction(() => !document.querySelector(".busy-row"), null, { t
 const pl = await page.textContent("#log");
 ok(pl.includes("ล็อกอิน Wi-Fi สำเร็จ ด้วยรหัส hub1") && pl.includes("รหัส bad1 ใช้ไม่ได้"), "refused account skipped, next account logged in");
 ok(["TESTSERIAL001", "TESTSERIAL002"].some((sr) => readFileSync(join(ROOT, "p-" + sr), "utf8").trim() === "done"), "login page passed on the device");
+ok(["TESTSERIAL001", "TESTSERIAL002"].some((sr) => { try { return readFileSync(join(ROOT, "p-" + sr + ".lastuser"), "utf8") === "hub1"; } catch (e) { return false; } }), "User box holds only the user name even though the keyboard moved the page");
+ok((await page.textContent("#ptToday")).includes("hub1 1 ครั้ง"), "today's count shown next to the button");
 const pt = await page.textContent("#ptList");
 ok(/วันนี้ \d+ ครั้ง · ตั้งแต่ \d\d:\d\d/.test(pt), "account shows today's count and the time it was first used");
 await page.click("#ptList details summary");
 ok((await page.textContent("#ptList")).includes("ไม่ผ่าน 1") || (await page.textContent("#ptList")).includes("ไม่ผ่าน 2"), "day view lists refused tries");
-for (const sr of ["TESTSERIAL001", "TESTSERIAL002"]) rmSync(join(ROOT, "p-" + sr), { force: true });
+for (const sr of ["TESTSERIAL001", "TESTSERIAL002"]) for (const x of ["", ".lastuser"]) rmSync(join(ROOT, "p-" + sr + x), { force: true });
 
 console.log("one-click setup after a reset");
 await page.evaluate(() => { document.getElementById("help").hidden = true; });

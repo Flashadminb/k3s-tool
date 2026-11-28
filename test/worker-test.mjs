@@ -201,6 +201,7 @@ try {
   ok(/[A-Z2-9]{5}-[A-Z2-9]{5}/.test(await page.textContent("#ivOut")), "invite link and code shown after creating");
   // an important setting changed in the page asks for the password (Energy Shield) and then saves
   await page.click("button[data-tab=wifi]");
+  await page.click('details.fold:has(#wfSsid) > summary');
   await page.fill("#wfSsid", "Hub2"); await page.fill("#wfPass", "pass-word-2"); await page.click("button[data-act=wifiAdd]");
   await page.waitForSelector("#vfy:not([hidden])", { timeout: 10000 });
   ok(await page.isVisible("#vfy .shield"), "verification window with the energy shield");

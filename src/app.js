@@ -37,6 +37,7 @@ const HELP = {
   SETTINGS: ["ตั้งค่าบางข้อไม่สำเร็จ", ["ข้อที่ไม่สำเร็จอาจถูกระบบบริษัทล็อกไว้ ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash", "ข้ออื่นที่สำเร็จแล้วใช้งานได้ตามปกติ"]],
   WIFI: ["ต่อ Wi-Fi ไม่สำเร็จ", ["เช็กชื่อ Wi-Fi ให้ตรงตัวพิมพ์เล็ก/ใหญ่ และรหัสผ่านให้ถูก", "เครื่องต้องอยู่ในระยะสัญญาณ (กด ค้นหา ดูว่าเครื่องเห็น Wi-Fi นี้ไหม)", "ถ้าขึ้นว่าไม่อนุญาต / not allowed: ระบบบริษัทล็อกการตั้ง Wi-Fi ห้ามหาทางเลี่ยง ให้แจ้งไอที Flash"]],
   DROPPED: ["เครื่องหลุดการเชื่อมต่อ", ["ถ้าถอดสายเอง: ไม่ต้องทำอะไร เสียบกลับเมื่อไหร่ เว็บจะต่อให้เอง", "ถ้าเครื่องใช้ iLauncher: iLauncher ปิด USB debugging ทันทีที่ออกจากหน้า Settings ให้เข้า Settings > เปิด USB debugging แล้วค้างไว้ที่หน้า Settings ระหว่างใช้เว็บ (อย่ากด Home/Back) · ห้ามหาทางเลี่ยงระบบบริษัท", "ถ้าหลุดเองบ่อยๆ: เปลี่ยนสาย หรือเสียบเข้าคอมตรงๆ"]],
+  PORTAL: ["ล็อกอิน Wi-Fi ไม่สำเร็จ", ["เครื่องต้องต่อ Wi-Fi ตัวที่มีหน้าล็อกอินอยู่ก่อน (ดูแถบแจ้งเตือนว่ามี ลงชื่อเข้าใช้เครือข่าย ไหม)", "หาหน้าล็อกอินไม่เจอ: ลองเปิดหน้าล็อกอินเองที่เครื่อง (แตะแจ้งเตือน หรือแตะใต้ชื่อ Wi-Fi) แล้วกดปุ่มอีกครั้ง เว็บจะใส่รหัสในหน้าที่เปิดอยู่ให้", "รหัสไม่ผ่าน / เกินจำนวน: ตั้งเป็น อัตโนมัติ เว็บจะลองรหัสถัดไปให้ หรือเพิ่มรหัสใหม่ในรายการ", "ระหว่างเว็บพิมพ์ อย่าแตะหน้าจอเครื่อง"]],
   WIFI_MANUAL: ["เครื่องรุ่นนี้ต้องแตะเลือก Wi-Fi เอง 1 ครั้ง", ["Android ของเครื่องนี้ไม่ให้คอมสั่งต่อ Wi-Fi (ใช้ได้กับ Android 12 ขึ้นไป เช่น K3S) ไม่ใช่ระบบบริษัทบล็อก", "เว็บเปิดหน้า Wi-Fi ที่เครื่องให้แล้ว: แตะชื่อ Wi-Fi ที่ต้องการ (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "พอขึ้นช่องใส่รหัส กดปุ่ม พิมพ์รหัส... ด้านล่าง เว็บจะพิมพ์รหัสที่บันทึกไว้และกด Enter ให้", "ไม่อยากจับเครื่อง: ใช้ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกชื่อ Wi-Fi จากคอม"]],
   TYPE: ["ส่งข้อความไม่ได้", ["พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์บนคีย์บอร์ด (ภาษาไทยส่งไม่ได้)", "ที่เครื่องต้องเปิดช่องใส่รหัสค้างไว้ก่อน แล้วค่อยกดส่ง", "ดูหน้าจอเครื่องผ่าน เครื่อง > ดู/คุมหน้าจอสด ได้"]],
   SCREEN: ["จับภาพ/อัดหน้าจอไม่ได้", ["ปลดล็อกหน้าจอเครื่องแล้วลองใหม่", "บางแอปห้ามจับภาพหน้าจอ (จะได้ภาพดำ)", "ถ้ายังไม่ได้ ระบบบริษัทอาจล็อกการจับหน้าจอ ให้แจ้งไอที"]],
@@ -536,7 +537,7 @@ function renderDevices() {
   const tab = document.querySelector(".tabs .on").dataset.tab;
   // In the space layout the empty-state note lives on the stage, so it shows on every tab
   $("nodev").hidden = !!n || (!box.classList.contains("orbit") && !["data", "device", "apps", "setup"].includes(tab));
-  renderWifiSaved();
+  renderWifiSaved(); renderPortal();
 }
 
 /* ---------- Space layout: devices float on orbits around the connect hub ---------- */
@@ -1362,7 +1363,7 @@ async function checkBanned(d) {
    Apps are disabled (pm disable-user), not removed: unlocking brings them back with their data.
    ===================================================================== */
 // never switched off: Flash Kit, scanning, the home screen, keyboard and the services Flash Kit relies on
-const FORCE_KEEP = /flash|scan|barcode|wedge|inputmethod|keyboard|launcher|home|provision|setupwizard|\.gms$|webview|packageinstaller|permissioncontroller|systemui/i;
+const FORCE_KEEP = /captiveportal|flash|scan|barcode|wedge|inputmethod|keyboard|launcher|home|provision|setupwizard|\.gms$|webview|packageinstaller|permissioncontroller|systemui/i;
 // kept by default (Flash Kit may open the camera; calls), can be ticked off
 const DEFAULT_KEEP = /dialer|telecom|\.phone$|camera/i;
 const SETTINGS_PKG = "com.android.settings";
@@ -1663,8 +1664,215 @@ function wifiConnect(w) {
     await new Promise((res) => setTimeout(res, 4000));
     await renderWifiNow();
     if (fails.length) throw new Error("WIFI: " + fails.join(" / "));
+    if (portalAuto()) await portalAfterWifi(ts.filter((d) => !manual.includes(d)));
   }, "WIFI");
 }
+/* =====================================================================
+   Wi-Fi login page (captive portal): some networks open a "Sign in to <Wi-Fi>" page with User / Password / LOGIN.
+   The page opens it on the device (from the notification, else from the Wi-Fi screen), types a saved account and
+   taps LOGIN. Each use is counted per account: how many times, which day, from what time.
+   Works on locked devices too: the login screen is a system app the lock never switches off.
+   ===================================================================== */
+const portalList = () => st.load("portal", []);
+const portalLog = () => st.load("portalLog", []);
+const dayKey = (t) => { const x = new Date(t); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+const hhmm = (t) => new Date(t).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+const P_OPEN = /sign in to (a |the )?(wi-?fi )?network|sign in to|tap here to sign in|ลงชื่อเข้าใช้|ลงชื่อเข้าสู่ระบบ|แตะเพื่อลงชื่อ|แตะที่นี่เพื่อ/i;
+const P_BTN = /^(login|log in|sign in|signin|เข้าสู่ระบบ|ลงชื่อเข้าใช้|ล็อกอิน|connect|เชื่อมต่อ|submit|ตกลง|ok)$/i;
+const P_ERR = /invalid|incorrect|wrong|fail|error|exceed|limit|expired|ไม่ถูกต้อง|ผิดพลาด|ผิด|เกิน|หมดอายุ|ไม่สำเร็จ/i;
+
+/** "portal" = the Wi-Fi wants a login, "ok" = internet works, "none" = no Wi-Fi, "?" = could not tell */
+async function portalState(d) {
+  const t = (await d.sh("dumpsys connectivity 2>/dev/null | grep -E 'NetworkAgentInfo.*(WIFI|wifi)' | head -3")).out;
+  if (!t.trim()) return "?";
+  if (/CAPTIVE_PORTAL/.test(t)) return "portal";
+  if (/VALIDATED/.test(t)) return "ok";
+  return "?";
+}
+async function topActivity(d) {
+  return (await d.sh("dumpsys activity activities 2>/dev/null | grep -m2 -E 'mResumedActivity|ResumedActivity:'")).out;
+}
+const onPortal = async (d) => /captiveportal/i.test(await topActivity(d));
+const portalFields = (nodes) => {
+  const edits = nodes.filter((n) => /EditText/.test(n.cls) && n.w > 0 && n.h > 0).sort((a, b) => a.y - b.y);
+  const pass = edits.find((n) => n.pass) || edits[1];
+  const user = edits.find((n) => n !== pass && n.y < (pass ? pass.y : 1e9)) || (edits.length > 1 ? edits[0] : null);
+  return { user, pass };
+};
+const btnText = (n) => (n.text || n.desc).replace(/[^\p{L}\p{N} ]/gu, "").trim();
+
+/** Bring the login page up on the device. Returns a function that puts back what had to be opened for it */
+async function openPortal(d) {
+  await d.sh("input keyevent 224; wm dismiss-keyguard 2>/dev/null; true");
+  if (await onPortal(d)) return async () => {};
+  // 1. the "Sign in to Wi-Fi network" notification (works with Settings locked)
+  await d.sh("cmd statusbar expand-notifications 2>/dev/null || service call statusbar 1 >/dev/null 2>&1; true");
+  await sleep(1200);
+  let hit = (await readScreen(d)).find((n) => P_OPEN.test(n.text + " " + n.desc) && n.w > 0);
+  if (hit) {
+    await d.sh(`input tap ${hit.x} ${hit.y}`);
+    for (let i = 0; i < 6; i++) { await sleep(1000); if (await onPortal(d)) return async () => {}; }
+  }
+  await d.sh("cmd statusbar collapse 2>/dev/null || service call statusbar 2 >/dev/null 2>&1; true");
+  // 2. the Wi-Fi screen ("Tap here to sign in to network" under the Wi-Fi name); Settings switched off by the lock is
+  //    switched on for this and off again afterwards
+  const settingsOff = /package:com\.android\.settings\s*$/m.test((await d.sh("pm list packages -d 2>/dev/null")).out);
+  if (settingsOff) await d.sh(`pm enable ${SETTINGS_PKG}`);
+  const putBack = async () => { if (settingsOff) await d.sh(`pm disable-user --user 0 ${SETTINGS_PKG}`).catch(() => {}); };
+  await d.sh("am start -a android.settings.WIFI_SETTINGS");
+  for (let i = 0; i < 5; i++) {
+    await sleep(1500);
+    hit = (await readScreen(d)).find((n) => P_OPEN.test(n.text + " " + n.desc) && n.w > 0);
+    if (hit) break;
+  }
+  if (hit) {
+    await d.sh(`input tap ${hit.x} ${hit.y}`);
+    for (let i = 0; i < 8; i++) { await sleep(1000); if (await onPortal(d)) return putBack; }
+  }
+  await d.sh("input keyevent 3");
+  await putBack();
+  throw new Error("PORTAL_NOPAGE");
+}
+
+/** Type one account into the open login page and press LOGIN. Resolves "ok", or throws with what the page said */
+async function portalFill(d, acc) {
+  let f = {}, nodes = [];
+  for (let i = 0; i < 15; i++) {   // the page is a web page: give it time to load
+    nodes = await readScreen(d);
+    f = portalFields(nodes);
+    if (f.user && f.pass) break;
+    await sleep(1000);
+  }
+  if (!f.user || !f.pass) throw new Error("PORTAL_NOFORM");
+  const clear = "input keyevent 123 " + Array(40).fill(67).join(" ");
+  setStatus(d, { title: "ใส่ User", big: "1/3", ring: 33 });
+  await d.sh(`input tap ${f.user.x} ${f.user.y}`); await sleep(500);
+  await d.sh(clear);
+  await d.shOk(`input text ${q(typeable(acc.user))}`);
+  setStatus(d, { title: "ใส่ Password", big: "2/3", ring: 66 });
+  await d.sh(`input tap ${f.pass.x} ${f.pass.y}`); await sleep(500);
+  await d.sh(clear);
+  await d.shOk(`input text ${q(typeable(acc.pass))}`);
+  // close the keyboard (Esc, not Back: Back would close the login page) so LOGIN is not hidden under it
+  await d.sh("input keyevent 111"); await sleep(800);
+  setStatus(d, { title: "กด LOGIN", big: "3/3", ring: 85 });
+  const after = await readScreen(d);
+  const btn = after.filter((n) => P_BTN.test(btnText(n)) && n.w > 0 && n.y > f.pass.y).sort((a, b) => a.y - b.y)[0];
+  if (btn) await d.sh(`input tap ${btn.x} ${btn.y}`);
+  else { await d.sh(`input tap ${f.pass.x} ${f.pass.y}`); await sleep(300); await d.sh("input keyevent 66"); }
+  // done when Android sees the internet (or the login page closes by itself); an error on the page means a bad account
+  for (let i = 0; i < 20; i++) {
+    await sleep(1500);
+    if ((await portalState(d)) === "ok") return "ok";
+    if (!(await onPortal(d))) return "ok";
+    const s = await readScreen(d);
+    const msg = s.map((n) => n.text).find((t) => t && t.length < 120 && P_ERR.test(t) && !/^(password|user)/i.test(t));
+    if (msg) throw new Error("PORTAL_BAD:" + msg);
+  }
+  throw new Error("PORTAL_BAD:กด LOGIN แล้ว แต่หน้าล็อกอินยังไม่ผ่าน");
+}
+
+function portalRecord(acc, d, ok, why) {
+  const l = portalLog();
+  l.push({ u: acc.user, s: d.serial, n: shortName(d), t: Date.now(), ok, why: why || "" });
+  st.save("portalLog", l.slice(-3000));
+}
+/** Accounts in the order to try: the chosen one, or (auto) the least used today first */
+function portalOrder(choice, taken) {
+  const list = portalList();
+  if (choice !== "auto") return list.filter((a) => a.user === choice);
+  const today = dayKey(Date.now());
+  const used = (u) => portalLog().filter((x) => x.u === u && x.ok && dayKey(x.t) === today).length + (taken.get(u) || 0);
+  return [...list].sort((a, b) => used(a.user) - used(b.user));
+}
+async function portalLogin(d, choice, taken) {
+  const order = portalOrder(choice, taken);
+  if (!order.length) throw new Error("PORTAL_NOACC");
+  taken.set(order[0].user, (taken.get(order[0].user) || 0) + 1);   // spread a group over the accounts
+  if ((await portalState(d)) === "ok") return { skipped: true };
+  setStatus(d, { title: "เปิดหน้าล็อกอิน Wi-Fi", big: "…", ring: 10 });
+  const putBack = await openPortal(d);
+  try {
+    let last;
+    for (const acc of order) {
+      try {
+        await portalFill(d, acc);
+        portalRecord(acc, d, true);
+        await d.sh("input keyevent 3");
+        return { acc };
+      } catch (e) {
+        last = e;
+        if (!/^PORTAL_BAD:/.test(e.message)) throw e;
+        portalRecord(acc, d, false, e.message.slice(11));
+        log(`${label(d)}: รหัส ${acc.user} ใช้ไม่ได้ (${e.message.slice(11)})${choice === "auto" && acc !== order[order.length - 1] ? " ลองรหัสถัดไป" : ""}`);
+        if (choice !== "auto") break;
+        if (!(await onPortal(d))) await openPortal(d);
+      }
+    }
+    throw last;
+  } finally { await putBack(); }
+}
+/** Log in every target device; quiet = called after connecting Wi-Fi (no questions, devices without a login page skipped) */
+async function portalRun(ts, quiet) {
+  const choice = $("ptUse") ? $("ptUse").value : "auto";
+  if (!portalList().length) { if (!quiet) throw new Error("PORTAL_NOACC"); return; }
+  const taken = new Map(), fails = [];
+  await Promise.all(ts.map(async (d) => {
+    try {
+      if (quiet && (await portalState(d)) !== "portal") return;
+      const r = await portalLogin(d, choice, taken);
+      if (r.skipped) { log(`${label(d)}: เน็ตใช้ได้อยู่แล้ว ไม่ต้องใส่รหัส Wi-Fi`); setStatus(d, { title: "เน็ตใช้ได้แล้ว", big: "✓", ring: 100, done: true }); return; }
+      log(`${label(d)}: ล็อกอิน Wi-Fi สำเร็จ ด้วยรหัส ${r.acc.user}`);
+      setStatus(d, { title: "ล็อกอิน Wi-Fi แล้ว", big: "✓", ring: 100, done: true });
+    } catch (e) {
+      const m = e.message.replace(/^PORTAL_BAD:/, "");
+      fails.push(`${label(d)}: ${{ PORTAL_NOPAGE: "หาหน้าล็อกอินไม่เจอ", PORTAL_NOFORM: "หน้าล็อกอินไม่มีช่อง User/Password", PORTAL_NOACC: "ยังไม่มีรหัสในรายการ" }[m] || m}`);
+      setStatus(d, { title: "ล็อกอิน Wi-Fi ไม่สำเร็จ", err: true, done: true });
+    }
+  }));
+  renderPortal();
+  if (fails.length) throw new Error(fails.join("\n"));
+}
+const portalAuto = () => !!st.load("portalAuto", true) && portalList().length > 0;
+/** After connecting Wi-Fi: devices that landed on a login page get logged in (others are left alone) */
+async function portalAfterWifi(ts) {
+  if (!ts.length) return;
+  try { await portalRun(ts, true); } catch (e) { log("ล็อกอิน Wi-Fi บางเครื่องไม่สำเร็จ: " + e.message.replace(/\n/g, " / ")); }
+}
+function renderPortal() {
+  const box = $("ptList");
+  if (!box) return;
+  const list = portalList(), lg = portalLog(), today = dayKey(Date.now());
+  const sel = $("ptUse"), was = sel.value;
+  sel.replaceChildren(el("option", { value: "auto", text: "อัตโนมัติ (ใช้รหัสที่วันนี้ใช้น้อยสุด ไม่ผ่านลองรหัสถัดไป)" }), ...list.map((a) => el("option", { value: a.user, text: a.user })));
+  sel.value = [...sel.options].some((o) => o.value === was) ? was : "auto";
+  $("ptAuto").checked = !!st.load("portalAuto", true);
+  if (!list.length) { box.replaceChildren(el("div", { class: "item mut", text: "ยังไม่มีรหัส เพิ่มได้ด้านล่าง" })); return; }
+  box.replaceChildren(...list.map((a, i) => {
+    const mine = lg.filter((x) => x.u === a.user);
+    const ok = mine.filter((x) => x.ok), td = ok.filter((x) => dayKey(x.t) === today);
+    const days = [...new Set(mine.map((x) => dayKey(x.t)))].sort().reverse().slice(0, 14);
+    const sum = td.length ? `วันนี้ ${td.length} ครั้ง · ตั้งแต่ ${hhmm(td[0].t)} ถึง ${hhmm(td[td.length - 1].t)}` : "วันนี้ยังไม่ได้ใช้";
+    return el("div", { class: "item", style: "display:block" },
+      el("div", { class: "row", style: "justify-content:space-between" },
+        el("div", { class: "nm" }, a.user, el("small", { text: `${sum} · รวม ${ok.length} ครั้ง` })),
+        el("div", { class: "row" },
+          el("button", { class: "blue need-dev", text: "ใช้รหัสนี้", onclick: () => { $("ptUse").value = a.user; actions.portalLogin(); } }),
+          el("button", { class: "red admin-only", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบรหัส ${a.user}? (ประวัติการใช้ยังเก็บไว้)`)) { const l = portalList(); l.splice(i, 1); st.save("portal", l); renderPortal(); } } }))),
+      days.length ? el("details", { style: "margin-top:6px" }, el("summary", { class: "mut", text: "ดูรายวัน" }),
+        ...days.map((k) => {
+          const dd = mine.filter((x) => dayKey(x.t) === k), good = dd.filter((x) => x.ok), bad = dd.length - good.length;
+          const [y, m, dn] = k.split("-");
+          return el("div", { class: "mut", style: "padding:3px 0" },
+            el("b", { text: `${dn}/${m}/${+y + 543}: ${good.length} ครั้ง` }),
+            good.length ? ` · ${hhmm(good[0].t)} ถึง ${hhmm(good[good.length - 1].t)}` : "",
+            bad ? ` · ไม่ผ่าน ${bad}` : "",
+            ` · เครื่อง: ${[...new Set(dd.map((x) => x.n))].join(", ")}`);
+        })) : null);
+  }));
+  box.querySelectorAll(".need-dev").forEach((e) => (e.hidden = !all().length));
+}
+
 /*
  * One click for a device that was reset (or is new): Flash Kit, standard settings, the first saved Wi-Fi, field lock.
  * Flash Kit goes first on its own (it needs the download); the rest runs on every device side by side.
@@ -1703,6 +1911,7 @@ async function setupAll() {
       } catch (e) { fails.push(`${label(d)}: ${e.message}`); setStatus(d, { title: "ตั้งไม่ครบ", err: true, done: true }); }
     }));
     renderAll();
+    if (w && portalAuto()) { await sleep(4000); await portalAfterWifi(ts.filter((d) => !manual.includes(d))); }
     if (manual.length) {
       // older Android: Wi-Fi only from the device screen; open it there and offer to type the password
       for (const d of manual) await d.sh("input keyevent 224; am start -a android.settings.WIFI_SETTINGS");
@@ -2159,6 +2368,22 @@ const actions = {
     $("typeText").value = "";
   }, "TYPE"),
   wifiStatus: () => run("เช็ก Wi-Fi", renderWifiNow, "WIFI"),
+  portalLogin: () => run("ล็อกอิน Wi-Fi", async () => {
+    const ts = targets();
+    if (!portalList().length) { showHelp("PORTAL", "ยังไม่มีรหัส: เพิ่ม User / Password ในการ์ด ล็อกอิน Wi-Fi ก่อน"); return false; }
+    if (!(await kioskOk(ts, "การเปิดหน้าล็อกอิน Wi-Fi"))) return false;
+    if (ts.length > 1 && !(await confirmBox(`ใส่รหัสล็อกอิน Wi-Fi ให้ ${ts.length} เครื่อง?\nระหว่างนี้อย่าแตะหน้าจอเครื่อง`))) return false;
+    await portalRun(ts, false);
+  }, "PORTAL"),
+  portalAdd: () => {
+    const user = $("ptUser").value.trim(), pass = $("ptPass").value;
+    if (!user || !pass) { (user ? $("ptPass") : $("ptUser")).focus(); return; }
+    if (/[^\x20-\x7e]/.test(user + pass)) { showHelp("TYPE"); return; }
+    const l = portalList().filter((a) => a.user !== user);
+    l.push({ user, pass });
+    st.save("portal", l); $("ptUser").value = ""; $("ptPass").value = "";
+    renderPortal(); log(`บันทึกรหัสล็อกอิน Wi-Fi ${user} แล้ว`);
+  },
   wifiAdd: () => {
     const ssid = $("wfSsid").value.trim(), pass = $("wfPass").value, sec = $("wfSec").value;
     if (!ssid) { $("wfSsid").focus(); return; }
@@ -2591,12 +2816,14 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("autoEvery").value = String(auto.every); $("autoPct").value = String(auto.pct);
   $("autoEvery").addEventListener("change", (e) => { auto.every = +e.target.value; scheduleAuto(); log(auto.every ? `เปิดลบอัตโนมัติทุก ${auto.every} นาที` : "ปิดลบอัตโนมัติ"); });
   $("autoPct").addEventListener("change", (e) => { auto.pct = +e.target.value; scheduleAuto(); });
+  $("ptAuto").addEventListener("change", (e) => st.save("portalAuto", e.target.checked));
+  $("ptShow").addEventListener("change", (e) => ($("ptPass").type = e.target.checked ? "text" : "password"));
   if (auto.every) scheduleAuto(); else renderAuto();
   setInterval(autoTick, 30000);
   setInterval(pollAll, 15000);
   window.addEventListener("beforeunload", (e) => { if (auto.every && all().length) { e.preventDefault(); e.returnValue = ""; } });
 
-  loadStdForm(); loadBannedText(); loadFlashForm(); renderWifiSaved();
+  loadStdForm(); loadBannedText(); loadFlashForm(); renderWifiSaved(); renderPortal();
   // full Settings off and "Settings off except Wi-Fi" are alternatives: ticking one clears the other
   if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked, settingsWifi: e.target.checked ? false : lockCfg().settingsWifi }); renderLock(devices.get(selected)); });
   if ($("lockSettingsWifi")) $("lockSettingsWifi").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settingsWifi: e.target.checked, settings: e.target.checked ? false : lockCfg().settings }); renderLock(devices.get(selected)); });

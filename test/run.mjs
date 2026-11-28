@@ -34,7 +34,8 @@ stub("df", `if [ "$SERIAL" = TESTSERIAL003 ]; then [ "$1" = -k ] && { echo "df: 
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
  package) if [ "$2" = com.oem.home ]; then echo "        android.intent.category.HOME"; elif [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
- activity) [ -f "${join(ROOT, "w-")}$SERIAL" ] && echo "  mResumedActivity: ActivityRecord{1 u0 com.android.wallpaper/.CropActivity t5}" || echo "  mResumedActivity: ActivityRecord{2 u0 com.android.launcher3/.Launcher t1}";;
+ connectivity) P="${join(ROOT, "p-")}$SERIAL"; ps=$(cat "$P" 2>/dev/null); [ -z "$ps" ] && exit 0; [ "$ps" = done ] && echo "  NetworkAgentInfo{ ni{[type: WIFI[]]} Capabilities: INTERNET&NOT_RESTRICTED&VALIDATED}" || echo "  NetworkAgentInfo{ ni{[type: WIFI[]]} Capabilities: INTERNET&NOT_RESTRICTED&CAPTIVE_PORTAL}";;
+ activity) case "$(cat "${join(ROOT, "p-")}$SERIAL" 2>/dev/null)" in open|err) echo "  mResumedActivity: ActivityRecord{3 u0 com.android.captiveportallogin/.CaptivePortalLoginActivity t9}"; exit 0;; esac; [ -f "${join(ROOT, "w-")}$SERIAL" ] && echo "  mResumedActivity: ActivityRecord{1 u0 com.android.wallpaper/.CropActivity t5}" || echo "  mResumedActivity: ActivityRecord{2 u0 com.android.launcher3/.Launcher t1}";;
  account) [ "$(cat "${join(ROOT, "g-")}$SERIAL" 2>/dev/null)" = done ] && echo "  Account {name=hub@example.com, type=com.google}";;
  device_policy) echo "  Device Owner: admin=ComponentInfo{com.mdm.agent/com.mdm.agent.Admin} package=com.mdm.agent";;
  power) [ -f "${join(ROOT, "awake-")}$SERIAL" ] && echo "  mWakefulness=Awake" || echo "  mWakefulness=Asleep";;
@@ -59,6 +60,7 @@ if [ "$2" = query-activities ]; then
   case "$*" in *category.HOME*) echo "com.oem.home/.Home"; exit 0;; esac
   for p in com.flashexpress.kit jp.naver.line.android com.android.chrome com.android.settings; do grep -qx "$p" "$PMSTATE.dis" 2>/dev/null || echo "$p/.Main"; done
 fi
+if [ "$1" = statusbar ]; then P="${join(ROOT, "p-")}$SERIAL"; [ "$2" = expand-notifications ] && [ "$(cat "$P" 2>/dev/null)" = need ] && echo shade > "$P"; [ "$2" = collapse ] && [ "$(cat "$P" 2>/dev/null)" = shade ] && echo need > "$P"; exit 0; fi
 if [ "$1" = wifi ]; then
   echo "cmd $*" >> "${join(ROOT, "calls.log")}"
   W="${join(ROOT, "wifi-")}$SERIAL"
@@ -83,12 +85,25 @@ esac`);
 stub("input", `echo "input $*" >> "${join(ROOT, "calls.log")}"; [ "$2" = 224 ] && touch "${join(ROOT, "awake-")}$SERIAL"
 G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null)
 W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
+P="${join(ROOT, "p-")}$SERIAL"; ps=$(cat "$P" 2>/dev/null)
+if [ -n "$ps" ] && [ "$ps" != done ]; then
+  [ "$1" = text ] && echo "$2" >> "$P.typed"
+  [ "$1" = tap ] && [ "$ps" = shade ] && [ "$3" = 150 ] && echo open > "$P"
+  [ "$1" = tap ] && [ "$3" = 860 ] && { grep -qx goodpass "$P.typed" && echo done > "$P" || echo err > "$P"; rm -f "$P.typed"; }
+  exit 0
+fi
 case "$1" in text) case "$2" in *@*) echo pass > "$G";; *) [ "$gs" = pass ] && echo agree > "$G";; esac;; tap) [ "$gs" = agree ] && [ "$2" = 200 ] && echo done > "$G"; [ "$ws" = set ] && [ "$3" = 1050 ] && echo both > "$W"; [ "$ws" = both ] && [ "$3" = 650 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; }; [ "$ws" = custom ] && [ "$3" = 1250 ] && { rm -f "$W"; echo "$SERIAL" >> "${join(ROOT, "wall-done")}"; };; esac; true`);
 // Google sign-in screens as uiautomator sees them: email field, then password field, then "I agree"
 stub("uiautomator", `G="${join(ROOT, "g-")}$SERIAL"; gs=$(cat "$G" 2>/dev/null || echo email)
 W="${join(ROOT, "w-")}$SERIAL"; ws=$(cat "$W" 2>/dev/null)
 [ "$ws" = set ] && gs=wset; [ "$ws" = both ] && gs=wboth; [ "$ws" = custom ] && gs=wcustom
+P="${join(ROOT, "p-")}$SERIAL"; case "$(cat "$P" 2>/dev/null)" in
+ shade) gs=pshade;; open) gs=pform;; err) gs=perr;; esac
+F='<node text="User" class="android.widget.EditText" bounds="[40,600][680,680]" /><node text="" class="android.widget.EditText" password="true" bounds="[40,700][680,780]" /><node text="" content-desc="LOGIN" class="android.widget.Button" bounds="[40,820][680,900]" />'
 case "$gs" in
+ pshade) n='<node text="BPLBHUB#Warehouse5G" bounds="[0,40][720,90]" /><node text="Sign in to Wi-Fi network" bounds="[0,100][720,200]" />';;
+ pform) n="$F";;
+ perr) n="$F"'<node text="Invalid password" bounds="[40,500][680,560]" />';;
  wcustom) n='<node text="Preview" bounds="[0,100][720,1100]" /><node text="Apply now" class="android.widget.Button" bounds="[100,1200][600,1300]" />';;
  wset) n='<node text="" content-desc="Set wallpaper" class="android.widget.Button" bounds="[100,1000][600,1100]" />';;
  wboth) n='<node text="Home screen" bounds="[100,400][600,500]" /><node text="Lock screen" bounds="[100,500][600,600]" /><node text="Home and lock screens" bounds="[100,600][600,700]" />';;
@@ -98,6 +113,7 @@ case "$gs" in
  *) n='<node text="Accounts" class="android.widget.TextView" bounds="[0,0][720,100]" />';;
 esac
 printf '<?xml version="1.0"?><hierarchy rotation="0">%s</hierarchy>' "$n" > "$2"`);
+stub("service", `P="${join(ROOT, "p-")}$SERIAL"; [ "$*" = "call statusbar 1" ] && [ "$(cat "$P" 2>/dev/null)" = need ] && echo shade > "$P"; true`);
 stub("content", `echo "Row: 0 _id=42"`);
 stub("logcat", `echo "11-27 10:00:00.000 I/Test: hello"`);
 // 1x1 png
@@ -446,6 +462,23 @@ ok(await page.isVisible("#help.info") && (await page.textContent("#help")).inclu
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("android.settings.WIFI_SETTINGS"), "device Wi-Fi screen opened");
 await page.click('#help button:has-text("พิมพ์รหัส")'); await idle();
 ok(readFileSync(join(ROOT, "calls.log"), "utf8").includes("input text abcdefgh"), "saved password typed into the device");
+
+console.log("Wi-Fi login page (User / Password): auto picks an account, tries the next when one is refused");
+await page.evaluate(() => { document.getElementById("help").hidden = true; });
+for (const sr of ["TESTSERIAL001", "TESTSERIAL002"]) writeFileSync(join(ROOT, "p-" + sr), "need\n");
+await page.fill("#ptUser", "bad1"); await page.fill("#ptPass", "nope"); await click("portalAdd");
+await page.fill("#ptUser", "hub1"); await page.fill("#ptPass", "goodpass"); await click("portalAdd");
+ok((await page.textContent("#ptList")).includes("hub1") && !(await page.textContent("#ptList")).includes("goodpass"), "login accounts saved, password not shown");
+await click("portalLogin");
+await page.waitForFunction(() => !document.querySelector(".busy-row"), null, { timeout: 60000 }).catch(() => {}); await idle();
+const pl = await page.textContent("#log");
+ok(pl.includes("ล็อกอิน Wi-Fi สำเร็จ ด้วยรหัส hub1") && pl.includes("รหัส bad1 ใช้ไม่ได้"), "refused account skipped, next account logged in");
+ok(["TESTSERIAL001", "TESTSERIAL002"].some((sr) => readFileSync(join(ROOT, "p-" + sr), "utf8").trim() === "done"), "login page passed on the device");
+const pt = await page.textContent("#ptList");
+ok(/วันนี้ \d+ ครั้ง · ตั้งแต่ \d\d:\d\d/.test(pt), "account shows today's count and the time it was first used");
+await page.click("#ptList details summary");
+ok((await page.textContent("#ptList")).includes("ไม่ผ่าน 1") || (await page.textContent("#ptList")).includes("ไม่ผ่าน 2"), "day view lists refused tries");
+for (const sr of ["TESTSERIAL001", "TESTSERIAL002"]) rmSync(join(ROOT, "p-" + sr), { force: true });
 
 console.log("one-click setup after a reset");
 await page.evaluate(() => { document.getElementById("help").hidden = true; });

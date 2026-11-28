@@ -228,7 +228,7 @@ button:disabled{opacity:.45;cursor:wait}
 label{display:flex;gap:8px;align-items:center}
 input[type=checkbox]{width:22px;height:22px;accent-color:var(--gold)}
 input[type=range]{accent-color:var(--gold)}
-select,input[type=text],input[type=number],textarea{font:inherit;color:var(--tx);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(5,7,13,.6)}
+select,input[type=text],input[type=password],input[type=number],textarea{font:inherit;color:var(--tx);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(5,7,13,.6)}
 textarea{width:100%;min-height:120px;font:15px/1.5 ui-monospace,Consolas,monospace}
 code{background:rgba(227,180,106,.12);color:var(--gold-hi);padding:2px 8px;border-radius:6px;font-size:15px}
 .kbd{display:inline-block;background:#1f2638;border:1px solid var(--line);color:#fff;padding:2px 8px;border-radius:6px;font-size:14px}
@@ -626,6 +626,24 @@ body:not(.role-admin) .owner-only{display:none!important}
       <div class="row end" style="margin-top:10px"><button class="admin-only blue" data-act="wifiAdd">บันทึก</button></div>
       <div class="warnbox admin-only" id="wifiNote">รหัสเก็บไว้ในเบราว์เซอร์ของคอมเครื่องนี้เท่านั้น ไม่ได้ส่งไปที่ไหน แต่ไม่ได้เข้ารหัส อย่าบันทึกบนคอมที่คนอื่นใช้ร่วม</div>
     </div>
+    <div class="card" id="portalCard">
+      <h2>ล็อกอิน Wi-Fi (หน้า User / Password)</h2>
+      <div class="mut">Wi-Fi บางตัวต่อแล้วต้องใส่ User / Password อีกชั้น เว็บเปิดหน้านั้นที่เครื่อง ใส่รหัสและกด LOGIN ให้ ทำได้ทั้งเครื่องที่ล็อกออกงานแล้วและยังไม่ล็อก · ระหว่างนี้อย่าแตะหน้าจอเครื่อง</div>
+      <div class="row need-dev" style="margin-top:10px">
+        <select id="ptUse" style="flex:1;min-width:200px"><option value="auto">อัตโนมัติ</option></select>
+        <button class="blue" data-act="portalLogin">ใส่รหัสให้เครื่อง</button>
+      </div>
+      <label style="display:block;margin-top:8px"><input type="checkbox" id="ptAuto" checked> ใส่ให้เองหลังกด เชื่อมต่อ Wi-Fi และตอน ตั้งเครื่องใหม่ทั้งหมด (เฉพาะเครื่องที่ขึ้นหน้าล็อกอิน)</label>
+      <h3>รหัสที่บันทึกไว้ และจำนวนครั้งที่ใช้</h3>
+      <div class="list" id="ptList"></div>
+      <h3 class="admin-only">เพิ่มรหัส</h3>
+      <div class="admin-only" style="display:grid;gap:8px">
+        <input type="text" id="ptUser" autocomplete="off" placeholder="User">
+        <div class="row"><input type="password" id="ptPass" autocomplete="new-password" placeholder="Password" style="flex:1;min-width:160px"><label><input type="checkbox" id="ptShow"> แสดง</label></div>
+      </div>
+      <div class="row end admin-only" style="margin-top:10px"><button class="blue" data-act="portalAdd">บันทึกรหัส</button></div>
+      <div class="mut" style="margin-top:6px">จำนวนครั้งนับจากคอมเครื่องนี้ · รหัสเก็บไว้ในเบราว์เซอร์ ไม่อยู่ในโค้ดเว็บ</div>
+    </div>
     <div class="card need-dev">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">Wi-Fi ที่เครื่องเห็น</h2><button data-act="wifiScan">ค้นหา</button></div>
       <div class="mut">ค้นหาจากเครื่องที่เลือก กดชื่อเพื่อเอาไปใส่ช่องเพิ่ม Wi-Fi</div>
@@ -779,6 +797,12 @@ body:not(.role-admin) .owner-only{display:none!important}
 <div class="step"><div class="n">1</div><div class="t">ถ้าเว็บโหลดเองไม่ได้: Chrome จะเปิดแท็บโหลดไฟล์ รอโหลดเสร็จแล้วกด <b>ยืนยัน</b> แล้วเลือกไฟล์ <b>.apk</b> ที่ใหม่สุดใน Downloads</div></div>
 <div class="step"><div class="n">2</div><div class="t">ครั้งต่อไปไม่ต้องโหลดซ้ำ: เลือก <b>ใช้ไฟล์ที่เก็บไว้</b><small>ดูวันที่โหลดล่าสุดได้ที่ ตั้งค่า &gt; Flash Kit</small></div></div>
 <div class="step"><div class="n">3</div><div class="t">ทางสำรอง: ตั้งค่า &gt; Flash Kit &gt; <b>เลือกไฟล์ .apk ในคอม</b></div></div>
+</details>
+<details class="card sym"><summary>ต่อ Wi-Fi แล้วต้องใส่ User / Password อีกชั้น</summary>
+<div class="step"><div class="n">1</div><div class="t">แท็บ <b>Wi-Fi</b> &gt; การ์ด <b>ล็อกอิน Wi-Fi</b>: เพิ่ม User / Password ไว้ (เพิ่มได้หลายชุด)</div></div>
+<div class="step"><div class="n">2</div><div class="t">เลือกเครื่องหรือทั้งกลุ่ม แล้วกด <b>ใส่รหัสให้เครื่อง</b><small>เลือก อัตโนมัติ: เว็บใช้รหัสที่วันนี้ใช้น้อยสุด ถ้าไม่ผ่านจะลองรหัสถัดไปให้</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">แต่ละรหัสบอกว่าวันนี้ใช้ไปกี่ครั้ง ตั้งแต่กี่โมง และกด <b>ดูรายวัน</b> เพื่อดูย้อนหลังว่าใช้กับเครื่องไหน</div></div>
+<div class="step"><div class="n">4</div><div class="t">ถ้าเว็บหาหน้าล็อกอินไม่เจอ: เปิดหน้าล็อกอินเองที่เครื่องก่อน (แตะแจ้งเตือน หรือแตะใต้ชื่อ Wi-Fi) แล้วกดปุ่มอีกครั้ง</div></div>
 </details>
 <details class="card sym"><summary>ต่อ Wi-Fi ไม่ได้</summary>
 <div class="step"><div class="n">1</div><div class="t">เครื่อง Android รุ่นเก่า (11 ลงไป) ต่อ Wi-Fi จากคอมโดยตรงไม่ได้: เว็บจะเปิดหน้า Wi-Fi ที่เครื่องให้ แตะชื่อ Wi-Fi แล้วกด <b>พิมพ์รหัสเข้าเครื่อง</b> ในเว็บ</div></div>

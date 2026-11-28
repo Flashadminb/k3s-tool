@@ -354,18 +354,19 @@ ok(await page.isVisible(".sat-tag.lock"), "device circle tagged as locked");
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); localStorage.removeItem("k3s-tool:fieldLock"); });
 await click("lockRelease"); await idle();
 ok(dis().trim() === "", "unlock from a different browser: every app back on (list read from the device)");
-// "ปิด Settings" on Android 7+: closed screen by screen, the start-up screen kept (the whole app off made phones slow to start)
+// "ปิด Settings": the whole app off (Android refuses closing single screens over ADB); a restart then stays on the
+// start-up screen until the device is plugged in and unlocked, which the hub wants
 const comp = () => (existsSync(join(ROOT, "pm-TESTSERIAL001.comp")) ? readFileSync(join(ROOT, "pm-TESTSERIAL001.comp"), "utf8") : "");
 await page.check("#lockSettings");
 await click("lockApply"); await accept(); await idle();
-const c1 = comp();
-ok(c1.includes("com.android.settings/.Settings\n") && c1.includes(".SubSettings") && c1.includes("AppInfoActivity") && c1.includes("WifiSettingsActivity"), "Settings screens switched off, Wi-Fi ones too");
-ok(!c1.includes("FallbackHome") && !c1.includes("Receiver"), "start-up screen and non-screens kept");
-ok(!dis().includes("com.android.settings"), "Settings app itself stays on (phone starts normally)");
-ok(dis().includes("jp.naver.line.android"), "apps locked as usual");
+ok(dis().includes("com.android.settings") && dis().includes("jp.naver.line.android"), "Settings app switched off with the other apps");
+ok(comp().trim() === "", "no single-screen changes");
+// a device locked by the short-lived screen-by-screen version: its leftover list is switched back on at unlock
+writeFileSync(join(TMP, "idata-tools-settings.txt"), "com.android.settings/.SubSettings\n");
+writeFileSync(join(ROOT, "pm-TESTSERIAL001.comp"), "com.android.settings/.SubSettings\n");
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); });
 await click("lockRelease"); await idle();
-ok(comp().trim() === "" && dis().trim() === "", "unlock: Settings screens and apps all back");
+ok(comp().trim() === "" && dis().trim() === "", "unlock: Settings, apps and leftover screens all back");
 await page.uncheck("#lockSettings");
 // device locked, then factory reset (all apps back on, lock list on the device gone), then plugged in again
 await click("lockApply"); await accept(); await idle();

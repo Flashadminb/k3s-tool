@@ -33,7 +33,7 @@ stub("xargs", `[ "$SERIAL" = TESTSERIAL003 ] && { echo "sh: xargs: not found" >&
 stub("df", `if [ "$SERIAL" = TESTSERIAL003 ]; then [ "$1" = -k ] && { echo "df: Unknown option 'k'" >&2; exit 1; }; printf 'Filesystem               Size     Used     Free   Blksize\n%s     11.6G     2.1G     9.5G   4096\n' "$1"; else exec /usr/bin/df "$@"; fi`);
 stub("dumpsys", `case "$1" in
  battery) printf '  AC powered: false\\n  USB powered: true\\n  status: 2\\n  health: 2\\n  level: 76\\n  temperature: 312\\n';;
- package) if [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
+ package) if [ "$2" = com.oem.home ]; then echo "        android.intent.category.HOME"; elif [ "$2" = com.android.settings ]; then printf 'Activity Resolver Table:\\n  Non-Data Actions:\\n      android.intent.action.MAIN:\\n        abc com.android.settings/.Settings filter\\n        abd com.android.settings/.Settings$WifiSettingsActivity filter\\n        abe com.android.settings/.network.NetworkProviderSettings filter\\n        abf com.android.settings/.FallbackHome filter\\n        abg com.android.settings/.SubSettings filter\\n        abh com.android.settings/.Settings$AppInfoActivity filter\\n\\nReceiver Resolver Table:\\n        abi com.android.settings/.SomeReceiver filter\\n'; else echo "    versionName=1.2.$RANDOM"; fi;;
  activity) [ -f "${join(ROOT, "w-")}$SERIAL" ] && echo "  mResumedActivity: ActivityRecord{1 u0 com.android.wallpaper/.CropActivity t5}" || echo "  mResumedActivity: ActivityRecord{2 u0 com.android.launcher3/.Launcher t1}";;
  account) [ "$(cat "${join(ROOT, "g-")}$SERIAL" 2>/dev/null)" = done ] && echo "  Account {name=hub@example.com, type=com.google}";;
  device_policy) echo "  Device Owner: admin=ComponentInfo{com.mdm.agent/com.mdm.agent.Admin} package=com.mdm.agent";;
@@ -338,6 +338,17 @@ ok((await page.textContent("#log")).includes("อาจถูกรีเซ็�
 ok((await page.textContent(".satw")).includes("หลุดล็อก"), "circle tagged as lock lost");
 await page.evaluate(() => { document.getElementById("help").hidden = true; });
 await page.click("button[data-tab=apps]");
+
+console.log("home app switched off by an older version is switched back on at connect");
+writeFileSync(join(ROOT, "pm-TESTSERIAL001.dis"), "com.oem.home\n");
+writeFileSync(join(TMP, "idata-tools-locked.txt"), "com.oem.home\n");
+await page.click("button[data-tab=device]"); await click("reboot"); await accept(); await idle();
+await page.waitForFunction(() => !document.querySelector("#devices .satw"), null, { timeout: 10000 });
+await page.evaluate(() => { window.__pick = "TESTSERIAL001"; });
+await click("connect"); await idle();
+await page.waitForFunction(() => document.getElementById("log").textContent.includes("แอปหน้าหลักถูกปิดอยู่"), null, { timeout: 20000 }).catch(() => {});
+ok(!readFileSync(join(ROOT, "pm-TESTSERIAL001.dis"), "utf8").includes("com.oem.home") && (await page.textContent("#log")).includes("เปิดคืนให้แล้ว"), "disabled home app switched back on when the device connects");
+await page.evaluate(() => { document.getElementById("help").hidden = true; });
 
 console.log("settings");
 await page.click("button[data-tab=setup]");

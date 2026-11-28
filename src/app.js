@@ -43,6 +43,7 @@ const HELP = {
   WALL_TAP: ["เครื่องนี้ต้องกดยืนยันที่เครื่อง 1 ครั้ง (ครั้งแรกของรุ่นนี้)", ["หน้าตั้งวอลเปเปอร์ของรุ่นนี้เว็บยังไม่รู้จัก: แตะที่เครื่องตามปกติ เว็บจะดูแล้วจำไว้ ครั้งหน้ากดเองทุกเครื่องรุ่นนี้","ที่หน้าจอเครื่อง จะขึ้นหน้าตั้งวอลเปเปอร์พร้อมรูปที่เลือก (ถ้าเครื่องล็อกอยู่ ให้ปลดล็อกก่อน)", "กด ตั้งวอลเปเปอร์ (Set wallpaper)", "เลือก หน้าจอหลักและหน้าจอล็อก (Home and lock screens)", "ถ้าไม่อยากจับเครื่อง: แท็บ เครื่อง > ดู/คุมหน้าจอสด แล้วคลิกจากคอมแทนได้", "ถ้าเครื่องถามว่าจะเปิดด้วยแอปไหน ให้เลือก วอลเปเปอร์ หรือ Wallpaper"]],
   FLASH_DL: ["โหลด Flash Kit อัตโนมัติไม่สำเร็จ", ["ตรวจว่าคอมต่อเน็ตอยู่ และลิงก์ใน ตั้งค่า > Flash Kit ถูกต้อง", "ถ้าเว็บให้เลือกไฟล์: คลิกไฟล์ Flash Kit .apk ที่ใหม่สุดในโฟลเดอร์ Downloads แล้วกด Open", "ทางสำรอง: กดปุ่ม Flash Kit มุมขวาบนเพื่อโหลดเอง แล้วใช้ เครื่อง > ติดตั้ง / อัปเดต APK"]],
   DEV_BUSY: ["เครื่องนี้กำลังทำงานอื่นอยู่", ["รอให้งานเดิมเสร็จก่อน (ดูแถบด้านล่างจอ)", "ระหว่างนี้สั่งงานเครื่องอื่นได้ตามปกติ: คลิกดาวเครื่องอื่นก่อน แล้วค่อยกดปุ่ม", "ถ้าเลือกกลุ่มไว้ และมีเครื่องในกลุ่มที่ยังทำงานอยู่ ให้รอ หรือเอาเครื่องนั้นออกจากกลุ่มก่อน"]],
+  HOME_FIXED: ["เปิดหน้าหลักของเครื่องคืนให้แล้ว", ["เครื่องนี้ขึ้นแต่ภาพพื้นหลัง เพราะแอปหน้าหลักถูกปิดไว้ตอนล็อกออกงาน (เว็บรุ่นก่อน)", "เว็บเปิดคืนให้เองแล้ว และกดปุ่ม Home ให้ ถ้ายังไม่ขึ้นไอคอน ให้กด ⌂ ที่เครื่อง", "ถ้าเครื่องถามว่าจะใช้แอปไหนเป็นหน้าหลัก ให้เลือกตัวเดิม แล้วกด Always (ทุกครั้ง)", "เครื่องยังล็อกออกงานส่วนอื่นอยู่ตามเดิม"]],
   LOCK_LOST: ["เครื่องนี้เคยล็อกออกงานไว้ แต่ตอนนี้ไม่ล็อกแล้ว", ["อาจถูกรีเซ็ตเครื่อง (Factory reset) หรือมีคนปลดล็อกจากคอมเครื่องอื่น", "ถามคนที่ใช้เครื่องล่าสุดว่าเกิดอะไรขึ้น", "ตั้งกลับให้ครบในคลิกเดียว: แท็บ เครื่อง > ตั้งเครื่องใหม่ทั้งหมด (Flash Kit, ตั้งค่า, Wi-Fi, ล็อก)"]],
   GOOGLE: ["ใส่บัญชี Google ไม่สำเร็จ", ["ดูหน้าจอเครื่อง: ถ้าค้างที่หน้าล็อกอิน ทำต่อเองที่เครื่องได้เลย", "เช็กว่าเครื่องต่อ Wi-Fi อยู่ และอีเมล/รหัสถูก", "ถ้าบัญชีเปิดยืนยัน 2 ขั้นตอน: กดยืนยันที่มือถือ hub แล้วลองใหม่", "เครื่องที่ไม่มีบริการ Google จะเปิดหน้าล็อกอินไม่ได้"]],
   UNKNOWN: ["เกิดข้อผิดพลาด", ["ถ่ายภาพหน้าจอส่วน Log ด้านล่างส่งให้ผู้ดูแล", "ลองถอดสายแล้วเชื่อมต่อใหม่"]]
@@ -1403,7 +1404,26 @@ async function unlockSettingsScreens(d) {
   const r = await d.sh(`[ -f ${SETTINGS_FILE} ] || { echo 0; exit 0; }; n=0; while read c; do pm enable --user 0 "$c" >/dev/null 2>&1; n=$((n+1)); done < ${SETTINGS_FILE}; rm -f ${SETTINGS_FILE}; echo $n`);
   return parseInt(r.out.trim().split(/\s+/).pop(), 10) || 0;
 }
+/*
+ * Safety net: a locked device whose home-screen app was switched off shows only the wallpaper and the
+ * ◁ ⌂ ☰ bar (an older version could do that). On connect, any app this page switched off that can be the
+ * home screen is switched back on at once.
+ */
+async function repairHome(d) {
+  const mine = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d))])];
+  if (!mine.length) return;
+  const r = await d.sh(`for p in ${mine.map(q).join(" ")}; do dumpsys package "$p" 2>/dev/null | grep -q 'android.intent.category.HOME' && echo "$p"; done`);
+  const homes = pkgList(r.out.split("\n").map((p) => "package:" + p.trim()).join("\n"));
+  if (!homes.length) return;
+  for (const p of homes) await d.sh(`pm enable ${q(p)}`);
+  const left = mine.filter((p) => !homes.includes(p));
+  st.save(lockedKey(d), left); await saveDeviceLockList(d, left);
+  await d.sh("input keyevent 3");
+  log(`⚠️ ${label(d)}: แอปหน้าหลักถูกปิดอยู่ (${homes.join(", ")}) เปิดคืนให้แล้ว หน้าหลักควรกลับมา · ล็อกออกงานส่วนอื่นยังอยู่`);
+  showHelp("HOME_FIXED", label(d), true);
+}
 async function readLockState(d) {
+  await repairHome(d).catch(() => {});
   d.info.settingsLocked = parseInt((await d.sh(`[ -f ${SETTINGS_FILE} ] && sort -u ${SETTINGS_FILE} | wc -l || echo 0`)).out.trim(), 10) || 0;
   const mine = [...new Set([...st.load(lockedKey(d), []), ...(await deviceLockList(d))])];
   if (mine.length) {

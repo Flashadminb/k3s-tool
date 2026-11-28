@@ -1,5 +1,6 @@
 # Cloudflare Worker that serves IDATA TOOLS behind a login (see worker/index.js).
-# Deployed by .github/workflows/pages.yml through scripts/cf-deploy.mjs, which fills in the KV namespace id.
+# Deployed by .github/workflows/pages.yml through scripts/cf-deploy.mjs, which creates the D1 database if needed
+# and fills in its id. The first-owner / recovery code is the SETUP_CODE secret (from the IDT_SETUP_CODE repo secret).
 name = "idata-tools"
 main = "worker/index.js"
 compatibility_date = "2025-09-01"
@@ -10,9 +11,7 @@ directory = "site"
 binding = "ASSETS"
 run_worker_first = true
 
-[[kv_namespaces]]
+[[d1_databases]]
 binding = "DB"
-id = "00000000000000000000000000000000"
-
-[triggers]
-crons = ["0 * * * *"]
+database_name = "idata-tools"
+database_id = "00000000-0000-0000-0000-000000000000"

@@ -11,6 +11,14 @@
         ],
         "createdAt": "2026-11-27T12:59:51.198Z",
         "reason": "Claude: #screenImg in the live-screen card gets its src from device screenshots at runtime"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "src/index.html"
+        ],
+        "createdAt": "2026-11-28T08:29:57.374Z"
       }
     ]
   }

@@ -372,13 +372,11 @@ async function addDevice(d) {
   if (!selected || !devices.get(selected) || devices.get(selected).closed) selected = d.serial;
   log("เชื่อมต่อ " + label(d) + " (ใช้ที่เก็บรูปแบบ " + d.info.profile.name + ")");
   d.disconnected.then(() => {
+    if (d.dropped) return;
     log("หลุดการเชื่อมต่อ: " + label(d));
     // The page cannot tell a pulled cable from a device that switched USB debugging off (e.g. entering iLauncher)
     if (!d.rebooting && !d.unplugged) showHelp("DROPPED", label(d), true);
-    devices.delete(d.serial); group.delete(d.serial);
-    if (selected === d.serial) selected = devices.keys().next().value || null;
-    if (live.dev === d) stopLive();
-    renderAll();
+    dropDevice(d);
   });
   try { st.save("everConnected", true); } catch (e) {}
   // First visit opens the guide; once a device is connected, jump to the main delete tab
@@ -758,12 +756,24 @@ function renderHubTools() {
   $("flashNeedN").textContent = need.length;
 }
 
+/** Take a device off the screen (cable pulled or connection lost); safe to call twice */
+function dropDevice(d) {
+  if (d.dropped) return;
+  d.dropped = true;
+  if (devices.get(d.serial) === d) devices.delete(d.serial);
+  group.delete(d.serial);
+  if (selected === d.serial) selected = devices.keys().next().value || null;
+  if (hoverSerial === d.serial) hoverSerial = null;
+  if (live.dev === d) stopLive();
+  renderAll();
+}
 /** Left card: the hovered device, else the clicked one; with a group it also lists the group */
 function renderCard() {
   const c = $("devCard");
   if (!c) return;
   const gs = groupDevs();
-  const d = devices.get(hoverSerial) || (gs.length ? devices.get(groupPin) : devices.get(selected));
+  const open = (x) => (x && !x.closed ? x : null);
+  const d = open(devices.get(hoverSerial)) || (gs.length ? open(devices.get(groupPin)) : open(devices.get(selected)));
   c.hidden = !d && !gs.length;
   $("dcGroup").hidden = !gs.length;
   if (gs.length) {
@@ -3062,6 +3072,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     log("ถอดสาย: " + label(d));
     d.stop && d.stop().catch(() => {});
     d.close();
+    // the info card and the device list are cleared now, even if the old connection never reports that it ended
+    dropDevice(d);
   });
   autoConnect();
 });

@@ -537,6 +537,13 @@ await page.click("button[data-tab=apps]");
 await page.waitForFunction(() => document.getElementById("appCount").textContent.includes("ทั้งหมด"), null, { timeout: 30000 }); await idle();
 ok(!(await page.textContent("#lockCount")).includes("จะปิด 0 แอป"), "Android 6 lock plan has apps without cmd: " + await page.textContent("#lockCount"));
 
+console.log("cable pulled: the device and its info card go at once");
+const cardSerial = await page.textContent("#dcSerial");
+await page.evaluate((sn) => { const e = new Event("disconnect"); e.device = { serialNumber: sn }; navigator.usb.dispatchEvent(e); }, cardSerial.trim());
+await page.waitForTimeout(300);
+ok(!(await page.$(`.satw[data-serial="${cardSerial.trim()}"]`)) && (await page.textContent("#dcSerial")).trim() !== cardSerial.trim() || await page.isHidden("#dcDetail"), "unplugged device and its card cleared");
+ok((await page.textContent("#log")).includes("ถอดสาย"), "unplug logged");
+
 console.log("mobile width");
 await page.setViewportSize({ width: 375, height: 800 });
 await page.waitForTimeout(400);

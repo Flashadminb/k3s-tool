@@ -4,6 +4,16 @@
 // the owner account exists (it is only needed for the first setup and for owner recovery).
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+// The account id is 32 hex characters; a pasted value may carry spaces, a new line or the rest of the dashboard link
+const rawId = process.env.CLOUDFLARE_ACCOUNT_ID || "";
+const accountId = (rawId.match(/[0-9a-f]{32}/i) || [])[0];
+if (!accountId) {
+  console.error(`CLOUDFLARE_ACCOUNT_ID does not contain a 32-character account id (it has ${rawId.length} characters). ` +
+    "Copy it again from the Cloudflare dashboard (Workers & Pages > Account ID) into the GitHub secret.");
+  process.exit(1);
+}
+process.env.CLOUDFLARE_ACCOUNT_ID = accountId.toLowerCase();
+process.env.CLOUDFLARE_API_TOKEN = (process.env.CLOUDFLARE_API_TOKEN || "").trim();
 const w = (args, input) => execFileSync("npx", ["wrangler", ...args], { encoding: "utf8", input, stdio: [input ? "pipe" : "ignore", "pipe", "inherit"] });
 const NAME = "idata-tools";
 const list = JSON.parse(w(["d1", "list", "--json"]).replace(/^[^[]*/, ""));

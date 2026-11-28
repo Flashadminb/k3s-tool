@@ -1432,15 +1432,19 @@ async function saveDeviceLockList(d, list) {
   await d.sh(list.length ? `printf '%s\\n' ${list.map(q).join(" ")} > ${LOCK_FILE}` : `rm -f ${LOCK_FILE}`);
 }
 /*
- * Experimental: Settings stays installed but every screen in it is switched off except the Wi-Fi screens and the
- * ones the phone needs to start up. The switched-off screens are listed in a file on the device for unlocking.
+ * "ปิด Settings" on Android 7+: the Settings app also holds the screen shown while the phone starts up (FallbackHome).
+ * Switching the whole app off made those phones slow to start, so there every Settings screen is switched off
+ * except the start-up ones. Android 6 has no such screen: the whole app is switched off as before.
+ * The switched-off screens are listed in a file on the device, so any computer can unlock.
+ * (The older "Settings off except Wi-Fi" option was removed: holding the Wi-Fi icon led back into Settings.)
  */
 const SETTINGS_FILE = "/data/local/tmp/idata-tools-settings.txt";
-const SETTINGS_KEEP = "wifi|NetworkProvider|SettingsPanel|Internet|FallbackHome|CryptKeeper|Encrypt|Provision|SetupRedirect";
+const SETTINGS_BOOT = "FallbackHome|CryptKeeper|Encrypt|Provision|SetupRedirect";
+const settingsByScreens = (d) => (parseInt(d.info.sdk, 10) || caps(d).sdk || 0) >= 24;
 const SETTINGS_ACTIVITIES = "dumpsys package com.android.settings | awk '/^Activity Resolver Table:/{a=1;next} /Resolver Table:/{a=0} a' | grep -oE 'com\\.android\\.settings/[A-Za-z0-9_.$]+' | sort -u";
 async function lockSettingsScreens(d, onCount) {
-  // decided and done on the device in one go: list Settings screens, keep the Wi-Fi ones, switch the rest off
-  const r = await d.shStream(`${SETTINGS_ACTIVITIES} | grep -viE '${SETTINGS_KEEP}' | while read c; do o=$(pm disable --user 0 "$c" 2>&1); case "$o" in *disabled*) echo "$c" >> ${SETTINGS_FILE}; echo "$c";; esac; done`, () => onCount && onCount());
+  // decided and done on the device in one go: list Settings screens, keep the start-up ones, switch the rest off
+  const r = await d.shStream(`${SETTINGS_ACTIVITIES} | grep -viE '${SETTINGS_BOOT}' | while read c; do o=$(pm disable --user 0 "$c" 2>&1); case "$o" in *disabled*) echo "$c" >> ${SETTINGS_FILE}; echo "$c";; esac; done`, () => onCount && onCount());
   return r.out.split("\n").filter(Boolean).length;
 }
 async function unlockSettingsScreens(d) {
@@ -1486,8 +1490,17 @@ async function readLockState(d) {
 }
 async function lockDevice(d) {
   if (!d.info.apps) await loadApps(d);
-  const plan = lockPlan(d).filter((x) => x.block);
+  const full = lockPlan(d).filter((x) => x.block);
+  // Android 7+: Settings is closed screen by screen below (keeps the start-up screen), not switched off whole
+  const screens = settingsByScreens(d) && full.some((x) => x.isSettings);
+  const plan = screens ? full.filter((x) => !x.isSettings) : full;
   const done = [], fails = [];
+  if (screens && (await deviceLockList(d)).includes(SETTINGS_PKG)) {
+    // locked whole by an older version: switch the app back on so the phone starts normally, then close its screens
+    await d.sh(`pm enable ${SETTINGS_PKG}`);
+    const left = (await deviceLockList(d)).filter((p) => p !== SETTINGS_PKG);
+    await saveDeviceLockList(d, left); st.save(lockedKey(d), st.load(lockedKey(d), []).filter((p) => p !== SETTINGS_PKG));
+  }
   setStatus(d, { title: "กำลังล็อก", big: "0/" + plan.length, ring: 0 });
   for (const [i, x] of plan.entries()) {
     const r = await d.sh(`pm disable-user --user 0 ${q(x.pkg)}`);
@@ -1498,16 +1511,13 @@ async function lockDevice(d) {
   st.save(lockedKey(d), all); d.info.locked = all;
   await saveDeviceLockList(d, all);
   if (all.length) { st.updateRegistry(d.serial, { fieldLock: "ล็อก", fieldLockAt: Date.now() }); d.info.resetSuspect = false; }
-  const cfg = lockCfg();
-  if (cfg.settingsWifi && !cfg.settings) {
-    if (d.info.kiosk) log(`${label(d)}: ใช้ iLauncher จึงไม่ปิด Settings (ต้องใช้เปิด USB debugging)`);
-    else {
-      let n = 0;
-      setStatus(d, { title: "ปิดหน้า Settings", big: "0", ring: 50 });
-      const c = await lockSettingsScreens(d, () => { n++; if (n % 10 === 0) setStatus(d, { title: "ปิดหน้า Settings", big: String(n), ring: 50 }); });
-      d.info.settingsLocked = (d.info.settingsLocked || 0) + c;
-      log(`${label(d)}: ปิดหน้าใน Settings ${c} หน้า เหลือหน้า Wi-Fi (ทดลอง) · ลองเข้า Settings จากทุกทางที่เครื่อง แล้วลองต่อ Wi-Fi`);
-    }
+  if (screens) {
+    let n = 0;
+    setStatus(d, { title: "ปิด Settings", big: "0", ring: 50 });
+    const c = await lockSettingsScreens(d, () => { n++; if (n % 10 === 0) setStatus(d, { title: "ปิด Settings", big: String(n), ring: 50 }); });
+    d.info.settingsLocked = (d.info.settingsLocked || 0) + c;
+    if (c) { st.updateRegistry(d.serial, { fieldLock: "ล็อก", fieldLockAt: Date.now() }); d.info.resetSuspect = false; }
+    log(`${label(d)}: ปิด Settings แล้ว (${c} หน้า) · เว้นหน้าที่ใช้ตอนเปิดเครื่องไว้ เครื่องจะเปิดได้ตามปกติ`);
   }
   await loadApps(d);
   setStatus(d, { title: "ล็อกออกงานแล้ว", big: String(done.length), unit: "แอปถูกปิด", ring: 100, done: true });
@@ -1538,7 +1548,6 @@ function renderLock(d) {
   const plan = d && lockPlan(d);
   const cfg = lockCfg();
   $("lockSettings").checked = !!cfg.settings;
-  if ($("lockSettingsWifi")) $("lockSettingsWifi").checked = !!cfg.settingsWifi && !cfg.settings;
   $("lockKioskNote").hidden = !(d && d.info.kiosk);
   const sL = d && d.info.settingsLocked ? ` · ปิดหน้า Settings ${d.info.settingsLocked} หน้า` : "";
   $("lockState").textContent = !d ? "-" : (d.info.locked || []).length || sL ? `${label(d)}: ล็อกอยู่ (${(d.info.locked || []).length} แอปถูกปิด${sL})` : `${label(d)}: ใช้งานปกติ`;
@@ -1789,7 +1798,13 @@ async function openPortal(d) {
   //    switched on for this and off again afterwards
   const settingsOff = /package:com\.android\.settings\s*$/m.test((await d.sh("pm list packages -d 2>/dev/null")).out);
   if (settingsOff) await d.sh(`pm enable ${SETTINGS_PKG}`);
-  const putBack = async () => { if (settingsOff) await d.sh(`pm disable-user --user 0 ${SETTINGS_PKG}`).catch(() => {}); };
+  // Android 7+ lock closes Settings screen by screen: open just the Wi-Fi ones for this, close them again after
+  const wifiScreens = pkgList((await d.sh(`grep -iE 'wifi|NetworkProvider|Internet|SettingsPanel' ${SETTINGS_FILE} 2>/dev/null | sed 's/^/package:/'`)).out);
+  for (const c of wifiScreens) await d.sh(`pm enable --user 0 ${q(c)}`);
+  const putBack = async () => {
+    if (settingsOff) await d.sh(`pm disable-user --user 0 ${SETTINGS_PKG}`).catch(() => {});
+    for (const c of wifiScreens) await d.sh(`pm disable --user 0 ${q(c)}`).catch(() => {});
+  };
   await d.sh("am start -a android.settings.WIFI_SETTINGS");
   for (let i = 0; i < 5; i++) {
     await sleep(1500);
@@ -3051,8 +3066,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   loadStdForm(); loadBannedText(); loadFlashForm(); renderWifiSaved(); renderPortal();
   // full Settings off and "Settings off except Wi-Fi" are alternatives: ticking one clears the other
-  if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked, settingsWifi: e.target.checked ? false : lockCfg().settingsWifi }); renderLock(devices.get(selected)); });
-  if ($("lockSettingsWifi")) $("lockSettingsWifi").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settingsWifi: e.target.checked, settings: e.target.checked ? false : lockCfg().settings }); renderLock(devices.get(selected)); });
+  if ($("lockSettings")) $("lockSettings").addEventListener("change", (e) => { st.save("fieldLock", { ...lockCfg(), settings: e.target.checked, settingsWifi: false }); renderLock(devices.get(selected)); });
   if ($("gEmail")) $("gEmail").value = st.load("gEmail", "");
   [["typeShow", "typeText"], ["wfShow", "wfPass"], ["gShow", "gPass"]].forEach(([c, i]) => { if ($(c)) $(c).addEventListener("change", (e) => ($(i).type = e.target.checked ? "text" : "password")); });
   if ($("typeText")) $("typeText").addEventListener("keydown", (e) => { if (e.key === "Enter") actions.typeSend(); });

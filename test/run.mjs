@@ -354,17 +354,19 @@ ok(await page.isVisible(".sat-tag.lock"), "device circle tagged as locked");
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); localStorage.removeItem("k3s-tool:fieldLock"); });
 await click("lockRelease"); await idle();
 ok(dis().trim() === "", "unlock from a different browser: every app back on (list read from the device)");
-// experimental: Settings off except its Wi-Fi screens
+// "ปิด Settings" on Android 7+: closed screen by screen, the start-up screen kept (the whole app off made phones slow to start)
 const comp = () => (existsSync(join(ROOT, "pm-TESTSERIAL001.comp")) ? readFileSync(join(ROOT, "pm-TESTSERIAL001.comp"), "utf8") : "");
-await page.check("#lockSettingsWifi");
+await page.check("#lockSettings");
 await click("lockApply"); await accept(); await idle();
 const c1 = comp();
-ok(c1.includes("com.android.settings/.Settings\n") && c1.includes(".SubSettings") && c1.includes("AppInfoActivity"), "Settings screens switched off");
-ok(!c1.includes("Wifi") && !c1.includes("NetworkProvider") && !c1.includes("FallbackHome") && !c1.includes("Receiver"), "Wi-Fi screens, start-up screen and non-screens kept");
+ok(c1.includes("com.android.settings/.Settings\n") && c1.includes(".SubSettings") && c1.includes("AppInfoActivity") && c1.includes("WifiSettingsActivity"), "Settings screens switched off, Wi-Fi ones too");
+ok(!c1.includes("FallbackHome") && !c1.includes("Receiver"), "start-up screen and non-screens kept");
+ok(!dis().includes("com.android.settings"), "Settings app itself stays on (phone starts normally)");
+ok(dis().includes("jp.naver.line.android"), "apps locked as usual");
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes("locked:")) localStorage.removeItem(k); });
 await click("lockRelease"); await idle();
 ok(comp().trim() === "" && dis().trim() === "", "unlock: Settings screens and apps all back");
-await page.uncheck("#lockSettingsWifi");
+await page.uncheck("#lockSettings");
 // device locked, then factory reset (all apps back on, lock list on the device gone), then plugged in again
 await click("lockApply"); await accept(); await idle();
 ok(dis().includes("jp.naver.line.android"), "locked again before the simulated reset");

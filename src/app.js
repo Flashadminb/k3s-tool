@@ -471,6 +471,7 @@ async function connectNew() {
   try { d = await adb.openUsb(usb, (s) => { busyMsg(`รอกด Allow ที่เครื่องรหัส ${String(s || "").slice(-6)}`); authWait(true, s); }); }
   catch (e) { if (e.message === "CANCELLED") { log(`ยกเลิกการรอเครื่องรหัส ${usb.serial.slice(-6)}`); return false; } throw e; }
   finally { authWait(false, usb.serial); clearTimeout(why); }
+  keyNote(usb.serial);
   busyMsg("กำลังอ่านข้อมูลเครื่อง");
   await addDevice(d);
 }
@@ -481,6 +482,7 @@ async function autoConnect() {
   if (autoConnecting) return;
   autoConnecting = true;
   try {
+    await Promise.race([keysReady, sleep(8000)]);   // shared hub keys first, or the device is asked with this computer's own key
     for (const usb of await adb.knownDevices()) {
       if (devices.has(usb.serial) && !devices.get(usb.serial).closed) continue;
       if (pending.has(usb.serial)) continue;
@@ -488,7 +490,10 @@ async function autoConnect() {
       for (let tryNo = 1; tryNo <= 5; tryNo++) {
         try {
           log("พบเครื่องที่เคยอนุญาต " + usb.serial.slice(-6) + " กำลังเชื่อมต่อ ...");
-          await addDevice(await adb.openUsb(usb, () => authWait(true, usb.serial)));
+          adb.authTrace.local = adb.authTrace.shared = 0;
+          const d0 = await adb.openUsb(usb, () => authWait(true, usb.serial));
+          keyNote(usb.serial);
+          await addDevice(d0);
           break;
         } catch (e) {
           if (e.message === "BUSY") { showHelp("BUSY"); break; }
@@ -2907,6 +2912,13 @@ async function renderUsers() {
 /* ---------- ADB keys: devices that allowed the old site (or another computer) keep working without "Allow" ---------- */
 const NEW_SITE = "https://idata-tools.flashbplbhub.workers.dev";
 let keysReady = Promise.resolve();
+/** which key the device accepted (the last one offered), for the log */
+function keyNote(serial) {
+  if (auth.me.role === "local") return;
+  const t = adb.authTrace;
+  const n = t.shared + t.local;
+  log(`เครื่องรหัส ${String(serial).slice(-6)} ผ่านด้วย${t.local ? "กุญแจของคอมนี้" : t.shared === 1 ? "กุญแจหลักของฮับ" : `กุญแจจากระบบชุดที่ ${t.shared}`} (ลอง ${n} ชุด)`);
+}
 async function loadSharedKeys() {
   try {
     let l = await auth.apiGet("/api/adbkeys");

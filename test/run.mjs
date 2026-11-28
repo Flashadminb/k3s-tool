@@ -138,6 +138,15 @@ console.log("first visit");
 ok(await page.isVisible("#tab-guide"), "first visit opens the setup guide");
 await page.click("button[data-tab=data]");
 
+console.log("guide menu");
+await page.click("button[data-tab=guide]");
+await page.click('.gmenu button[data-g="power"]');
+ok(await page.isVisible('.gpage[data-g="power"]') && !(await page.isVisible('.gpage[data-g="start"]')), "guide shows one topic at a time");
+ok((await page.textContent('.gpage[data-g="power"]')).includes("เปิดหน้าหลักของเครื่องคืนให้แล้ว"), "no-icons fix is in the guide");
+await page.click('.gpage[data-g="power"] a[data-g-go="start"]').catch(() => {});
+await page.click('.gmenu button[data-g="start"]');
+await page.click("button[data-tab=data]");
+
 console.log("connect + counts");
 await click("connect"); await idle();
 await page.waitForFunction(() => !document.getElementById("cSuccess").textContent.includes("กำลัง"));

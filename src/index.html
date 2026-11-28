@@ -282,6 +282,16 @@ body:not(.has-dev) .dock .acts button,body:not(.has-dev) .dock .stats{opacity:.8
 .dlgbox input{width:100%;margin:8px 0}
 #dlgList label{padding:10px 0;border-bottom:1px solid var(--line)}
 .role-staff .admin-only{display:none!important}
+.gmenu{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.gmenu button{justify-content:center;text-align:center;white-space:normal;line-height:1.25;padding:10px 12px}
+.gmenu button.on{background:var(--gold,#e8be5a);color:#1b1400;border-color:transparent;font-weight:600}
+details.sym{padding:0;overflow:hidden}
+details.sym>summary{cursor:pointer;list-style:none;padding:14px 16px;font-weight:600;display:flex;justify-content:space-between;gap:10px;align-items:center}
+details.sym>summary::-webkit-details-marker{display:none}
+details.sym>summary::after{content:"＋";color:var(--gold,#e8be5a);flex:none}
+details.sym[open]>summary::after{content:"－"}
+details.sym>:not(summary){margin-left:16px;margin-right:16px}
+details.sym>:last-child{margin-bottom:14px}
 body:not(.role-admin) .owner-only{display:none!important}
 .who{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--mut);white-space:nowrap}
 .who button{padding:4px 10px;font-size:13px}
@@ -420,7 +430,7 @@ body:not(.role-admin) .owner-only{display:none!important}
       <div id="nodev" class="stagenote glass">
         <div class="part">เสียบสาย USB แล้วกดวงกลมตรงกลาง</div>
         <div class="step"><div class="n">1</div><div class="t">เสียบสายระหว่างเครื่องกับคอม<small>เครื่องที่เคยเชื่อมแล้ว เว็บจะต่อให้เอง</small></div></div>
-        <div class="step"><div class="n">2</div><div class="t">เครื่องใหม่ / เพิ่งรีเซ็ต ต้องเปิด USB debugging ก่อน<small><a href="#" data-goto="guide">ดูวิธีในเมนู คู่มือ</a> · กดแล้วไม่เห็นชื่อเครื่อง ดูหัวข้อ "ไม่เห็นชื่อเครื่อง" ในคู่มือ</small></div></div>
+        <div class="step"><div class="n">2</div><div class="t">เครื่องใหม่ / เพิ่งรีเซ็ต ต้องเปิด USB debugging ก่อน<small><a href="#" data-goto="guide">ดูวิธีในเมนู คู่มือ</a> · กดแล้วไม่เห็นชื่อเครื่อง: <a href="#" data-goto="guide" data-g-open="fix">คู่มือ &gt; เว็บต่อเครื่องไม่ได้</a></small></div></div>
       </div>
 
       <div id="authWait" class="stagenote glass" hidden>
@@ -691,67 +701,143 @@ body:not(.role-admin) .owner-only{display:none!important}
     </div>
   </section>
 <section class="tab" id="tab-guide" hidden>
+<div class="ptitle"><svg class="i"><use href="#i-book"/></svg>คู่มือ</div>
+<nav class="gmenu" aria-label="หมวดคู่มือ">
+  <button data-g="start" class="on">เริ่มใช้ครั้งแรก</button>
+  <button data-g="fix">เว็บต่อเครื่องไม่ได้ / ใช้งานติด</button>
+  <button data-g="power">ปิดเครื่อง / รีเซ็ต / เปิดไม่ขึ้น</button>
+  <button data-g="phone">ใช้กับมือถือ</button>
+  <button data-g="ilauncher">เครื่องที่ใช้ iLauncher</button>
+</nav>
+<div class="mut" style="margin-bottom:10px">ชื่อเมนูในเครื่องเขียนเป็น <b>ภาษาอังกฤษ</b> ตามที่เห็นจริง (ภาษาไทยในวงเล็บคือความหมาย) · กดหัวข้อเพื่อเปิดดูวิธีแก้</div>
+
+<div class="gpage" data-g="start">
 <div class="warnbox">ทำครั้งเดียวต่อเครื่อง · ถ้ารีเซ็ตเครื่อง ต้องทำใหม่</div>
-<div class="mut" style="margin-bottom:10px">ชื่อเมนูเขียนเป็น <b>ภาษาอังกฤษ</b> ตามที่เห็นในเครื่อง (ภาษาไทยในวงเล็บคือความหมาย)</div>
-<div class="card"><div class="part">ส่วน A · ที่เครื่อง: เปิด Developer options (โหมดนักพัฒนา)</div><div class="step"><div class="n">1</div><div class="t">เปิด <b>Settings</b> (การตั้งค่า)</div></div>
+<div class="card"><div class="part">ขั้น 1 · ที่เครื่อง: เปิด Developer options (โหมดนักพัฒนา)</div>
+<div class="step"><div class="n">1</div><div class="t">เปิด <b>Settings</b> (การตั้งค่า)</div></div>
 <div class="step"><div class="n">2</div><div class="t">แตะ <b>About phone</b> (เกี่ยวกับโทรศัพท์)<small>อยู่ล่างสุดของ Settings · บางรุ่นอยู่ใน System &gt; About phone</small></div></div>
-<div class="step"><div class="n">3</div><div class="t">แตะ <b>Build number</b> (หมายเลขบิวด์) <b>7 ครั้ง</b> ติดกัน<small>หาไม่เจอ: พิมพ์ "build" ในช่อง Search (ค้นหา) บนสุดของ Settings · ถ้าถามรหัส ให้ใส่รหัสปลดล็อกจอ</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">แตะ <b>Build number</b> (หมายเลขบิวด์) <b>7 ครั้ง</b> ติดกัน<small>หาไม่เจอ: พิมพ์ "build" ในช่อง Search บนสุดของ Settings · ถ้าถามรหัส ให้ใส่รหัสปลดล็อกจอ</small></div></div>
 <div class="step"><div class="n">4</div><div class="t">ขึ้น <b>"You are now a developer!"</b> (คุณเป็นนักพัฒนาแล้ว) = สำเร็จ</div></div></div>
-<div class="card"><div class="part">ส่วน B · ที่เครื่อง: เปิด USB debugging</div><div class="step"><div class="n">1</div><div class="t"><b>Settings</b> &gt; <b>System</b> (ระบบ) &gt; <b>Developer options</b> (ตัวเลือกสำหรับนักพัฒนา)<small>หาไม่เจอ: พิมพ์ "developer" ในช่อง Search</small></div></div>
-<div class="step"><div class="n">2</div><div class="t">สวิตช์บนสุด <b>Use developer options</b> (ใช้ตัวเลือกสำหรับนักพัฒนา) ต้องเป็นสีน้ำเงิน (เปิด)</div></div>
-<div class="step"><div class="n">3</div><div class="t"><b>เลื่อนลงไปเรื่อยๆ</b> จนเจอหัวข้อ <b>Debugging</b> (การแก้ไขข้อบกพร่อง)<small>อยู่ค่อนข้างลึก ต้องเลื่อนผ่าน Memory, Bug report, Stay awake ฯลฯ ก่อน · หรือกดรูปแว่นขยายมุมขวาบน แล้วพิมพ์ "USB debugging"</small></div></div>
-<div class="step"><div class="n">4</div><div class="t">เปิดสวิตช์ <b>USB debugging</b> (การแก้ไขข้อบกพร่อง USB) ให้เป็นสีน้ำเงิน แล้วกด <b>OK</b> (ตกลง)</div></div>
-<div class="step"><div class="n">5</div><div class="t">เลื่อนลงต่อ หา <b>Default USB configuration</b> (การตั้งค่า USB เริ่มต้น) แล้วเลือก <b>File transfer</b> (โอนไฟล์)<small>ถ้าเป็น Charging only (ชาร์จอย่างเดียว) คอมอาจมองไม่เห็นเครื่อง</small></div></div>
+<div class="card"><div class="part">ขั้น 2 · ที่เครื่อง: เปิด USB debugging</div>
+<div class="step"><div class="n">1</div><div class="t"><b>Settings</b> &gt; <b>System</b> (ระบบ) &gt; <b>Developer options</b> (ตัวเลือกสำหรับนักพัฒนา)<small>หาไม่เจอ: พิมพ์ "developer" ในช่อง Search</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">สวิตช์บนสุด <b>Use developer options</b> ต้องเป็นสีน้ำเงิน (เปิด)</div></div>
+<div class="step"><div class="n">3</div><div class="t">เลื่อนลงจนเจอหัวข้อ <b>Debugging</b> (การแก้ไขข้อบกพร่อง)<small>อยู่ค่อนข้างลึก · หรือกดรูปแว่นขยายมุมขวาบน แล้วพิมพ์ "USB debugging"</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">เปิดสวิตช์ <b>USB debugging</b> แล้วกด <b>OK</b> (ตกลง)</div></div>
+<div class="step"><div class="n">5</div><div class="t">หา <b>Default USB configuration</b> (การตั้งค่า USB เริ่มต้น) เลือก <b>File transfer</b> (โอนไฟล์)<small>ถ้าเป็น Charging only (ชาร์จอย่างเดียว) คอมอาจมองไม่เห็นเครื่อง</small></div></div>
 <div class="step"><div class="n">6</div><div class="t">(แนะนำ) ถ้ามี <b>Disable adb authorization timeout</b> ให้เปิดด้วย<small>จะได้ไม่ต้องกด Allow ใหม่ทุก 7 วัน · ไม่มีก็ข้ามได้</small></div></div>
-<div class="step"><div class="n">7</div><div class="t">เสียบสาย USB แล้วรูดแถบแจ้งเตือนลงมา ต้องเห็น <b>USB debugging connected</b> = พร้อมแล้ว</div></div>
 <div class="warnbox">ไม่มีเมนูนี้ หรือสวิตช์เป็นสีเทา = บริษัทล็อกไว้ ให้แจ้งไอที Flash</div></div>
-<div class="card"><div class="part">ส่วน C · ที่คอม: เชื่อมต่อ</div><div class="step"><div class="n">1</div><div class="t">เสียบสาย USB · ปลดล็อกหน้าจอเครื่อง</div></div>
-<div class="step"><div class="n">2</div><div class="t">กดวงกลม <b>เชื่อมต่อเครื่อง</b> กลางจอ</div></div>
+<div class="card"><div class="part">ขั้น 3 · ที่คอม: เชื่อมต่อ</div>
+<div class="step"><div class="n">1</div><div class="t">เปิดเว็บนี้ใน <b>Chrome</b> หรือ <b>Edge</b> · เสียบสาย USB เข้าช่องที่<b>จ่ายไฟพอ</b> (ช่องหลังเคส หรือช่องตรงของโน้ตบุ๊ก) · ปลดล็อกหน้าจอเครื่อง</div></div>
+<div class="step"><div class="n">2</div><div class="t">กดวงกลม <b>+ เพิ่มเครื่อง</b> กลางจอ</div></div>
 <div class="step"><div class="n">3</div><div class="t">หน้าต่างเล็กของ Chrome เด้งขึ้น: คลิกชื่อเครื่อง แล้วกด <b>Connect</b> (เชื่อมต่อ)</div></div>
-<div class="step"><div class="n">4</div><div class="t">ที่เครื่องขึ้น <b>Allow USB debugging?</b> (อนุญาตไหม): ติ๊ก <b>Always allow from this computer</b> (อนุญาตจากคอมนี้เสมอ) แล้วกด <b>Allow</b> (อนุญาต)</div></div><div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง</div></div>
-<div class="card" id="phoneGuide"><div class="part">ใช้กับมือถือ Android (ไปแก้หน้างาน)</div>
+<div class="step"><div class="n">4</div><div class="t">ที่เครื่องขึ้น <b>Allow USB debugging?</b>: ติ๊ก <b>Always allow from this computer</b> (อนุญาตจากคอมนี้เสมอ) แล้วกด <b>Allow</b></div></div>
+<div class="step"><div class="n">5</div><div class="t">(แนะนำ) กดปุ่ม <b>ตั้งชื่อ</b> ในกรอบซ้ายบน · เครื่องจะกะพริบให้รู้ว่าเป็นเครื่องไหน<small>ชื่อเก็บในตัวเครื่อง เสียบคอมไหนก็ขึ้นชื่อ</small></div></div>
+<div class="mut" style="margin-top:8px">ครั้งต่อไป แค่เสียบสาย เว็บจะต่อให้เอง · คอมหรือมือถือเครื่องใหม่ต้องกด Allow ที่ PDA ใหม่ 1 ครั้ง</div></div>
+</div>
+
+<div class="gpage" data-g="fix" hidden>
+<details class="card sym"><summary>กดเพิ่มเครื่องแล้ว ไม่เห็นชื่อเครื่องในหน้าต่าง</summary>
+<div class="step"><div class="n">1</div><div class="t">ดูที่วงกลมกลางจอก่อน<small>ถ้าเครื่องขึ้นเป็นวงกลมอยู่แล้ว แปลว่าต่ออยู่แล้ว (Chrome จะไม่แสดงเครื่องที่เว็บใช้อยู่)</small></div></div>
+<div class="step"><div class="n">2</div><div class="t"><b>เปลี่ยนช่อง USB</b> ที่คอม<small>ช่องหน้าเคส ฮับ USB หรือสายพ่วง มักจ่ายไฟไม่พอ ใช้ช่องหลังเคสแทน · ลองเปลี่ยนสายด้วย (สายชาร์จบางเส้นส่งข้อมูลไม่ได้)</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">รูดแถบแจ้งเตือนที่เครื่อง ต้องเห็น <b>USB debugging connected</b><small>ไม่เห็น: USB debugging ปิดอยู่ (เช่นเพิ่งรีเซ็ต) ให้ทำ <a href="#" data-g-go="start">เริ่มใช้ครั้งแรก</a> ขั้น 2 ใหม่</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ในแถบแจ้งเตือน แตะข้อความ USB แล้วเลือก <b>File transfer</b> (โอนไฟล์)</div></div>
+<div class="step"><div class="n">5</div><div class="t">ปิดแท็บอื่นที่เปิดเว็บนี้ซ้ำ ปิดโปรแกรมอื่นที่ใช้มือถือ ถอดสาย รอ 3 วินาที เสียบใหม่</div></div>
+<div class="step"><div class="n">6</div><div class="t">ยังไม่เจอ: ดูหัวข้อ <b>คอมเครื่องใหม่</b> และ <b>เช็กด้วย adb</b> ด้านล่าง</div></div>
+</details>
+<details class="card sym"><summary>คอมเครื่องใหม่: บางรุ่นขึ้น แต่บางรุ่นไม่ขึ้น (Windows)</summary>
+<div class="mut" style="margin-bottom:8px">Chrome ต่อได้เฉพาะเครื่องที่ Windows ลงไดรเวอร์แบบ <b>WinUSB</b> ไว้ · ทำครั้งเดียวต่อคอมต่อรุ่น</div>
+<div class="step"><div class="n">1</div><div class="t">กด <span class="kbd">⊞ Windows</span> พิมพ์ <code>Device Manager</code> (ตัวจัดการอุปกรณ์) กด <span class="kbd">Enter</span></div></div>
+<div class="step"><div class="n">2</div><div class="t">หา <b>ADB Interface</b> หรือชื่อรุ่นเครื่อง ที่มี ⚠️ สีเหลือง (มักอยู่ใน <b>Other devices</b>)<small>ไม่มี ⚠️ = ไดรเวอร์ปกติ ปัญหาน่าจะเป็นช่อง USB หรือสาย</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">โหลดโปรแกรม <b>Zadig</b> จาก zadig.akeo.ie แล้วเปิด (ไม่ต้องติดตั้ง)<small>เมนู <b>Options</b> &gt; ติ๊ก <b>List All Devices</b> · เลือกรายการที่เป็นเครื่อง PDA</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ช่องขวาเลือก <b>WinUSB</b> กด <b>Install Driver</b> หรือ <b>Replace Driver</b> รอจนสำเร็จ<small>ระวังเลือกให้ถูก อย่าเลือกเมาส์ คีย์บอร์ด หรือกล้อง</small></div></div>
+<div class="step"><div class="n">5</div><div class="t">ถอดสาย เสียบใหม่ แล้วกด <b>+ เพิ่มเครื่อง</b></div></div>
+<div class="warnbox">คอมบริษัทที่ลงโปรแกรมเองไม่ได้ ให้แจ้งไอที</div>
+</details>
+<details class="card sym"><summary>ไม่มีหน้าต่าง "Allow" ขึ้นที่เครื่อง / เว็บรอ Allow นาน</summary>
+<div class="step"><div class="n">1</div><div class="t">ปลดล็อกหน้าจอเครื่อง แล้วถอดสายเสียบใหม่</div></div>
+<div class="step"><div class="n">2</div><div class="t">ถ้าเคยกด Deny (ปฏิเสธ): <b>Developer options</b> &gt; <b>Revoke USB debugging authorizations</b> แล้วลองใหม่</div></div>
+<div class="step"><div class="n">3</div><div class="t">เสียบหลายเครื่องพร้อมกัน: กด Allow ทีละเครื่องตามชื่อที่เว็บบอก หรือกด <b>ยกเลิกการรอ</b> แล้วเสียบใหม่</div></div>
+</details>
+<details class="card sym"><summary>ขึ้นว่า "เครื่องถูกใช้อยู่" / เช็กด้วย adb</summary>
+<ol><li>กด <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>
+<li>พิมพ์ <code>cd C:\Users\Flash\Desktop\Best\platform-tools</code> กด <span class="kbd">Enter</span></li>
+<li>พิมพ์ <code>adb devices</code> กด <span class="kbd">Enter</span>
+<ul><li>ขึ้นรหัสเครื่องตามด้วย <code>device</code> = เครื่องปกติ</li><li><code>unauthorized</code> = ยังไม่ได้กด Allow ที่เครื่อง</li><li>ไม่ขึ้นอะไร = สาย, ช่อง USB หรือ USB debugging ปิดอยู่</li></ul></li>
+<li>พิมพ์ <code>adb kill-server</code> กด <span class="kbd">Enter</span> แล้วกลับมาเสียบใหม่ในเว็บ</li></ol>
+<a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">โหลด Platform-Tools</a>
+</details>
+<details class="card sym"><summary>ต่อได้แล้วหลุดบ่อย</summary>
+<div class="step"><div class="n">1</div><div class="t">เปลี่ยนช่อง USB หรือสาย (ไฟไม่พอทำให้หลุด)</div></div>
+<div class="step"><div class="n">2</div><div class="t">เครื่องที่ใช้ iLauncher หลุดทุกครั้งที่ออกจากหน้า Settings: ดู <a href="#" data-g-go="ilauncher">เครื่องที่ใช้ iLauncher</a></div></div>
+<div class="step"><div class="n">3</div><div class="t">ตั้งให้จอเปิดค้างตอนเสียบสาย: แตะป้าย <b>จอดับ</b> ใต้วงกลม แล้วตอบ ยืนยัน</div></div>
+</details>
+<details class="card sym"><summary>สั่งคำสั่งผิดเครื่อง / อยากหยุดคำสั่ง</summary>
+<div class="step"><div class="n">1</div><div class="t">กดปุ่ม <b>หยุด</b> สีแดงในกล่องสถานะกลางจอ<small>เว็บสั่งเครื่องหยุดทันที · ส่วนที่ทำไปแล้ว (เช่นรูปที่ลบไปแล้ว) ไม่ย้อนกลับ</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">ก่อนสั่ง ดูชื่อเครื่องในกรอบซ้ายบน หรือกด <b>หาเครื่องนี้</b> ให้เครื่องกะพริบก่อน</div></div>
+</details>
+<details class="card sym"><summary>อัปเดต Flash Kit ไม่ได้</summary>
+<div class="step"><div class="n">1</div><div class="t">ถ้าเว็บโหลดเองไม่ได้: Chrome จะเปิดแท็บโหลดไฟล์ รอโหลดเสร็จแล้วกด <b>ยืนยัน</b> แล้วเลือกไฟล์ <b>.apk</b> ที่ใหม่สุดใน Downloads</div></div>
+<div class="step"><div class="n">2</div><div class="t">ครั้งต่อไปไม่ต้องโหลดซ้ำ: เลือก <b>ใช้ไฟล์ที่เก็บไว้</b><small>ดูวันที่โหลดล่าสุดได้ที่ ตั้งค่า &gt; Flash Kit</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">ทางสำรอง: ตั้งค่า &gt; Flash Kit &gt; <b>เลือกไฟล์ .apk ในคอม</b></div></div>
+</details>
+<details class="card sym"><summary>ต่อ Wi-Fi ไม่ได้</summary>
+<div class="step"><div class="n">1</div><div class="t">เครื่อง Android รุ่นเก่า (11 ลงไป) ต่อ Wi-Fi จากคอมโดยตรงไม่ได้: เว็บจะเปิดหน้า Wi-Fi ที่เครื่องให้ แตะชื่อ Wi-Fi แล้วกด <b>พิมพ์รหัสเข้าเครื่อง</b> ในเว็บ</div></div>
+<div class="step"><div class="n">2</div><div class="t">เครื่องรุ่นเก่าบางรุ่นต่อ 5G ไม่ได้ ให้ใช้ Wi-Fi 2.4G</div></div>
+</details>
+</div>
+
+<div class="gpage" data-g="power" hidden>
+<details class="card sym" open><summary>เปิดเครื่องแล้วมีแต่ภาพพื้นหลัง ไม่มีไอคอน (ปุ่ม ◁ ⌂ ☰ ขึ้นปกติ)</summary>
+<div class="mut" style="margin-bottom:8px">สาเหตุที่พบบ่อย: แอปหน้าหลักถูกปิดไว้ตอนล็อกออกงาน (เว็บรุ่นก่อน) หรือเครื่องเพิ่งเปิดครั้งแรกหลังรีเซ็ตและยังโหลดไม่เสร็จ</div>
+<div class="step"><div class="n">1</div><div class="t">ที่คอม กด <span class="kbd">Ctrl</span>+<span class="kbd">F5</span></div></div>
+<div class="step"><div class="n">2</div><div class="t">เสียบเครื่องทีละเครื่อง (ใช้ช่อง USB ที่จ่ายไฟพอ)</div></div>
+<div class="step"><div class="n">3</div><div class="t">ถ้าเว็บต่อได้: เว็บเช็กเองว่าแอปหน้าหลักถูกปิดไหม ถ้าใช่จะเปิดคืนและกดปุ่ม Home ให้ ขึ้นกล่องเขียว <b>"เปิดหน้าหลักของเครื่องคืนให้แล้ว"</b> ไอคอนควรกลับมา<small>ถ้าเครื่องถามว่าจะใช้แอปไหนเป็นหน้าหลัก ให้เลือกตัวเดิม แล้วกด <b>Always</b> (ทุกครั้ง) · การล็อกออกงานส่วนอื่นยังอยู่ตามเดิม</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">ถ้ายังไม่มีไอคอน: แท็บ <b>แอป</b> &gt; กด <b>ปลดล็อก</b> จะเปิดแอปที่ปิดไว้คืนทั้งหมด</div></div>
+<div class="warnbox"><b>ถ้าเว็บต่อไม่ได้เลย</b> = เครื่องโดนรีเซ็ตแล้ว USB debugging ถูกปิด (การล็อกถูกล้างไปแล้ว) อาการนี้น่าจะเป็นเพราะเครื่องเพิ่งเปิดครั้งแรกและยังโหลดไม่เสร็จ: ลองกดปุ่ม ⌂ ที่เครื่อง หรือเสียบชาร์จทิ้งไว้ 10–15 นาที</div>
+</details>
+<details class="card sym"><summary>เปิดเครื่องไม่ติด จอดำสนิท</summary>
+<div class="step"><div class="n">1</div><div class="t">เสียบ<b>หัวชาร์จติดผนัง</b> (ไม่ใช่ช่อง USB คอม) ทิ้งไว้ <b>30 นาที</b><small>รีเซ็ตและการเปิดเครื่องครั้งแรกกินไฟมาก แบตอาจหมด · ดูว่ามีไฟสถานะหรือรูปแบตขึ้นไหม</small></div></div>
+<div class="step"><div class="n">2</div><div class="t">กดปุ่ม Power ค้าง <b>15–20 วินาที</b> ระหว่างเสียบชาร์จ</div></div>
+<div class="step"><div class="n">3</div><div class="t">ถ้าถอดแบตได้: ถอดแบต รอ 10 วินาที ใส่กลับ แล้วกดเปิด</div></div>
+<div class="step"><div class="n">4</div><div class="t">ลองสายหรือหัวชาร์จอื่น · ยังไม่ขึ้นอะไรเลย = ส่งศูนย์ iData (แบตหรือบอร์ด)</div></div>
+</details>
+<details class="card sym"><summary>ค้างที่โลโก้ iData / Flash หรือวนขึ้นโลโก้ซ้ำ</summary>
+<div class="step"><div class="n">1</div><div class="t">เพิ่งรีเซ็ต: เปิดครั้งแรกใช้เวลาได้ถึง <b>10–20 นาที</b> เสียบชาร์จแล้วรอ อย่ากดอะไร</div></div>
+<div class="step"><div class="n">2</div><div class="t">เกิน 30 นาที: กด Power ค้าง 15 วินาทีให้ดับ แล้วเปิดใหม่</div></div>
+<div class="step"><div class="n">3</div><div class="t">ยังค้าง: เข้า <b>เมนู Recovery</b> (หัวข้อด้านล่าง) เลือก <b>Wipe cache partition</b> แล้ว <b>Reboot system now</b></div></div>
+<div class="step"><div class="n">4</div><div class="t">ยังไม่ได้: ใน Recovery ทำ <b>Wipe data/factory reset</b> (ข้อมูลในเครื่องหายหมด) · ยังไม่ได้อีก = ส่งศูนย์ iData หรือไอที Flash ลงระบบใหม่</div></div>
+</details>
+<details class="card sym"><summary>เครื่องโดนรีเซ็ต (Factory reset) แล้วเกิดอะไรขึ้น / ตั้งกลับยังไง</summary>
+<div class="mut" style="margin-bottom:8px">ที่หายไป: รูปทั้งหมด, Flash Kit และแอปที่ลงเพิ่ม, การล็อกออกงาน, Wi-Fi ที่บันทึก, USB debugging และการ Allow คอม · ชื่อเครื่องในตัวเครื่องหาย แต่คอมที่เคยตั้งชื่อจะเขียนคืนให้</div>
+<div class="step"><div class="n">1</div><div class="t">ตั้งค่าเครื่องให้ผ่านหน้าแรก (ภาษา, Wi-Fi, ข้ามบัญชี Google ได้)</div></div>
+<div class="step"><div class="n">2</div><div class="t">เปิด USB debugging ใหม่: <a href="#" data-g-go="start">เริ่มใช้ครั้งแรก</a> ขั้น 1–2</div></div>
+<div class="step"><div class="n">3</div><div class="t">เสียบเข้าเว็บ กด <b>Always allow</b> ที่เครื่อง<small>คอมที่เคยล็อกเครื่องนี้จะขึ้นป้าย <b>หลุดล็อก · อาจรีเซ็ต</b></small></div></div>
+<div class="step"><div class="n">4</div><div class="t">แท็บ <b>เครื่อง</b> &gt; <b>ตั้งเครื่องใหม่ทั้งหมด</b><small>ลง Flash Kit, ตั้งค่ามาตรฐาน, ต่อ Wi-Fi, ล็อกออกงาน ในคลิกเดียว</small></div></div>
+<div class="warnbox">กันพนักงานรีเซ็ตจากปุ่มไม่ได้ 100% · ระบบกันรีเซ็ตด้วยบัญชี Google (FRP) ไม่ทำงานบน K3S ที่ลองแล้ว · ดูว่ารุ่นไหนรองรับได้ที่ แท็บ เครื่อง &gt; ช่อง <b>กันรีเซ็ต (FRP)</b></div>
+</details>
+<details class="card sym"><summary>วิธีเข้าเมนู Recovery (หน้ารีเซ็ตเครื่อง)</summary>
+<div class="step"><div class="n">1</div><div class="t">ง่ายสุด: เสียบเว็บ แท็บ <b>เครื่อง</b> &gt; กด <b>เข้าเมนู Recovery</b></div></div>
+<div class="step"><div class="n">2</div><div class="t">ด้วยปุ่ม: ปิดเครื่องให้สนิท แล้วกด <b>Power + เพิ่มเสียง</b> ค้างจนขึ้นโลโก้ ปล่อย Power แต่กดเสียงค้างไว้<small>ไม่ขึ้นเมนู ให้ลอง <b>Power + ลดเสียง</b> · ขึ้นรูปหุ่นยนต์ "No command": กด Power ค้าง แล้วกดเพิ่มเสียง 1 ที</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">ในเมนู: ปุ่มเสียงขึ้น/ลง = เลื่อน · ปุ่ม Power = เลือก<small><b>Reboot system now</b> = เปิดเครื่องปกติ · <b>Wipe cache partition</b> = ล้างแคช ไม่มีอะไรหาย · <b>Wipe data/factory reset</b> = ล้างเครื่อง ทุกอย่างหาย</small></div></div>
+</details>
+</div>
+
+<div class="gpage" data-g="phone" hidden>
+<div class="card"><div class="part">ใช้กับมือถือ Android (ไปแก้หน้างาน)</div>
 <div class="step"><div class="n">1</div><div class="t">มือถือ <b>Android</b> ที่มี <b>Chrome</b> + สาย <b>USB-C ต่อ USB-C</b> หรือหัวแปลง <b>OTG</b><small>iPhone ใช้ไม่ได้ (Safari ไม่รองรับการต่ออุปกรณ์ USB)</small></div></div>
-<div class="step"><div class="n">2</div><div class="t">เปิดเว็บนี้ใน Chrome บนมือถือ แล้วกดเมนู 3 จุด &gt; <b>Add to Home screen</b> (เพิ่มลงในหน้าจอหลัก) หรือ <b>Install app</b><small>จะได้ไอคอน IDATA TOOLS เปิดได้เหมือนแอป</small></div></div>
-<div class="step"><div class="n">3</div><div class="t">ที่ฮับ ทำครั้งเดียวต่อเครื่อง: ต่อ PDA กับมือถือ กดวงกลม <b>เชื่อมต่อเครื่อง</b> แล้วที่ PDA ติ๊ก <b>Always allow</b> กด <b>Allow</b><small>มือถือกับคอมต้องได้รับอนุญาตแยกกัน</small></div></div>
-<div class="step"><div class="n">4</div><div class="t">หน้างาน: เสียบ PDA เข้ามือถือ เว็บจะต่อให้เอง แล้ว ปลดล็อก / ต่อ Wi-Fi / ลบรูป ได้เหมือนบนคอม<small>รายการที่ล็อกไว้เก็บอยู่ในตัว PDA: ล็อกจากคอม แล้วปลดล็อกด้วยมือถือได้</small></div></div>
-<div class="warnbox">ถ้าเสียบแล้ว PDA กลับชาร์จไฟให้มือถือแทน (เว็บไม่เห็นเครื่อง): กลับหัวสาย หรือใช้หัวแปลง OTG ที่ฝั่งมือถือ แล้วเสียบใหม่</div></div>
-<div class="card" id="ilauncher"><div class="part">เครื่องที่อยู่ใน iLauncher</div>
+<div class="step"><div class="n">2</div><div class="t">เปิดเว็บนี้ใน Chrome บนมือถือ กดเมนู 3 จุด &gt; <b>Add to Home screen</b> หรือ <b>Install app</b><small>จะได้ไอคอน IDATA TOOLS เปิดได้เหมือนแอป</small></div></div>
+<div class="step"><div class="n">3</div><div class="t">ที่ฮับ ทำครั้งเดียวต่อเครื่อง: ต่อ PDA กับมือถือ กด <b>+ เพิ่มเครื่อง</b> แล้วที่ PDA ติ๊ก <b>Always allow</b> กด <b>Allow</b><small>มือถือกับคอมต้องได้รับอนุญาตแยกกัน · ทำก่อนส่งเครื่องออกงาน เพราะตอนเครื่องค้างจะกด Allow ไม่ได้</small></div></div>
+<div class="step"><div class="n">4</div><div class="t">หน้างาน: เสียบ PDA เข้ามือถือ เว็บต่อให้เอง แล้ว ปลดล็อก / ต่อ Wi-Fi / ลบรูป ได้เหมือนบนคอม<small>รายการที่ล็อกไว้เก็บอยู่ในตัว PDA: ล็อกจากคอม แล้วปลดล็อกด้วยมือถือได้</small></div></div>
+<div class="warnbox">เสียบแล้ว PDA กลับชาร์จไฟให้มือถือแทน: กลับหัวสาย หรือใช้หัวแปลง OTG ที่ฝั่งมือถือ แล้วเสียบใหม่</div></div>
+</div>
+
+<div class="gpage" data-g="ilauncher" hidden>
+<div class="card"><div class="part">เครื่องที่ใช้ iLauncher</div>
 <div class="step"><div class="n">1</div><div class="t">ใน iLauncher กดเข้า <b>Settings</b> แล้วเปิด <b>USB debugging</b></div></div>
 <div class="step"><div class="n">2</div><div class="t"><b>ค้างไว้ที่หน้า Settings</b> อย่ากด Home หรือ Back แล้วใช้เว็บได้ตามปกติ<small>iLauncher ของบริษัทปิด USB ทันทีที่ออกจาก Settings: ตั้งใจไว้ ห้ามหาทางเลี่ยง</small></div></div>
 <div class="step"><div class="n">3</div><div class="t">ให้จอเปิดค้าง: ตอนเว็บถาม "ให้จอเปิดค้างไว้ไหม" ตอบ ยืนยัน หรือเปิด <b>Stay awake</b> ใน Developer options<small>จอดับแล้วเครื่องอาจกลับหน้า iLauncher และหลุด</small></div></div>
-<div class="step"><div class="n">4</div><div class="t">ทำงานเสร็จค่อยออกจาก Settings<small>รีสตาร์ทแอป Flash และส่งรูปหน้าจอ จะพาเครื่องออกจาก Settings: เว็บจะเตือนก่อน</small></div></div></div>
-<div class="card" id="notFound"><div class="part">กดเชื่อมต่อแล้ว ไม่เห็นชื่อเครื่องในหน้าต่าง</div>
-<div class="step"><div class="n">1</div><div class="t">ดูที่ดาวกลางจอก่อน<small>ถ้าเครื่องขึ้นเป็นดาวอยู่แล้ว แปลว่าต่ออยู่แล้ว ไม่ต้องกดซ้ำ (Chrome จะไม่แสดงเครื่องที่เว็บนี้ใช้อยู่)</small></div></div>
-<div class="step"><div class="n">2</div><div class="t">รูดแถบแจ้งเตือนที่เครื่องลงมา ต้องเห็น <b>USB debugging connected</b> (เชื่อมต่อการแก้ไขข้อบกพร่อง USB แล้ว)<small>ถ้าไม่เห็น: USB debugging ปิดอยู่ (เช่นเพิ่งรีเซ็ต) ให้ทำส่วน B ใหม่ หรือสายเสีย/เป็นสายชาร์จอย่างเดียว ให้เปลี่ยนสาย</small></div></div>
-<div class="step"><div class="n">3</div><div class="t">ในแถบแจ้งเตือน แตะข้อความ USB แล้วเลือก <b>File transfer</b> (โอนไฟล์)<small>บางเครื่องโหมด Charging only (ชาร์จอย่างเดียว) จะไม่ให้คอมเห็นเครื่อง</small></div></div>
-<div class="step"><div class="n">4</div><div class="t">ปิดแท็บอื่นที่เปิดเว็บนี้ซ้ำ และปิดโปรแกรมอื่นที่ใช้มือถือ แล้วถอดสาย รอ 3 วินาที เสียบใหม่</div></div>
-<div class="step"><div class="n">5</div><div class="t">ยังไม่เจอ: เช็กด้วย adb ตามหัวข้อ <b>เช็กด้วย adb</b> ด้านล่าง</div></div></div>
-<div class="card" id="winDriver"><div class="part">คอมเครื่องใหม่: บางเครื่องขึ้น แต่รุ่นใหม่ไม่ขึ้นในหน้าต่าง (Windows)</div>
-<div class="mut" style="margin-bottom:8px">Chrome ต่อเครื่องได้เฉพาะเครื่องที่ Windows ลงไดรเวอร์แบบ <b>WinUSB</b> ไว้ รุ่นที่เคยเสียบคอมนี้แล้วมักมีอยู่แล้ว รุ่นใหม่ต้องลงครั้งเดียวต่อคอม</div>
-<div class="step"><div class="n">1</div><div class="t">เช็กที่เครื่องก่อน: รูดแถบแจ้งเตือน ต้องเห็น <b>USB debugging connected</b><small>ไม่เห็น = ทำส่วน B ด้านบนก่อน (เครื่องใหม่หรือเพิ่งรีเซ็ตยังไม่ได้เปิด)</small></div></div>
-<div class="step"><div class="n">2</div><div class="t">ที่คอม กด <span class="kbd">⊞ Windows</span> พิมพ์ <code>Device Manager</code> (ตัวจัดการอุปกรณ์) กด <span class="kbd">Enter</span></div></div>
-<div class="step"><div class="n">3</div><div class="t">หา <b>ADB Interface</b> หรือชื่อรุ่นเครื่อง ที่มีเครื่องหมาย ⚠️ สีเหลือง (มักอยู่ใน <b>Other devices</b>)<small>ถ้าอยู่ใน <b>Universal Serial Bus devices</b> หรือ <b>Android Device</b> โดยไม่มี ⚠️ = ไดรเวอร์ปกติ ข้ามไปข้อ 6</small></div></div>
-<div class="step"><div class="n">4</div><div class="t">ลงไดรเวอร์ด้วยโปรแกรม <b>Zadig</b> (ฟรี ไม่ต้องติดตั้ง): โหลดจาก zadig.akeo.ie แล้วเปิด<small>เมนู <b>Options</b> &gt; ติ๊ก <b>List All Devices</b> · เลือกรายการที่เป็นเครื่อง PDA (มักชื่อ ADB Interface หรือชื่อรุ่น)</small></div></div>
-<div class="step"><div class="n">5</div><div class="t">ช่องขวาเลือก <b>WinUSB</b> แล้วกด <b>Install Driver</b> หรือ <b>Replace Driver</b> รอจนขึ้นว่าสำเร็จ<small>ระวังเลือกให้ถูกเครื่อง อย่าเลือกเมาส์ คีย์บอร์ด หรือกล้อง</small></div></div>
-<div class="step"><div class="n">6</div><div class="t">ปิดโปรแกรมอื่นที่ใช้มือถือ (adb, โปรแกรมโอนไฟล์ ฯลฯ) ถอดสาย รอ 3 วินาที เสียบใหม่ แล้วกดวงกลม <b>เชื่อมต่อเครื่อง</b></div></div>
-<div class="warnbox">ทำครั้งเดียวต่อคอมต่อรุ่นเครื่อง · คอมของบริษัทที่ลงโปรแกรมเองไม่ได้ ให้แจ้งไอที</div></div>
-<details><summary>ติดปัญหาอื่น? กดดูวิธีแก้</summary>
-    <h3>เช็กด้วย adb (ใช้บอกว่าปัญหาอยู่ที่เครื่อง หรือที่เบราว์เซอร์)</h3>
-    <ol><li>กดปุ่ม <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>
-    <li>พิมพ์ <code>cd C:\Users\Flash\Desktop\Best\platform-tools</code> กด <span class="kbd">Enter</span></li>
-    <li>พิมพ์ <code>adb devices</code> กด <span class="kbd">Enter</span></li>
-    <li>ขึ้นรหัสเครื่องตามด้วย <code>device</code> = เครื่องปกติ ให้พิมพ์ <code>adb kill-server</code> กด <span class="kbd">Enter</span> แล้วกลับมากดเชื่อมต่อในเว็บ</li>
-    <li>ขึ้น <code>unauthorized</code> = ยังไม่ได้กด Allow ที่เครื่อง</li>
-    <li>ไม่ขึ้นอะไรเลย = ปัญหาที่สาย, ช่อง USB หรือ USB debugging ปิดอยู่</li></ol>
-    <h3>ขึ้นว่า "เครื่องถูกใช้อยู่"</h3>
-    <ol><li>กดปุ่ม <span class="kbd">⊞ Windows</span> พิมพ์ <code>cmd</code> กด <span class="kbd">Enter</span></li>
-    <li>พิมพ์ <code>cd C:\Users\Flash\Desktop\Best\platform-tools</code> กด <span class="kbd">Enter</span></li>
-    <li>พิมพ์ <code>adb kill-server</code> กด <span class="kbd">Enter</span></li>
-    <li>ปิดแท็บเว็บนี้ที่เปิดซ้ำ แล้วเสียบสายใหม่</li></ol>
-    <a class="btn-link" href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">โหลด Platform-Tools</a>
-    <h3>ไม่มีหน้าต่าง "อนุญาต" ที่เครื่อง</h3>
-    <ol><li>ปลดล็อกหน้าจอเครื่อง แล้วถอดสายเสียบใหม่</li><li>ถ้าเคยกด Deny (ปฏิเสธ): <b>Developer options</b> &gt; <b>Revoke USB debugging authorizations</b> (ยกเลิกการอนุญาตทั้งหมด) แล้วลองใหม่</li></ol>
-  </details>
+<div class="step"><div class="n">4</div><div class="t">ทำงานเสร็จค่อยออกจาก Settings<small>รีสตาร์ทแอป Flash, ส่งรูปหน้าจอ และใส่บัญชี Google จะพาเครื่องออกจาก Settings: เว็บจะเตือนก่อน</small></div></div></div>
+</div>
 </section>
 
       <details><summary>บันทึกการทำงาน (Log)</summary><pre id="log"></pre></details>

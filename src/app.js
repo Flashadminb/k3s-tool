@@ -2503,6 +2503,14 @@ async function setWallpaper(file) {
 /* =====================================================================
    Start
    ===================================================================== */
+function guidePage(g) {
+  if (!document.querySelector(`.gpage[data-g="${g}"]`)) g = "start";
+  document.querySelectorAll(".gmenu button").forEach((b) => b.classList.toggle("on", b.dataset.g === g));
+  document.querySelectorAll(".gpage").forEach((p) => (p.hidden = p.dataset.g !== g));
+  st.save("guidePage", g);
+  const t = $("tab-guide");
+  if (t && !t.hidden) t.scrollIntoView({ block: "start" });
+}
 function showTab(name) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => (t.hidden = t.id !== "tab-" + name));
@@ -2556,7 +2564,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   applyRole(await auth.initAuth());
   document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => actions[b.dataset.act]()));
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
-  document.querySelectorAll("[data-goto]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.goto); }));
+  document.querySelectorAll("[data-goto]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.goto); if (a.dataset.gOpen) guidePage(a.dataset.gOpen); }));
+  // guide: one topic at a time, picked from the menu at the top (remembers the last one)
+  document.querySelectorAll(".gmenu button").forEach((b) => b.addEventListener("click", () => guidePage(b.dataset.g)));
+  document.querySelectorAll("[data-g-go]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); guidePage(a.dataset.gGo); }));
+  guidePage(st.load("guidePage", "start"));
   document.querySelectorAll("button[data-key]").forEach((b) => b.addEventListener("click", () => liveInput("input keyevent " + b.dataset.key)));
   $("apkFile").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) installApk(f); });
   $("wallFile").addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) setWallpaper(f); });

@@ -13,12 +13,19 @@ export const authTrace = { local: 0, shared: 0, made: false };
 const store = {
   generateKey: () => { authTrace.made = true; return webStore.generateKey(); },
   async *iterateKeys() {
+    // shared keys first: the first one is the hub's main key, and a device that asks for "Allow" is shown the
+    // first key tried, so allowing once works from every computer and phone logged in to the site
     const seen = new Set();
-    for await (const k of webStore.iterateKeys()) { seen.add(b64u(k.buffer)); authTrace.local++; yield k; }
-    for (const b of sharedKeys) if (!seen.has(b64u(b))) { authTrace.shared++; yield { buffer: b, name: "K3S Tool@" + location.hostname }; }
+    for (const b of sharedKeys) { seen.add(b64u(b)); authTrace.shared++; yield { buffer: b, name: "IDATA-TOOLS-HUB" }; }
+    for await (const k of webStore.iterateKeys()) { if (seen.has(b64u(k.buffer))) continue; authTrace.local++; yield k; }
   }
 };
 export const sharedKeyCount = () => sharedKeys.length;
+/** a new ADB key (PKCS#8, base64url) made in this browser, for the hub's main key */
+export async function makeKey() {
+  const { privateKey } = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-1" }, true, ["sign", "verify"]);
+  return b64u(new Uint8Array(await crypto.subtle.exportKey("pkcs8", privateKey)));
+}
 /** this browser's own ADB keys (PKCS#8), as base64url text */
 export async function localKeys() {
   const out = [];

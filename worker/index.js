@@ -365,7 +365,16 @@ async function api(req, env, url, s, body) {
   }
 
   if (p === "/api/adbkeys" && m === "GET")
-    return json((await many(env, "SELECT id, k, label, added_by, at FROM adbkeys ORDER BY at")).map((r) => (owner ? r : { k: r.k })));
+    return json((await many(env, "SELECT id, k, label, added_by, at FROM adbkeys ORDER BY (id = 'primary') DESC, at")).map((r) => (owner ? r : { id: r.id === "primary" ? "primary" : "", k: r.k })));
+  // the hub's main key: made once by the first browser that finds none (key generation is too heavy for the Worker),
+  // then every browser offers it first, so a device that allows it once works from every computer and phone
+  if (p === "/api/adbkeys/primary" && m === "POST") {
+    const k = String(body.k || "");
+    if (!/^[A-Za-z0-9_-]{600,4000}$/.test(k)) return bad("กุญแจไม่ถูกต้อง");
+    const r = await exec(env, "INSERT OR IGNORE INTO adbkeys(id,k,label,added_by,at) VALUES('primary',?,?,?,?)", k, "กุญแจหลักของฮับ (ใช้ร่วมทุกคอม)", s.username, now());
+    if (r.meta.changes) await logEv(env, req, { user: me, type: "action", detail: "สร้างกุญแจหลักของฮับ" });
+    return json({ ok: true, created: !!r.meta.changes });
+  }
   if (p === "/api/adbkeys" && m === "POST") {
     if (!verified(s) && !(await useTicket(env, s, req.headers.get("x-idt-ticket")))) return bad("ต้องยืนยันรหัสผ่านก่อน", 403, { verify: true });
     const keys = (Array.isArray(body.keys) ? body.keys : []).map(String).filter((k) => /^[A-Za-z0-9_-]{600,4000}$/.test(k)).slice(0, 20);

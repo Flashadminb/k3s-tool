@@ -42,3 +42,4 @@ export const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-")
 export const unb64u = (t) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 export const authTrace = { local: 0, shared: 0, made: false };
 export const sharedKeyCount = () => 0;
+export async function makeKey() { return ""; }

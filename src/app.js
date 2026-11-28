@@ -445,6 +445,7 @@ async function learnProfile(d) {
 async function connectNew() {
   log("รอเลือกเครื่องในหน้าต่างของเบราว์เซอร์ ...");
   const usb = await adb.requestUsb();
+  await Promise.race([keysReady, sleep(8000)]);   // the hub's shared key must be in hand before talking to the device
   // Picked a device that is already on the stage: just select it, never ask for "Allow" again
   let have = devices.get(usb.serial);
   if (have && !have.closed) {
@@ -465,7 +466,7 @@ async function connectNew() {
   // if the device still asks for "Allow" after a moment, say which keys it refused (helps tracing a missed key move)
   const why = setTimeout(() => {
     const t = adb.authTrace;
-    if (auth.me.role !== "local") log(`เครื่องรหัส ${usb.serial.slice(-6)} ไม่รู้จักกุญแจที่ลอง: ของคอมนี้ ${Math.max(0, t.local - (t.made ? 1 : 0))} ชุด + จากระบบ ${t.shared} ชุด (ระบบมีทั้งหมด ${adb.sharedKeyCount()} ชุด) จึงขอ Allow ใหม่`);
+    if (auth.me.role !== "local") log(`เครื่องรหัส ${usb.serial.slice(-6)} ยังไม่รู้จักกุญแจของฮับ (ลองแล้ว: จากระบบ ${t.shared} ชุด + ของคอมนี้ ${t.local} ชุด) กด Allow และติ๊ก "อนุญาตเสมอ" ครั้งเดียว แล้วเครื่องนี้จะใช้ได้กับทุกคอม`);
   }, 4000);
   try { d = await adb.openUsb(usb, (s) => { busyMsg(`รอกด Allow ที่เครื่องรหัส ${String(s || "").slice(-6)}`); authWait(true, s); }); }
   catch (e) { if (e.message === "CANCELLED") { log(`ยกเลิกการรอเครื่องรหัส ${usb.serial.slice(-6)}`); return false; } throw e; }
@@ -2897,7 +2898,7 @@ async function renderUsers() {
     const keys = await auth.apiGet("/api/adbkeys");
     $("keyList").replaceChildren(el("div", { class: "mut", text: keys.length ? `กุญแจ ADB ที่ใช้ร่วมกัน ${keys.length} ชุด (เครื่องที่เคยกด Allow ให้กุญแจไหน ต่อได้จากทุกคอม)` : "ยังไม่มีกุญแจ ADB ที่ใช้ร่วมกัน" }),
       ...keys.map((k) => el("div", { class: "item" }, el("div", { class: "nm" }, k.label || "กุญแจ ADB", el("small", { text: `เพิ่มโดย ${k.added_by || "?"} · ${dt(k.at)}` })),
-        el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox("ลบกุญแจนี้? เครื่องที่ Allow ไว้กับกุญแจนี้เท่านั้น จะต้องกด Allow ใหม่")) act("ลบกุญแจ ADB", () => auth.apiDel("/api/adbkeys?id=" + encodeURIComponent(k.id))); } }))));
+        el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox(k.id === "primary" ? "ลบกุญแจหลักของฮับ? ทุกเครื่องที่ Allow ไว้กับกุญแจนี้ต้องกด Allow ใหม่หมด (ระบบจะสร้างกุญแจหลักใหม่ให้)" : "ลบกุญแจนี้? เครื่องที่ Allow ไว้กับกุญแจนี้เท่านั้น จะต้องกด Allow ใหม่")) act("ลบกุญแจ ADB", () => auth.apiDel("/api/adbkeys?id=" + encodeURIComponent(k.id))); } }))));
     const ev = await auth.apiGet("/api/events?limit=40");
     $("eventList").replaceChildren(...(ev.length ? ev.map(evLine) : [el("div", { text: "ยังไม่มี" })]));
   } catch (e) { $("memberList").replaceChildren(el("div", { class: "item mut", text: "โหลดรายชื่อไม่ได้: " + e.message })); }
@@ -2905,8 +2906,17 @@ async function renderUsers() {
 
 /* ---------- ADB keys: devices that allowed the old site (or another computer) keep working without "Allow" ---------- */
 const NEW_SITE = "https://idata-tools.flashbplbhub.workers.dev";
+let keysReady = Promise.resolve();
 async function loadSharedKeys() {
-  try { const l = await auth.apiGet("/api/adbkeys"); adb.setSharedKeys(l.map((r) => adb.unb64u(r.k))); return l; } catch (e) { return []; }
+  try {
+    let l = await auth.apiGet("/api/adbkeys");
+    if (!l.some((r) => r.id === "primary")) {   // first browser ever: make the hub's main key
+      await auth.apiPost("/api/adbkeys/primary", { k: await adb.makeKey() });
+      l = await auth.apiGet("/api/adbkeys");
+    }
+    adb.setSharedKeys(l.map((r) => adb.unb64u(r.k)));
+    return l;
+  } catch (e) { log("โหลดกุญแจ ADB ของฮับไม่ได้: " + e.message); return []; }
 }
 async function shareKeys(extra, label) {
   const own = await adb.localKeys();
@@ -2932,7 +2942,8 @@ async function keyMigration() {
   if (auth.me.role === "local") return;
   const m = location.hash.match(/adbkeys=([\w.-]+)/);
   if (m) history.replaceState(null, "", location.pathname + location.search);
-  await loadSharedKeys();
+  keysReady = loadSharedKeys();
+  await keysReady;
   if (m) await shareKeys(m[1].split("."), "จากเว็บเก่า " + new Date().toLocaleDateString("th-TH")).catch((e) => log("นำเข้ากุญแจ ADB ไม่สำเร็จ: " + e.message));
 }
 

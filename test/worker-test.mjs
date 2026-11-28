@@ -177,6 +177,8 @@ try {
   ok((await post("/api/adbkeys", { keys: [fakeKey, fakeKey, fakeKey2], label: "old site" }, nokC, { "x-idt-ticket": r.j.ticket })).j.added === 2, "keys imported once each with the one-time ticket");
   ok((await req("/api/adbkeys", { cookie: owner })).j.length === 2 && (await req("/api/adbkeys", { cookie: nokC })).j[0].k === fakeKey, "every member's browser gets the shared keys");
   ok((await req("/api/adbkeys")).status === 401, "keys never served without login");
+  ok((await post("/api/adbkeys/primary", { k: "P".repeat(1600) }, nokC)).j.created && !(await post("/api/adbkeys/primary", { k: "Q".repeat(1600) }, owner)).j.created, "hub main key made once only");
+  ok((await req("/api/adbkeys", { cookie: nokC })).j[0].id === "primary", "main key comes first (it is the one a device is asked to allow)");
 
   console.log("owner recovery");
   for (const pw of ["x1", "x2", "x3"]) await post("/api/login", { username: "boss", password: pw });
@@ -214,7 +216,7 @@ try {
   await page.fill("#vfyPw", "owner-pass-9"); await page.click("#vfyOk");
   await page.waitForSelector("#vfy", { state: "hidden", timeout: 10000 });
   await page.waitForTimeout(800);
-  ok((await req("/api/adbkeys", { cookie: owner2 })).j.length === 3 && !(await page.evaluate(() => location.hash)), "keys from the old site link imported, link cleaned");
+  ok((await req("/api/adbkeys", { cookie: owner2 })).j.some((k) => k.k === "C".repeat(1600)) && !(await page.evaluate(() => location.hash)), "keys from the old site link imported, link cleaned");
   // an important setting changed in the page asks for the password (Energy Shield) and then saves
   await page.click("button[data-tab=wifi]");
   await page.click('details.fold:has(#wfSsid) > summary');

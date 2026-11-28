@@ -201,7 +201,9 @@ async function open(usbDev, onAuth) {
   waiting.set(usbDev.serial, usbDev.raw);
   try {
     const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: connStore });
-    return new Device(new Adb(transport), usbDev.serial);
+    const dev = new Device(new Adb(transport), usbDev.serial);
+    if (usbDev.raw) dev.usbIds = { vid: usbDev.raw.vendorId, pid: usbDev.raw.productId };
+    return dev;
   } catch (e) {
     if (waiting.get(usbDev.serial) === "cancelled") throw new Error("CANCELLED");
     throw e;

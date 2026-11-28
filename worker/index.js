@@ -30,7 +30,7 @@ const INVITE_DAYS = 7;
 const SUSPENDED = "บัญชีถูกระงับ กรุณาติดต่อเจ้าของระบบ";
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
 const ACTIONS = { delete: "ลบข้อมูล", unlock: "ปลดล็อกแอป", reset: "รีเซ็ตเครื่อง (Factory Reset)", recovery: "เข้าเมนู Recovery", uninstall: "ถอนแอป", autodelete: "เปิดลบอัตโนมัติ", settings: "เปลี่ยนค่าหลังบ้าน", adbkey: "นำเข้ากุญแจ ADB" };
-const LIGHT_KEYS = new Set(["names", "wallLearn"]); // shared settings that are not "important" (device nicknames, learned taps)
+const LIGHT_KEYS = new Set(["names", "wallLearn", "usbIds"]); // shared settings that are not "important" (device nicknames, learned taps)
 const enc = new TextEncoder();
 const now = () => Date.now();
 

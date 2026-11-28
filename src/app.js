@@ -365,12 +365,16 @@ async function addDevice(d) {
   d.info.profile = st.profileFor(d.info.model);
   await learnProfile(d).catch(() => {});
   devices.set(d.serial, d);
+  if (d.usbIds) {
+    const ids = st.load("usbIds", []), key = d.usbIds.vid + ":" + d.usbIds.pid;
+    if (!ids.includes(key)) st.save("usbIds", [...ids, key]);
+  }
   if (!selected || !devices.get(selected) || devices.get(selected).closed) selected = d.serial;
   log("เชื่อมต่อ " + label(d) + " (ใช้ที่เก็บรูปแบบ " + d.info.profile.name + ")");
   d.disconnected.then(() => {
     log("หลุดการเชื่อมต่อ: " + label(d));
     // The page cannot tell a pulled cable from a device that switched USB debugging off (e.g. entering iLauncher)
-    if (!d.rebooting) showHelp("DROPPED", label(d), true);
+    if (!d.rebooting && !d.unplugged) showHelp("DROPPED", label(d), true);
     devices.delete(d.serial); group.delete(d.serial);
     if (selected === d.serial) selected = devices.keys().next().value || null;
     if (live.dev === d) stopLive();
@@ -2276,6 +2280,7 @@ const actions = {
     ["nuFirst", "nuLast", "nuNick", "nuUser", "nuPass"].forEach((k) => ($(k).value = ""));
     await renderUsers();
   }, null, { free: true }),
+  plugAndGo: () => plugAndGoFile(),
   shareKey: () => run("แชร์กุญแจ ADB", () => shareKeys([], "คอมของ " + auth.me.name + " " + new Date().toLocaleDateString("th-TH")), null, { free: true }),
   meSave: () => run("บันทึกข้อมูลของฉัน", async () => {
     const r = await auth.apiPost("/api/me/profile", { first: $("meFirst").value, last: $("meLast").value, nick: $("meNick").value });
@@ -2941,6 +2946,24 @@ async function shareKeys(extra, label) {
   log(`นำเข้ากุญแจ ADB แล้ว ${r.added} ชุดใหม่ · เครื่องที่เคย Allow กับกุญแจเหล่านี้ ต่อได้เลยไม่ต้องกด Allow ใหม่`);
   if (auth.me.role === "admin") renderUsers();
 }
+/**
+ * Chrome / Edge ask a person to pick a USB device once per computer. A computer-wide browser policy
+ * (WebUsbAllowDevicesForUrls) can allow the iData models for this site ahead of time: then any of them that is
+ * plugged in connects by itself. This makes a .reg file with the USB ids of every model seen so far.
+ */
+function plugAndGoFile() {
+  const ids = st.load("usbIds", []).map((k) => k.split(":").map(Number)).filter(([v, p]) => v > 0 && p >= 0);
+  if (!ids.length) { showHelp("UNKNOWN", "ยังไม่มีข้อมูลรุ่นเครื่อง: ต่อ iData แต่ละรุ่นกับเว็บนี้อย่างน้อย 1 ครั้งก่อน แล้วกดปุ่มนี้อีกครั้ง"); return; }
+  const vendors = [...new Set(ids.map(([v]) => v))];
+  const devs = [...vendors.map((v) => ({ vendor_id: v })), ...ids.map(([v, p]) => ({ vendor_id: v, product_id: p }))];
+  const pol = JSON.stringify([{ devices: devs, urls: [location.origin] }]).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const reg = ["Windows Registry Editor Version 5.00", "",
+    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Google\\Chrome]", `"WebUsbAllowDevicesForUrls"="${pol}"`, "",
+    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Edge]", `"WebUsbAllowDevicesForUrls"="${pol}"`, ""].join("\r\n");
+  download(reg, "idata-tools-plug-and-go.reg", "application/octet-stream");
+  log(`ดาวน์โหลดไฟล์ตั้งคอมแล้ว (iData ${ids.length} รุ่น) · ดับเบิลคลิกไฟล์ > Yes > ปิด Chrome ทุกหน้าต่างแล้วเปิดใหม่`);
+}
+
 async function keyMigration() {
   // the old public site: one button takes this browser's keys to the new site (in the link's #part, never sent to a server)
   if (/github\.io$/.test(location.hostname)) {
@@ -3025,5 +3048,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
   if (!adb.hasWebUsb()) { showHelp("NO_WEBUSB"); return; }
   navigator.usb.addEventListener("connect", () => setTimeout(autoConnect, 800));
+  // cable pulled: take the device off the screen at once (otherwise it waits for the connection to time out)
+  navigator.usb.addEventListener("disconnect", (e) => {
+    const sn = e.device && e.device.serialNumber;
+    const d = sn && devices.get(sn);
+    if (!d || d.closed) return;
+    d.unplugged = true;
+    log("ถอดสาย: " + label(d));
+    d.stop && d.stop().catch(() => {});
+    d.close();
+  });
   autoConnect();
 });

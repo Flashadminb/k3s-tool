@@ -4,7 +4,7 @@
 import * as st from "./store.js";
 
 // Settings shared by every computer and phone: the owner's copy lives on the server
-export const SYNC_KEYS = ["profiles", "banned", "std", "flash", "wifi", "fieldLock", "gEmail", "names", "wallLearn", "portal"];
+export const SYNC_KEYS = ["profiles", "banned", "std", "flash", "wifi", "fieldLock", "gEmail", "names", "wallLearn", "portal", "usbIds"];
 export let me = { role: "local", name: "" };
 export const ACT_LABEL = { delete: "ลบข้อมูล", unlock: "ปลดล็อกแอป", reset: "รีเซ็ตเครื่อง (Factory Reset)", recovery: "เข้าเมนู Recovery", uninstall: "ถอนแอป", autodelete: "เปิดลบอัตโนมัติ", settings: "เปลี่ยนค่าหลังบ้าน", adbkey: "นำเข้ากุญแจ ADB" };
 

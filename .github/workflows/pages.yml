@@ -43,10 +43,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           IDT_SETUP_CODE: ${{ secrets.IDT_SETUP_CODE }}
 
+  # The old public address stays up for now only to carry each browser's ADB keys to the login site (move button);
+  # turn it off in Settings > Pages once every computer and phone has moved.
   pages:
     needs: target
-    if: needs.target.outputs.cf != 'yes'
     runs-on: ubuntu-latest
+    continue-on-error: true
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

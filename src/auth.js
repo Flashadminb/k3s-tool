@@ -6,7 +6,7 @@ import * as st from "./store.js";
 // Settings shared by every computer and phone: the owner's copy lives on the server
 export const SYNC_KEYS = ["profiles", "banned", "std", "flash", "wifi", "fieldLock", "gEmail", "names", "wallLearn", "portal"];
 export let me = { role: "local", name: "" };
-export const ACT_LABEL = { delete: "ลบข้อมูล", unlock: "ปลดล็อกแอป", reset: "รีเซ็ตเครื่อง (Factory Reset)", recovery: "เข้าเมนู Recovery", uninstall: "ถอนแอป", autodelete: "เปิดลบอัตโนมัติ", settings: "เปลี่ยนค่าหลังบ้าน" };
+export const ACT_LABEL = { delete: "ลบข้อมูล", unlock: "ปลดล็อกแอป", reset: "รีเซ็ตเครื่อง (Factory Reset)", recovery: "เข้าเมนู Recovery", uninstall: "ถอนแอป", autodelete: "เปิดลบอัตโนมัติ", settings: "เปลี่ยนค่าหลังบ้าน", adbkey: "นำเข้ากุญแจ ADB" };
 
 /** fetch JSON; 401 = the session is gone -> login page */
 async function raw(method, path, body, headers = {}) {
@@ -64,6 +64,17 @@ let noticeFn = (t) => console.warn(t);
 export const onNotice = (fn) => { noticeFn = fn; };
 const notice = (t) => noticeFn(t);
 
+/** POST that may need the password first (server answers verify:true): asks once, then sends again with the ticket */
+export async function verifiedPost(action, path, body, text) {
+  let r = await raw("POST", path, body);
+  if (!r.ok && r.j.verify) {
+    const v = await verifyDialog({ action, text });
+    if (!v) return null;
+    r = await raw("POST", path, body, v.ticket ? { "x-idt-ticket": v.ticket } : {});
+  }
+  if (!r.ok) throw new Error(r.j.error || "HTTP " + r.status);
+  return r.j;
+}
 export async function logout() { try { await apiPost("/api/logout"); } catch (e) {} location.href = "/login"; }
 
 /**

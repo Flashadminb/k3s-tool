@@ -3,7 +3,27 @@ import { AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { ReadableStream, ConcatBufferStream, ConcatStringStream, TextDecoderStream } from "@yume-chan/stream-extra";
 
-const store = new AdbWebCredentialStore("K3S Tool");
+const webStore = new AdbWebCredentialStore("K3S Tool");
+// Keys shared through the login server (imported from the old site / other computers): a device that allowed any
+// of them connects without asking again. This browser's own key is tried first; new keys are still made here.
+let sharedKeys = [];
+export const setSharedKeys = (list) => { sharedKeys = list; };
+const store = {
+  generateKey: () => webStore.generateKey(),
+  async *iterateKeys() {
+    const seen = new Set();
+    for await (const k of webStore.iterateKeys()) { seen.add(b64u(k.buffer)); yield k; }
+    for (const b of sharedKeys) if (!seen.has(b64u(b))) yield { buffer: b, name: "K3S Tool@" + location.hostname };
+  }
+};
+/** this browser's own ADB keys (PKCS#8), as base64url text */
+export async function localKeys() {
+  const out = [];
+  try { for await (const k of webStore.iterateKeys()) out.push(b64u(k.buffer)); } catch (e) {}
+  return out;
+}
+export const b64u = (u8) => { let s = ""; for (const x of u8) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+export const unb64u = (t) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 const mgr = AdbDaemonWebUsbDeviceManager.BROWSER;
 
 export const hasWebUsb = () => !!mgr;

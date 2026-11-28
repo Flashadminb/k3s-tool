@@ -169,6 +169,15 @@ try {
   ok((await req("/api/settings", { cookie: nokC })).j.wifi[0].ssid === "Hub", "members get the shared settings on any computer");
   ok((await req("/api/settings", { method: "PUT", cookie: nokC, body: {} })).status === 403, "members cannot change shared settings");
 
+  console.log("shared ADB keys");
+  const fakeKey = "A".repeat(1600), fakeKey2 = "B".repeat(1600);
+  r = await post("/api/adbkeys", { keys: [fakeKey] }, nokC);
+  ok(r.status === 403 && r.j.verify, "importing ADB keys needs the password");
+  r = await post("/api/verify", { action: "adbkey", password: "nok-pass-56", remember: false }, nokC);
+  ok((await post("/api/adbkeys", { keys: [fakeKey, fakeKey, fakeKey2], label: "old site" }, nokC, { "x-idt-ticket": r.j.ticket })).j.added === 2, "keys imported once each with the one-time ticket");
+  ok((await req("/api/adbkeys", { cookie: owner })).j.length === 2 && (await req("/api/adbkeys", { cookie: nokC })).j[0].k === fakeKey, "every member's browser gets the shared keys");
+  ok((await req("/api/adbkeys")).status === 401, "keys never served without login");
+
   console.log("owner recovery");
   for (const pw of ["x1", "x2", "x3"]) await post("/api/login", { username: "boss", password: pw });
   ok((await post("/api/login", { username: "boss", password: "owner-pass-1" })).status === 403, "owner locked after 3 wrong");
@@ -199,6 +208,13 @@ try {
   await page.fill("#ivNick", "ใหม่"); await page.click("button[data-act=inviteCreate]");
   await page.waitForFunction(() => /\/invite\//.test(document.getElementById("ivOut").textContent), null, { timeout: 10000 });
   ok(/[A-Z2-9]{5}-[A-Z2-9]{5}/.test(await page.textContent("#ivOut")), "invite link and code shown after creating");
+  // coming from the old site with this browser's keys in the link: asks the password once, then the keys are shared
+  await page.goto("about:blank"); await page.goto(base + "/#adbkeys=" + "C".repeat(1600));
+  await page.waitForSelector("#vfy:not([hidden])", { timeout: 15000 });
+  await page.fill("#vfyPw", "owner-pass-9"); await page.click("#vfyOk");
+  await page.waitForSelector("#vfy", { state: "hidden", timeout: 10000 });
+  await page.waitForTimeout(800);
+  ok((await req("/api/adbkeys", { cookie: owner2 })).j.length === 3 && !(await page.evaluate(() => location.hash)), "keys from the old site link imported, link cleaned");
   // an important setting changed in the page asks for the password (Energy Shield) and then saves
   await page.click("button[data-tab=wifi]");
   await page.click('details.fold:has(#wfSsid) > summary');

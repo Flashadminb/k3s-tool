@@ -2263,6 +2263,7 @@ const actions = {
     ["nuFirst", "nuLast", "nuNick", "nuUser", "nuPass"].forEach((k) => ($(k).value = ""));
     await renderUsers();
   }, null, { free: true }),
+  shareKey: () => run("แชร์กุญแจ ADB", () => shareKeys([], "คอมของ " + auth.me.name + " " + new Date().toLocaleDateString("th-TH")), null, { free: true }),
   meSave: () => run("บันทึกข้อมูลของฉัน", async () => {
     const r = await auth.apiPost("/api/me/profile", { first: $("meFirst").value, last: $("meLast").value, nick: $("meNick").value });
     auth.me.name = r.name; auth.me.first = $("meFirst").value; auth.me.last = $("meLast").value; auth.me.nick = $("meNick").value;
@@ -2887,15 +2888,53 @@ async function renderUsers() {
       el("div", { class: "nm" }, `${i.nickname || i.first_name || "ไม่ระบุชื่อ"} · ${IST[i.status]}`,
         el("small", { text: `สร้าง ${dt(i.created_at)} · หมดอายุ ${dt(i.expires_at)}${i.opened_at ? " · เปิดดูแล้ว" : ""}${i.used_username ? " · สมัครเป็น " + i.used_username : ""}` })),
       i.status === "pending" ? el("button", { class: "red", text: "ยกเลิก", onclick: () => act("ยกเลิกคำเชิญ", () => auth.apiPost("/api/invites/revoke", { id: i.id })) }) : null)));
+    const keys = await auth.apiGet("/api/adbkeys");
+    $("keyList").replaceChildren(el("div", { class: "mut", text: keys.length ? `กุญแจ ADB ที่ใช้ร่วมกัน ${keys.length} ชุด (เครื่องที่เคยกด Allow ให้กุญแจไหน ต่อได้จากทุกคอม)` : "ยังไม่มีกุญแจ ADB ที่ใช้ร่วมกัน" }),
+      ...keys.map((k) => el("div", { class: "item" }, el("div", { class: "nm" }, k.label || "กุญแจ ADB", el("small", { text: `เพิ่มโดย ${k.added_by || "?"} · ${dt(k.at)}` })),
+        el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox("ลบกุญแจนี้? เครื่องที่ Allow ไว้กับกุญแจนี้เท่านั้น จะต้องกด Allow ใหม่")) act("ลบกุญแจ ADB", () => auth.apiDel("/api/adbkeys?id=" + encodeURIComponent(k.id))); } }))));
     const ev = await auth.apiGet("/api/events?limit=40");
     $("eventList").replaceChildren(...(ev.length ? ev.map(evLine) : [el("div", { text: "ยังไม่มี" })]));
   } catch (e) { $("memberList").replaceChildren(el("div", { class: "item mut", text: "โหลดรายชื่อไม่ได้: " + e.message })); }
+}
+
+/* ---------- ADB keys: devices that allowed the old site (or another computer) keep working without "Allow" ---------- */
+const NEW_SITE = "https://idata-tools.flashbplbhub.workers.dev";
+async function loadSharedKeys() {
+  try { const l = await auth.apiGet("/api/adbkeys"); adb.setSharedKeys(l.map((r) => adb.unb64u(r.k))); return l; } catch (e) { return []; }
+}
+async function shareKeys(extra, label) {
+  const own = await adb.localKeys();
+  const keys = [...new Set([...extra, ...own])];
+  if (!keys.length) { log("เบราว์เซอร์นี้ยังไม่มีกุญแจ ADB (ยังไม่เคยต่อเครื่อง)"); return; }
+  const r = await auth.verifiedPost("adbkey", "/api/adbkeys", { keys, label }, "เก็บกุญแจ ADB ไว้ที่ระบบ: เครื่องที่เคยกด Allow ให้กุญแจนี้ จะต่อได้จากทุกคอมโดยไม่ต้องกด Allow ใหม่");
+  if (!r) { log("ยังไม่ได้นำเข้ากุญแจ ADB (ยกเลิก)"); return; }
+  await loadSharedKeys();
+  log(`นำเข้ากุญแจ ADB แล้ว ${r.added} ชุดใหม่ · เครื่องที่เคย Allow กับกุญแจเหล่านี้ ต่อได้เลยไม่ต้องกด Allow ใหม่`);
+  if (auth.me.role === "admin") renderUsers();
+}
+async function keyMigration() {
+  // the old public site: one button takes this browser's keys to the new site (in the link's #part, never sent to a server)
+  if (/github\.io$/.test(location.hostname)) {
+    const go = el("button", { class: "blue", text: "ย้ายไปเว็บใหม่ (พากุญแจไปด้วย)", onclick: async () => {
+      const keys = await adb.localKeys();
+      location.href = NEW_SITE + "/" + (keys.length ? "#adbkeys=" + keys.join(".") : "");
+    } });
+    document.body.append(el("div", { id: "moveBar", style: "position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:30;max-width:calc(100% - 24px);display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-radius:14px;background:rgba(10,20,44,.95);border:1px solid rgba(92,225,255,.5);color:#eaf4ff;font-size:15px" },
+      el("span", { text: "เว็บนี้ย้ายไปเว็บใหม่ที่ต้องล็อกอินแล้ว · กดปุ่มบนคอม/มือถือเครื่องนี้ 1 ครั้ง เครื่อง PDA ที่เคยกด Allow ไว้กับเครื่องนี้จะต่อกับเว็บใหม่ได้เลย ไม่ต้องกด Allow ใหม่" }), go));
+    return;
+  }
+  if (auth.me.role === "local") return;
+  const m = location.hash.match(/adbkeys=([\w.-]+)/);
+  if (m) history.replaceState(null, "", location.pathname + location.search);
+  await loadSharedKeys();
+  if (m) await shareKeys(m[1].split("."), "จากเว็บเก่า " + new Date().toLocaleDateString("th-TH")).catch((e) => log("นำเข้ากุญแจ ADB ไม่สำเร็จ: " + e.message));
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
   authorMark();
   auth.onNotice((t) => log("⚠️ " + t));
   applyRole(await auth.initAuth());
+  keyMigration();
   document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => actions[b.dataset.act]()));
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
   document.querySelectorAll("[data-goto]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); showTab(a.dataset.goto); if (a.dataset.gOpen) guidePage(a.dataset.gOpen); }));

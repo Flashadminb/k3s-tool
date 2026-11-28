@@ -29,7 +29,7 @@ const MAX_WRONG = 3;
 const INVITE_DAYS = 7;
 const SUSPENDED = "บัญชีถูกระงับ กรุณาติดต่อเจ้าของระบบ";
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
-const ACTIONS = { delete: "ลบข้อมูล", unlock: "ปลดล็อกแอป", reset: "รีเซ็ตเครื่อง (Factory Reset)", recovery: "เข้าเมนู Recovery", uninstall: "ถอนแอป", autodelete: "เปิดลบอัตโนมัติ", settings: "เปลี่ยนค่าหลังบ้าน" };
+const ACTIONS = { delete: "ลบข้อมูล", unlock: "ปลดล็อกแอป", reset: "รีเซ็ตเครื่อง (Factory Reset)", recovery: "เข้าเมนู Recovery", uninstall: "ถอนแอป", autodelete: "เปิดลบอัตโนมัติ", settings: "เปลี่ยนค่าหลังบ้าน", adbkey: "นำเข้ากุญแจ ADB" };
 const LIGHT_KEYS = new Set(["names", "wallLearn"]); // shared settings that are not "important" (device nicknames, learned taps)
 const enc = new TextEncoder();
 const now = () => Date.now();
@@ -87,7 +87,9 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER, user_id TEXT, username TEXT, type TEXT, ip TEXT, ua TEXT, detail TEXT, by_user TEXT)`,
   `CREATE INDEX IF NOT EXISTS events_user ON events(user_id, at)`,
   `CREATE TABLE IF NOT EXISTS rate(k TEXT PRIMARY KEY, n INTEGER NOT NULL, reset_at INTEGER NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT, updated_at INTEGER, updated_by TEXT)`
+  `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT, updated_at INTEGER, updated_by TEXT)`,
+  // ADB private keys shared by every logged-in browser, so a device that allowed one computer works from all of them
+  `CREATE TABLE IF NOT EXISTS adbkeys(id TEXT PRIMARY KEY, k TEXT NOT NULL, label TEXT, added_by TEXT, at INTEGER)`
 ];
 let schemaReady = null;
 function ensureSchema(env) {
@@ -250,7 +252,7 @@ ${field("u", "Username", "text", `required autocomplete="username" autocapitaliz
 ${field("p", "Password", "password", `required autocomplete="current-password"`)}
 <label class="chk"><input type="checkbox" id="r"> จำฉันไว้ (เข้าค้างไว้จนกว่าจะออกจากระบบ)</label>
 <button id="b">เข้าสู่ระบบ</button></form><p style="margin:14px 0 0">มีคำเชิญ? <a href="/invite">ใส่รหัสเชิญ</a></p>`,
-  `$("f").addEventListener("submit",(e)=>{e.preventDefault();go("/api/login",{username:$("u").value,password:$("p").value,remember:$("r").checked},$("b"),"/")});`);
+  `$("f").addEventListener("submit",(e)=>{e.preventDefault();go("/api/login",{username:$("u").value,password:$("p").value,remember:$("r").checked},$("b"),"/"+location.hash)});`);
 }
 function setupPage(hasCode) {
   if (!hasCode) return page("ตั้งค่าครั้งแรก", `<p>ยังเปิดใช้ไม่ได้</p><div class="msg">ยังไม่ได้ตั้งรหัสตั้งค่าครั้งแรก (Secret ชื่อ IDT_SETUP_CODE ใน GitHub อย่างน้อย 12 ตัว) แล้ว deploy ใหม่</div>`, "");
@@ -356,12 +358,34 @@ async function api(req, env, url, s, body) {
     await exec(env, "UPDATE users SET failed=0 WHERE id=?", s.user_id);
     let until = 0, ticket = "";
     if (body.remember) { until = now() + VERIFY_MS; await exec(env, "UPDATE sessions SET verified_until=? WHERE id=?", until, s.sid); }
-    else if (a === "settings") { ticket = randToken(24); await exec(env, "UPDATE sessions SET ticket=?, ticket_exp=? WHERE id=?", await sha(ticket), now() + TICKET_MS, s.sid); }
+    else if (a === "settings" || a === "adbkey") { ticket = randToken(24); await exec(env, "UPDATE sessions SET ticket=?, ticket_exp=? WHERE id=?", await sha(ticket), now() + TICKET_MS, s.sid); }
     await logEv(env, req, { user: me, type: "verify_ok", detail: body.remember ? "จำการยืนยัน 8 ชั่วโมง" : "ยืนยันครั้งนี้" });
-    if (a !== "settings") await logEv(env, req, { user: me, type: "action", detail: ACTIONS[a] + (body.detail ? " · " + clip(body.detail, 200) : "") });
+    if (a !== "settings" && a !== "adbkey") await logEv(env, req, { user: me, type: "action", detail: ACTIONS[a] + (body.detail ? " · " + clip(body.detail, 200) : "") });
     return json({ ok: true, verifiedUntil: until, ticket });
   }
 
+  if (p === "/api/adbkeys" && m === "GET")
+    return json((await many(env, "SELECT id, k, label, added_by, at FROM adbkeys ORDER BY at")).map((r) => (owner ? r : { k: r.k })));
+  if (p === "/api/adbkeys" && m === "POST") {
+    if (!verified(s) && !(await useTicket(env, s, req.headers.get("x-idt-ticket")))) return bad("ต้องยืนยันรหัสผ่านก่อน", 403, { verify: true });
+    const keys = (Array.isArray(body.keys) ? body.keys : []).map(String).filter((k) => /^[A-Za-z0-9_-]{600,4000}$/.test(k)).slice(0, 20);
+    if (!keys.length) return bad("ไม่มีกุญแจที่ใช้ได้");
+    const have = (await one(env, "SELECT COUNT(*) AS n FROM adbkeys")).n;
+    let added = 0;
+    for (const k of keys) {
+      if (have + added >= 60) break;
+      const r = await exec(env, "INSERT OR IGNORE INTO adbkeys(id,k,label,added_by,at) VALUES(?,?,?,?,?)", await sha(k), k, clip(body.label, 60), s.username, now());
+      added += r.meta.changes;
+    }
+    await logEv(env, req, { user: me, type: "action", detail: `${ACTIONS.adbkey} ${added} ชุด${body.label ? " · " + clip(body.label, 60) : ""}` });
+    return json({ ok: true, added });
+  }
+  if (p === "/api/adbkeys" && m === "DELETE") {
+    if (!owner) return bad("เฉพาะเจ้าของเท่านั้น", 403);
+    await exec(env, "DELETE FROM adbkeys WHERE id=?", url.searchParams.get("id") || "");
+    await logEv(env, req, { user: me, type: "action", detail: "ลบกุญแจ ADB 1 ชุด" });
+    return json({ ok: true });
+  }
   if (p === "/api/settings" && m === "GET") {
     const out = {};
     for (const r of await many(env, "SELECT k, v FROM settings")) { try { out[r.k] = JSON.parse(r.v); } catch (e) {} }

@@ -709,6 +709,8 @@ details.fold>summary{cursor:pointer;color:var(--mut);font-size:15px;padding:4px 
         <input type="text" id="nuUser" placeholder="Username" autocomplete="off" autocapitalize="none"><input type="password" id="nuPass" placeholder="Password 8 ตัวขึ้นไป" autocomplete="new-password">
       </div>
       <div class="row end" style="margin-top:8px"><button data-act="memberAdd">เพิ่มบัญชี</button></div>
+      <h3>กุญแจ ADB</h3>
+      <div class="list" id="keyList"></div>
       <h3>ประวัติการเข้าใช้งานล่าสุด</h3>
       <div id="eventList" class="mut">-</div>
     </div>
@@ -725,6 +727,9 @@ details.fold>summary{cursor:pointer;color:var(--mut);font-size:15px;padding:4px 
       </div>
       <div class="row end" style="margin-top:8px"><button data-act="mePw">เปลี่ยนรหัสผ่าน</button></div>
       <div class="mut" style="margin-top:6px">เปลี่ยนรหัสแล้ว เครื่องอื่นที่เข้าบัญชีนี้ไว้จะถูกออกจากระบบ</div>
+      <h3>กุญแจ ADB ของคอมนี้</h3>
+      <div class="mut">กดครั้งเดียวต่อคอม/มือถือ: เครื่องที่เคยกด Allow ให้คอมนี้ จะต่อจากคอมอื่นได้โดยไม่ต้องกด Allow ใหม่</div>
+      <div class="row end" style="margin-top:8px"><button data-act="shareKey">แชร์กุญแจของคอมนี้</button></div>
     </div>
     <div class="card">
       <h2>ตั้งค่าชุดมาตรฐานฮับ</h2>

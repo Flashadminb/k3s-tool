@@ -35,3 +35,8 @@ export async function openUsb(u, onAuth) {
 export async function requestAndOpen(onAuth) { return openUsb(await requestUsb(), onAuth); }
 export async function cancelWait(serial) { cancelled.add(serial); }
 export async function knownDevices() { return []; }
+// shared ADB keys (login server): nothing to do in the simulation
+export const setSharedKeys = () => {};
+export async function localKeys() { return []; }
+export const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export const unb64u = (t) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));

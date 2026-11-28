@@ -43,6 +43,7 @@ window.__sh = async (serial, cmd) => {
   if (cmd.includes("grep -i flash")) return R(o.flash ? "package:com.flashexpress.express.courier\n" : "");
   if (cmd.includes("versionName")) return R(`    versionName=${o.flash}\n`);
   if (cmd.includes("pm list packages")) return R(serial.endsWith("164") ? "package:com.flashexpress.express.courier\npackage:com.zhiliaoapp.musically\npackage:jp.naver.line.android\n" : "package:com.flashexpress.express.courier\npackage:jp.naver.line.android\n");
+  if (cmd.startsWith("du -sk '")) { await wait(300); return R(({ imagePath: 5200000, DCIM: 2100000, Android: 800000, Download: 300000, Pictures: 90000 }[cmd.match(/\/([^/']+)'/)[1]] || 42000) + "\tx\n"); }
   if (cmd.includes("ls -A | while")) return R("d\t5200000\timagePath\nd\t2100000\tDCIM\nd\t800000\tAndroid\nd\t300000\tDownload\nd\t90000\tPictures\nd\t42000\tcamera&muxer\nf\t4\t.nomedia\n");
   if (cmd.includes("-iname '*.jpg'")) { await wait(500); return R("1450000\t6800\t/sdcard/DCIM/Camera\n310000\t1700\t/sdcard/camera&muxer\n42000\t190\t/sdcard/Pictures/Screenshots\n8000\t12\t/sdcard/Download\n"); }
   if (cmd.includes("cmd wifi status")) return R(o.wifi ? `Wifi is enabled\nWifi is connected to "${o.wifi}"\n` : "Wifi is enabled\nWifi is not connected\n");

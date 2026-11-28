@@ -305,6 +305,8 @@ await click("fbOpen"); await idle();   // back to the top folder
 const fb = await page.textContent("#fbList");
 ok(fb.includes("DCIM") && fb.includes("Download") && fb.includes("Android"), "top folders listed");
 ok(!(await page.$('#fbList input[data-path$="/Android"]')), "Android folder cannot be ticked");
+await page.waitForFunction(() => !document.getElementById("fbList").textContent.includes("กำลังคำนวณ"), null, { timeout: 15000 });
+ok(/MB/.test(await page.textContent('#fbList .item:has-text("DCIM")')), "folder sizes fill in after the list shows");
 await page.click('#fbList .item:has-text("DCIM") button'); await idle();
 ok((await page.textContent("#fbList")).includes("Camera") && (await page.textContent("#fbPath")).includes("/DCIM"), "opened a folder");
 await click("fbUp"); await idle();

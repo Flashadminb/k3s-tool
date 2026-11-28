@@ -973,14 +973,32 @@ let fbPath = FB_ROOT, fbItems = [];
 // Android/ holds every app's own data (Flash Kit's included): browsing is fine, deleting there is not offered
 const fbLocked = (p) => p === FB_ROOT + "/Android" || p.startsWith(FB_ROOT + "/Android/");
 const fbWarn = (p) => /\/imagePath(\/fail)?$/.test(p) || /\/imagePath\/fail\//.test(p);
+/*
+ * Names first, folder sizes after: adding up a whole big folder (Android 11+ storage is slow to read) could keep
+ * the list from showing for half an hour. The list shows at once; each folder's size fills in by itself, one at a
+ * time, in the background (stops when another folder is opened or the device is unplugged).
+ */
+let fbGen = 0;
 async function fbList(d, path) {
   busyMsg("กำลังอ่านโฟลเดอร์ · " + (path.replace(FB_ROOT, "") || "/"));
-  const r = await d.sh(`cd ${q(path)} || exit 1; ls -A | while IFS= read -r f; do if [ -d "$f" ] && [ ! -L "$f" ]; then printf 'd\\t%s\\t%s\\n' "$(du -sk "$f" 2>/dev/null | cut -f1)" "$f"; else printf 'f\\t%s\\t%s\\n' "$(du -k "$f" 2>/dev/null | cut -f1)" "$f"; fi; done`);
+  const r = await d.sh(`cd ${q(path)} || exit 1; ls -A | while IFS= read -r f; do if [ -d "$f" ] && [ ! -L "$f" ]; then printf 'd\\t\\t%s\\n' "$f"; else printf 'f\\t%s\\t%s\\n' "$(du -k "$f" 2>/dev/null | cut -f1)" "$f"; fi; done`);
   if (r.code) throw new Error("เปิดโฟลเดอร์นี้ไม่ได้: " + (r.err || r.out).trim());
   fbPath = path; fbSerial = d.serial;
-  fbItems = r.out.split("\n").map((l) => { const [t, kb, ...n] = l.split("\t"); return { dir: t === "d", kb: +kb || 0, name: n.join("\t") }; })
-    .filter((x) => x.name).sort((a, b) => b.kb - a.kb);
+  fbItems = r.out.split("\n").map((l) => { const [t, kb, ...n] = l.split("\t"); return { dir: t === "d", kb: t === "d" ? null : +kb || 0, name: n.join("\t") }; })
+    .filter((x) => x.name).sort((a, b) => (b.dir - a.dir) || (b.kb || 0) - (a.kb || 0) || a.name.localeCompare(b.name));
   renderFb();
+  fbSizes(d, path, ++fbGen);
+}
+async function fbSizes(d, path, gen) {
+  const live = () => gen === fbGen && fbPath === path && !d.closed && !d.stopped;
+  for (const x of fbItems.filter((i) => i.dir)) {
+    if (!live()) return;
+    try { x.kb = parseInt((await d.sh(`du -sk ${q(path + "/" + x.name)} 2>/dev/null`)).out, 10) || 0; }
+    catch (e) { return; }
+    if (!live()) return;
+    if (!fbItems.some((i) => i.kb === null)) fbItems.sort((a, b) => b.kb - a.kb);   // all known: biggest first
+    renderFb();
+  }
 }
 // The Files menu opens the selected device's storage by itself (and again when another device is picked)
 let fbSerial = null;
@@ -1001,18 +1019,22 @@ function renderFb() {
   if (!box) return;
   $("fbCard").hidden = false;
   if ($("fbIdle")) $("fbIdle").hidden = true;
-  $("fbPath").textContent = "ที่เก็บในเครื่อง" + (fbPath.replace(FB_ROOT, "") || "") + "  ·  " + human(fbItems.reduce((s, x) => s + x.kb, 0));
+  const pending = fbItems.some((x) => x.kb === null);
+  $("fbPath").textContent = "ที่เก็บในเครื่อง" + (fbPath.replace(FB_ROOT, "") || "") + "  ·  " + (pending ? "กำลังคำนวณขนาด…" : human(fbItems.reduce((s, x) => s + x.kb, 0)));
   $("fbUp").hidden = fbPath === FB_ROOT;
   const locked = fbLocked(fbPath);
   $("fbLockNote").hidden = !locked;
+  // sizes fill in while the list is on screen: keep what is ticked
+  const ticked = new Set([...box.querySelectorAll("input:checked")].map((c) => c.dataset.path));
   box.replaceChildren(...(fbItems.length ? fbItems.map((x) => {
     const full = fbPath + "/" + x.name;
     const lock = fbLocked(full);
-    const c = lock ? el("span", { class: "tag sys", text: "ห้ามลบ" }) : el("input", { type: "checkbox", "data-path": full, "data-kb": x.kb });
+    const c = lock ? el("span", { class: "tag sys", text: "ห้ามลบ" }) : el("input", { type: "checkbox", "data-path": full, "data-kb": x.kb || 0 });
+    if (!lock && ticked.has(full)) c.checked = true;
     return el("div", { class: "item" },
       el("label", { class: "row", style: "gap:10px;flex-wrap:nowrap;min-width:0;flex:1" }, c,
         x.dir ? folderIcon() : null,
-        el("span", { class: "nm" }, x.name, el("small", { text: human(x.kb) + (x.dir ? " · โฟลเดอร์" : "") + (lock ? " · ข้อมูลของแอปต่างๆ" : fbWarn(full) ? " · รูปที่อาจยังไม่ส่ง" : "") }))),
+        el("span", { class: "nm" }, x.name, el("small", { text: (x.kb === null ? "กำลังคำนวณขนาด…" : human(x.kb)) + (x.dir ? " · โฟลเดอร์" : "") + (lock ? " · ข้อมูลของแอปต่างๆ" : fbWarn(full) ? " · รูปที่อาจยังไม่ส่ง" : "") }))),
       x.dir ? el("button", { text: "เปิด", onclick: () => run("เปิดโฟลเดอร์", () => fbList(cur(), full)) }) : null);
   }) : [el("div", { class: "item mut", text: "โฟลเดอร์ว่าง" })]));
 }

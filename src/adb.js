@@ -177,7 +177,7 @@ async function readAll(stream) {
 // Connections still waiting for "Allow", so the page can cancel a wait that will never finish
 const waiting = new Map();   // serial -> raw USBDevice
 
-async function open(usbDev, onAuth) {
+async function open(usbDev, onAuth, opts = {}) {
   let conn;
   const tryConnect = () => usbDev.connect();
   try { conn = await tryConnect(); }
@@ -196,7 +196,15 @@ async function open(usbDev, onAuth) {
   let rounds = 0;
   const connStore = {
     generateKey: () => store.generateKey(),
-    iterateKeys() { if (++rounds === 2 && onAuth) onAuth(usbDev.serial); return store.iterateKeys(); }
+    iterateKeys() {
+      if (++rounds === 2) {
+        // noPrompt (plug-in auto-connect): a device that knows none of our keys is new; leave the first "Allow"
+        // to the + add-device button instead of popping it up on its screen
+        if (opts.noPrompt) return (async function* () { throw new Error("NEEDS_ALLOW"); })();
+        if (onAuth) onAuth(usbDev.serial);
+      }
+      return store.iterateKeys();
+    }
   };
   waiting.set(usbDev.serial, usbDev.raw);
   try {
@@ -206,6 +214,7 @@ async function open(usbDev, onAuth) {
     return dev;
   } catch (e) {
     if (waiting.get(usbDev.serial) === "cancelled") throw new Error("CANCELLED");
+    if (/NEEDS_ALLOW/.test(String(e && e.message))) { try { await usbDev.raw.close(); } catch (e2) {} throw new Error("NEEDS_ALLOW"); }
     throw e;
   } finally { waiting.delete(usbDev.serial); }
 }

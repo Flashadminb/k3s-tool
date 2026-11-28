@@ -495,7 +495,7 @@ async function autoConnect() {
         try {
           log("พบเครื่องที่เคยอนุญาต " + usb.serial.slice(-6) + " กำลังเชื่อมต่อ ...");
           adb.authTrace.local = adb.authTrace.shared = 0;
-          const d0 = await adb.openUsb(usb, () => authWait(true, usb.serial));
+          const d0 = await adb.openUsb(usb, () => authWait(true, usb.serial), { noPrompt: auth.me.role !== "local" });
           authWait(false, usb.serial);   // in: no longer waiting for "Allow" while the device info loads
           keyNote(usb.serial);
           await addDevice(d0);
@@ -503,6 +503,7 @@ async function autoConnect() {
         } catch (e) {
           if (e.message === "BUSY") { showHelp("BUSY"); break; }
           if (e.message === "CANCELLED") { log(`ยกเลิกการรอเครื่องรหัส ${usb.serial.slice(-6)}`); break; }
+          if (e.message === "NEEDS_ALLOW") { log(`เครื่องใหม่รหัส ${usb.serial.slice(-6)} ยังไม่เคยกด Allow: กด + เพิ่มเครื่อง แล้วกด Allow ที่เครื่อง (ครั้งเดียว ใช้ได้ทุกคอม)`); break; }
           if (tryNo === 5) { log("เชื่อมต่ออัตโนมัติไม่สำเร็จ (" + (e.message || e) + ") กด + เชื่อมต่อเครื่อง เอง"); break; }
           await new Promise((r) => setTimeout(r, 3000));
         } finally { authWait(false, usb.serial); }

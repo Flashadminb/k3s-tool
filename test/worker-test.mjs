@@ -178,11 +178,6 @@ try {
   const owner2 = r.cookie;
   ok(r.status === 200, "owner back in");
 
-  console.log("rate limit");
-  let last;
-  for (let i = 0; i < 22; i++) last = await post("/api/login", { username: "ghost" + i, password: "wrong" });
-  ok(last.status === 429, "too many login tries from one place are blocked");
-
   console.log("browser");
   const require = createRequire(import.meta.url);
   process.env.NODE_PATH = execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
@@ -223,6 +218,11 @@ try {
   ok(!(await page.isVisible("#usersCard")) && (await page.isVisible("#meCard")), "employee: own account card, no member management");
   ok(errs.length === 0, "no page errors " + errs.join(" | "));
   await browser.close();
+
+  console.log("rate limit");
+  let last;
+  for (let i = 0; i < 22; i++) last = await post("/api/login", { username: "ghost" + i, password: "wrong" });
+  ok(last.status === 429, "too many login tries from one place are blocked");
 } finally {
   await w.stop();
 }

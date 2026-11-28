@@ -1088,6 +1088,7 @@ async function cleanupAction(kinds, text) {
   const ts = targets();
   const who = ts.length > 1 ? `\n\nจะทำกับทุกเครื่อง ${ts.length} เครื่อง พร้อมกัน` : `\n\nเครื่อง: ${label(ts[0])}`;
   if (!(await confirmBox(text + who))) return false;
+  if (!(await auth.guard("delete", kinds.join(" + ") + " · " + ts.map(label).join(", ")))) return false;
   progStart();
   // every device works at the same time; one failing does not stop the others
   const res = await Promise.allSettled(ts.map((d) => cleanup(d, kinds)));
@@ -1136,6 +1137,7 @@ async function bigFiles(d) {
     el("div", { class: "nm" }, x.path.split("/").pop(), el("small", { text: x.path })),
     el("div", { class: "row" }, el("b", { text: human(x.kb) }), el("button", { class: "red", text: "ลบ", onclick: () => run("ลบไฟล์", async () => {
       if (!(await confirmBox(`ลบไฟล์นี้ถาวร?\n${x.path}\n(${human(x.kb)})`))) return false;
+      if (!(await auth.guard("delete", x.path + " · " + label(d)))) return false;
       await d.shOk(`rm -f ${q(x.path)}`);
       st.addHistory({ serial: d.serial, model: d.info.model, action: "ลบไฟล์ " + x.path.split("/").pop(), how: "กดเอง", files: 1, freedKb: x.kb });
       await bigFiles(d); await refreshStorage(d); renderHistory();
@@ -1583,6 +1585,7 @@ function removeBanned(ds) {
   run("ถอนแอปต้องห้าม", async () => {
     const n = ds.reduce((a, d) => a + d.info.bannedFound.length, 0);
     if (!(await confirmBox(`ถอนแอปต้องห้าม ${n} รายการ จาก ${ds.length} เครื่อง?\nข้อมูลในแอปพวกนี้จะหายด้วย`))) return false;
+    if (!(await auth.guard("uninstall", `${n} แอป · ` + ds.map(label).join(", ")))) return false;
     const fails = [];
     for (const d of ds) {
       if (!d.info.apps) await loadApps(d);
@@ -2140,6 +2143,7 @@ const actions = {
     }
   }, "NO_FS"),
   cache: () => run("ล้างแคชแอป", async () => {
+    if (!(await auth.guard("delete", "ล้างแคชแอป · " + targets().map(label).join(", ")))) return false;
     for (const d of targets()) {
       const b = (await df(d)).used;
       const r = await d.sh("pm trim-caches 999G");
@@ -2179,22 +2183,41 @@ const actions = {
     }));
     log(`เปิดหน้าเพิ่มบัญชี Google ${ts.length - fails.length} เครื่อง · ใส่อีเมลและรหัสที่เครื่อง หรือใช้ เครื่อง > พิมพ์ข้อความเข้าเครื่อง${fails.length ? " · เปิดไม่ได้: " + fails.join(", ") + " (เครื่องอาจไม่มีบริการ Google)" : ""}`);
   }),
-  tgSave: () => run("ตั้งบอท Telegram", async () => { const r = await auth.apiPost("/api/telegram", { token: $("tgToken").value }); $("tgToken").value = ""; log("ตั้งบอท @" + r.bot + " แล้ว"); await renderUsers(); }, null, { free: true }),
-  staffAdd: () => run("เพิ่มพนักงาน", async () => {
-    const name = $("sfName").value.trim();
-    if (!name) throw new Error("ใส่ชื่อพนักงาน");
-    const s = await auth.apiPost("/api/staff", { name, chatId: $("sfChat").value, times: parseHours($("sfTimes").value) });
-    ["sfName", "sfChat", "sfTimes"].forEach((k) => ($(k).value = ""));
+  inviteCreate: () => run("สร้างคำเชิญ", async () => {
+    const r = await auth.apiPost("/api/invites", { first: $("ivFirst").value, last: $("ivLast").value, nick: $("ivNick").value, message: $("ivMsg").value, days: +$("ivDays").value });
+    const who = $("ivNick").value || $("ivFirst").value || "พนักงาน";
+    const out = $("ivOut");
+    out.hidden = false;
+    out.replaceChildren(el("b", { text: `คำเชิญของ ${who} (หมดอายุ ${new Date(r.expires_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })})` }),
+      el("div", { text: "ลิงก์: " + r.link }), el("div", { text: "รหัสเชิญ: " + r.code + "  (ใส่ที่ " + location.origin + "/invite)" }),
+      el("div", { class: "row", style: "margin-top:6px" },
+        el("button", { text: "คัดลอกลิงก์", onclick: () => navigator.clipboard.writeText(r.link).then(() => log("คัดลอกลิงก์เชิญแล้ว")) }),
+        el("button", { text: "คัดลอกรหัส", onclick: () => navigator.clipboard.writeText(r.code).then(() => log("คัดลอกรหัสเชิญแล้ว")) })),
+      el("small", { text: "ส่งลิงก์หรือรหัสให้เจ้าตัวเท่านั้น ลิงก์และรหัสนี้จะไม่แสดงอีก" }));
+    ["ivFirst", "ivLast", "ivNick", "ivMsg"].forEach((k) => ($(k).value = ""));
     await renderUsers();
-    if (await confirmBox(`เพิ่ม ${s.name} แล้ว\nส่งรหัสแรกให้เลยไหม? (ไม่งั้นจะได้รหัสตามเวลาที่ตั้ง)`)) {
-      const r = await auth.apiPost("/api/staff/rotate", { id: s.id });
-      await confirmBox(`รหัสของ ${s.name}: ${r.password}\n${r.sent ? "ส่งเข้า Telegram แล้ว" : "ส่ง Telegram ไม่ได้ (" + (r.error || "?") + ") ให้บอกรหัสนี้เอง"}`);
-      await renderUsers();
-    }
   }, null, { free: true }),
-  adminPw: () => run("เปลี่ยนรหัสเจ้าของ", async () => { await auth.apiPost("/api/admin/password", { old: $("adOld").value, password: $("adNew").value }); $("adOld").value = $("adNew").value = ""; log("เปลี่ยนรหัสเจ้าของแล้ว"); }, null, { free: true }),
+  memberAdd: () => run("เพิ่มบัญชี", async () => {
+    await auth.apiPost("/api/users", { first: $("nuFirst").value, last: $("nuLast").value, nick: $("nuNick").value, username: $("nuUser").value, password: $("nuPass").value });
+    log(`เพิ่มบัญชี ${$("nuUser").value} แล้ว`);
+    ["nuFirst", "nuLast", "nuNick", "nuUser", "nuPass"].forEach((k) => ($(k).value = ""));
+    await renderUsers();
+  }, null, { free: true }),
+  meSave: () => run("บันทึกข้อมูลของฉัน", async () => {
+    const r = await auth.apiPost("/api/me/profile", { first: $("meFirst").value, last: $("meLast").value, nick: $("meNick").value });
+    auth.me.name = r.name; auth.me.first = $("meFirst").value; auth.me.last = $("meLast").value; auth.me.nick = $("meNick").value;
+    applyRole(auth.me); log("บันทึกข้อมูลส่วนตัวแล้ว");
+  }, null, { free: true }),
+  mePw: () => run("เปลี่ยนรหัสผ่าน", async () => {
+    if ($("meNew").value !== $("meNew2").value) throw new Error("รหัสผ่านใหม่สองช่องไม่ตรงกัน");
+    await auth.apiPost("/api/me/password", { old: $("meOld").value, password: $("meNew").value });
+    ["meOld", "meNew", "meNew2"].forEach((k) => ($(k).value = ""));
+    auth.me.verifiedUntil = 0;
+    log("เปลี่ยนรหัสผ่านแล้ว · เครื่องอื่นที่เข้าบัญชีนี้ไว้ถูกออกจากระบบ");
+  }, null, { free: true }),
   lockRelease: () => run("ปลดล็อก", async () => {
     const ts = targets();
+    if (!(await auth.guard("unlock", ts.map(label).join(", ")))) return false;
     await Promise.all(ts.map((d) => unlockDevice(d)));
     renderAll();
   }),
@@ -2222,6 +2245,7 @@ const actions = {
     const warn = picks.some((p) => fbWarn(p.path) || /\/imagePath$/.test(p.path)) ? "\n\n⚠️ มีรูป fail ที่อาจยังไม่ส่งอยู่ในที่เลือก" : "";
     const list = picks.slice(0, 12).map((p) => "• " + p.path.replace(FB_ROOT + "/", "")).join("\n") + (picks.length > 12 ? `\n… และอีก ${picks.length - 12} รายการ` : "");
     if (!(await confirmBox(`ลบ ${picks.length} รายการ (${human(total)}) ลบถาวร กู้คืนไม่ได้${ts.length > 1 ? "\nทำกับ " + ts.length + " เครื่องในกลุ่ม" : ""}\n${list}${warn}`))) return false;
+    if (!(await auth.guard("delete", `ไฟล์ ${picks.length} รายการ · ` + ts.map(label).join(", ")))) return false;
     for (const d of ts) {
       const before = (await df(d)).used;
       for (const p of picks) { busyMsg("กำลังลบ " + p.path.replace(FB_ROOT + "/", "") + " · " + label(d)); await d.sh(`rm -rf -- ${q(p.path)}`); }
@@ -2240,6 +2264,7 @@ const actions = {
     const ts = targets();
     const names = dirs.map((x) => "• " + (x.replace(/^\/sdcard\/?/, "") || "(โฟลเดอร์หลัก)")).join("\n");
     if (!(await confirmBox(`ลบรูปและวิดีโอในโฟลเดอร์ต่อไปนี้ ${ts.length > 1 ? "จาก " + ts.length + " เครื่อง" : ""} (ลบถาวร ไม่เข้าถังขยะ)\n${names}\n\nไม่ลบรูปของ Flash Kit ใน success/fail`))) return false;
+    if (!(await auth.guard("delete", `รูปอื่น ${dirs.length} โฟลเดอร์ · ` + ts.map(label).join(", ")))) return false;
     for (const d of ts) {
       const before = (await df(d)).used;
       let files = 0;
@@ -2291,6 +2316,7 @@ const actions = {
   recovery: () => run("เข้าเมนู Recovery", async () => {
     const d = cur();
     if (!(await confirmBox(`เปิดเมนู Recovery ที่ ${label(d)}?\n\nเครื่องจะดับแล้วขึ้นเมนูตัวหนังสือ เว็บจะหลุดการเชื่อมต่อ (ปกติ)\nในเมนู: ปุ่มเสียง ขึ้น/ลง = เลื่อน · ปุ่ม Power = เลือก\n• Reboot system now = เปิดเครื่องตามปกติ ไม่มีอะไรหาย\n• Wipe data/factory reset = ล้างเครื่อง ทุกอย่างหาย (รูป แอป Flash Kit บัญชี การล็อก)\n\nถ้าจะล้างจริง: สำรองรูป fail ก่อน และต้องรู้บัญชี Google ของเครื่อง`))) return false;
+    if (!(await auth.guard("recovery", label(d)))) return false;
     d.rebooting = true;
     await d.rebootRecovery().catch(() => {});
     log(`${label(d)}: สั่งเข้าเมนู Recovery แล้ว ใช้ปุ่มเสียงเลื่อน ปุ่ม Power เลือก`);
@@ -2307,6 +2333,7 @@ const actions = {
     const d = cur();
     if (!(await confirmBox(`รีเซ็ต ${label(d)} จะลบข้อมูลทุกอย่างในเครื่อง กู้คืนไม่ได้ และต้องติดตั้ง Flash Kit ใหม่`, "RESET"))) return false;
     if (!(await confirmBox("ยืนยันอีกครั้ง: ลบข้อมูลทั้งเครื่องจริงๆ ใช่ไหม", "YES"))) return false;
+    if (!(await auth.guard("reset", label(d)))) return false;
     d.rebooting = true;
     const r = await d.sh("am broadcast -a android.intent.action.FACTORY_RESET -p android");
     log(r.out + r.err);
@@ -2745,7 +2772,7 @@ function showTab(name) {
   if (name === "files") openFilesTab();
 }
 
-/* ---------- Login roles and the owner's user management (only when served by the login server) ---------- */
+/* ---------- Login roles, my account, and the owner's member management (only when served by the login server) ---------- */
 function applyRole(me) {
   document.body.classList.add("role-" + me.role);
   if (me.role === "local") return;
@@ -2754,38 +2781,64 @@ function applyRole(me) {
   w.hidden = false;
   w.replaceChildren(el("span", { text: (me.role === "admin" ? "เจ้าของ · " : "พนักงาน · ") + me.name }), el("button", { text: "ออกจากระบบ", onclick: () => auth.logout() }));
   if ($("wifiNote")) $("wifiNote").textContent = "รายการ Wi-Fi (และค่าหลังบ้านอื่นๆ) เก็บไว้ที่ระบบล็อกอิน: บันทึกครั้งเดียว ทุกคอมและมือถือที่ล็อกอินได้รายการนี้ · พนักงานเห็นแต่ใช้ต่อ Wi-Fi ได้ แก้ไม่ได้";
+  if ($("meInfo")) {
+    $("meInfo").textContent = `Username: ${me.username} · ${me.role === "admin" ? "เจ้าของระบบ" : "พนักงาน"}${me.remember ? " · จำการเข้าสู่ระบบไว้ในเบราว์เซอร์นี้" : ""}`;
+    $("meFirst").value = me.first || ""; $("meLast").value = me.last || ""; $("meNick").value = me.nick || "";
+  }
   if (me.role === "admin") renderUsers();
 }
-const hoursText = (t) => (t && t.length ? t.map((h) => String(h).padStart(2, "0") + ":00").join(", ") : "ไม่ได้ตั้ง (เปลี่ยนเองเท่านั้น)");
-const parseHours = (s) => String(s || "").split(/[\s,]+/).map((x) => parseInt(x, 10)).filter((h) => h >= 0 && h <= 23);
+const EV_TEXT = { login_ok: "เข้าสู่ระบบ", login_fail: "ใส่รหัสผิด (เข้าสู่ระบบ)", login_blocked: "พยายามเข้าขณะถูกระงับ", logout: "ออกจากระบบ", locked: "🔒 บัญชีถูกระงับ", unlocked: "🔓 ปลดล็อก", verify_ok: "ยืนยันตัวตน", verify_fail: "ใส่รหัสผิด (ยืนยันคำสั่ง)", action: "สั่งคำสั่งสำคัญ", pw_changed: "เปลี่ยนรหัสผ่านเอง", pw_reset: "เจ้าของตั้งรหัสใหม่", revoked: "ถูกออกจากทุกเครื่อง", disabled: "ปิดการใช้งาน", enabled: "เปิดการใช้งาน", deleted: "ลบบัญชี", user_created: "สร้างบัญชี", user_updated: "แก้ข้อมูลโดยเจ้าของ", profile: "แก้ข้อมูลส่วนตัว", invite_created: "สร้างคำเชิญ", invite_revoked: "ยกเลิกคำเชิญ", invite_used: "สมัครด้วยคำเชิญ", recover_fail: "กู้บัญชีด้วยรหัสผิด" };
+const dt = (t) => (t ? new Date(t).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "-");
+const evLine = (e) => el("div", { class: "evrow", text: `${dt(e.at)} · ${e.username || "?"} · ${EV_TEXT[e.type] || e.type}${e.detail ? " · " + e.detail : ""}${e.by_user ? " · โดย " + e.by_user : ""}${e.ip ? " · " + e.ip : ""}` });
 async function renderUsers() {
-  if (auth.me.role !== "admin" || !$("staffList")) return;
+  if (auth.me.role !== "admin" || !$("memberList")) return;
+  const act = (name, fn) => run(name, async () => { await fn(); await renderUsers(); }, null, { free: true });
   try {
-    const tg = await auth.apiGet("/api/telegram");
-    $("tgState").textContent = tg.set ? `ตั้งบอทแล้ว: @${tg.bot} · พนักงานทัก @${tg.bot} ใน Telegram แล้วบอทจะตอบ Chat ID ให้` : "ยังไม่ได้ตั้งบอท: สร้างบอทที่ @BotFather ใน Telegram (คำสั่ง /newbot) แล้ววาง Token ที่ได้ลงช่องนี้";
-    const list = await auth.apiGet("/api/staff");
-    $("staffList").replaceChildren(...(list.length ? list.map((s) => {
-      const chat = el("input", { type: "text", value: s.chatId, placeholder: "Chat ID", inputmode: "numeric" });
-      const times = el("input", { type: "text", value: s.times.join(","), placeholder: "เวลา เช่น 7,19" });
-      const save = (extra) => run("บันทึกพนักงาน", async () => { await auth.apiPost("/api/staff", { id: s.id, name: s.name, chatId: chat.value, times: parseHours(times.value), enabled: s.enabled, ...extra }); await renderUsers(); }, null, { free: true });
-      return el("div", { class: "item staff-row" },
-        el("div", { class: "nm" }, s.name + (s.enabled ? "" : " (ปิดอยู่)"),
-          el("small", { text: `เปลี่ยนรหัส ${hoursText(s.times)}${s.next ? " · รอบถัดไป " + s.next : ""} · ${s.sentAt ? "ส่งรหัสล่าสุด " + new Date(s.sentAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "ยังไม่เคยส่งรหัส"}${s.sendError ? " · ⚠️ " + s.sendError : ""}` })),
-        el("div", { class: "row" }, chat, times, el("button", { text: "บันทึก", onclick: () => save({}) })),
-        el("div", { class: "row" },
-          el("button", { class: "blue", text: "ส่งรหัสใหม่ตอนนี้", onclick: () => run("ส่งรหัสใหม่", async () => {
-            const r = await auth.apiPost("/api/staff/rotate", { id: s.id });
-            await confirmBox(`รหัสใหม่ของ ${s.name}: ${r.password}\n\n${r.sent ? "ส่งเข้า Telegram แล้ว" : "ส่ง Telegram ไม่ได้ (" + (r.error || "?") + ") ให้บอกรหัสนี้เอง"}\nรหัสเก่าใช้เข้าไม่ได้แล้ว`);
-            await renderUsers();
-          }, null, { free: true }) }),
-          el("button", { text: s.enabled ? "ปิดการเข้า" : "เปิดการเข้า", onclick: () => save({ enabled: !s.enabled }) }),
-          el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบ ${s.name}? เข้าเว็บไม่ได้ทันที`)) run("ลบพนักงาน", async () => { await auth.apiDel("/api/staff?id=" + encodeURIComponent(s.id)); await renderUsers(); }, null, { free: true }); } })));
-    }) : [el("div", { class: "item mut", text: "ยังไม่มีพนักงาน" })]));
-  } catch (e) { $("staffList").replaceChildren(el("div", { class: "item mut", text: "โหลดรายชื่อไม่ได้: " + e.message })); }
+    const list = await auth.apiGet("/api/users");
+    $("memberList").replaceChildren(...list.map((u) => {
+      const st = u.locked_at ? ["🔒 ถูกระงับ (รหัสผิด)", "bad"] : u.status !== "active" ? ["ปิดใช้งาน", "sys"] : ["ใช้งานได้", "ok"];
+      const edit = el("div", { class: "edit", hidden: "" },
+        el("input", { type: "text", value: u.first_name || "", placeholder: "ชื่อ" }), el("input", { type: "text", value: u.last_name || "", placeholder: "นามสกุล" }),
+        el("input", { type: "text", value: u.nickname || "", placeholder: "ชื่อเล่น" }), el("input", { type: "text", value: u.username, placeholder: "Username", autocapitalize: "none" }),
+        el("button", { class: "blue", text: "บันทึก", onclick: () => { const [f, l, n, un] = [...edit.querySelectorAll("input")].map((i) => i.value); act("แก้ข้อมูลสมาชิก", () => auth.apiPost("/api/users/update", { id: u.id, first: f, last: l, nick: n, username: un })); } }));
+      const hist = el("details", {}, el("summary", { class: "mut", text: "ประวัติการเข้าใช้งาน" }), el("div", { class: "mut", text: "กำลังโหลด..." }));
+      hist.addEventListener("toggle", async () => {
+        if (!hist.open) return;
+        const ev = await auth.apiGet("/api/events?limit=60&user=" + encodeURIComponent(u.id)).catch(() => []);
+        hist.lastChild.replaceChildren(...(ev.length ? ev.map(evLine) : [el("div", { text: "ยังไม่มี" })]));
+      });
+      const isOwner = u.role === "admin";
+      return el("div", { class: "item mem", style: "display:block" },
+        el("div", { class: "nm" }, `${u.nickname || u.first_name || u.username} (${u.username})`,
+          el("small", { text: `${u.first_name || ""} ${u.last_name || ""} · ${isOwner ? "เจ้าของ" : "พนักงาน"} · เข้าล่าสุด ${dt(u.last_login)} · เปิดอยู่ ${u.sessions} เครื่อง` }),
+          el("span", { class: "tags" }, el("span", { class: "tag " + st[1], text: st[0] }))),
+        el("div", { class: "row", style: "flex-wrap:wrap;margin-top:6px" },
+          el("button", { text: "แก้ไข", onclick: () => (edit.hidden = !edit.hidden) }),
+          u.locked_at ? el("button", { class: "blue", text: "ปลดล็อก", onclick: () => act("ปลดล็อกบัญชี", () => auth.apiPost("/api/users/unlock", { id: u.id })) }) : null,
+          el("button", { text: "ตั้งรหัสใหม่", onclick: () => act("ตั้งรหัสใหม่", async () => {
+            if (!(await confirmBox(`ตั้งรหัสผ่านใหม่ให้ ${u.username}?\nระบบสุ่มรหัสใหม่ให้ (แสดงครั้งเดียว) · ${u.username} จะถูกออกจากทุกเครื่องและถูกปลดล็อก`))) return;
+            const r = await auth.apiPost("/api/users/password", { id: u.id, generate: true });
+            await confirmBox(`รหัสผ่านใหม่ของ ${u.username}: ${r.password}\n\nบอกเจ้าตัว แล้วให้เปลี่ยนเองที่ ตั้งค่า > บัญชีของฉัน`);
+          }) }),
+          el("button", { text: "ออกจากทุกเครื่อง", onclick: () => act("ยกเลิก Session", async () => { const r = await auth.apiPost("/api/users/revoke", { id: u.id }); log(`${u.username}: ออกจากระบบ ${r.revoked} เครื่อง`); }) }),
+          isOwner ? null : el("button", { text: u.status === "active" ? "ปิดใช้งาน" : "เปิดใช้งาน", onclick: () => act("เปลี่ยนสถานะบัญชี", () => auth.apiPost("/api/users/status", { id: u.id, active: u.status !== "active" })) }),
+          isOwner ? null : el("button", { class: "red", text: "ลบ", onclick: async () => { if (await confirmBox(`ลบบัญชี ${u.username}? เข้าเว็บไม่ได้ทันที กู้คืนไม่ได้`)) act("ลบบัญชี", () => auth.apiDel("/api/users?id=" + encodeURIComponent(u.id))); } })),
+        edit, hist);
+    }));
+    const inv = await auth.apiGet("/api/invites");
+    const IST = { pending: "รอสมัคร", used: "ใช้แล้ว", expired: "หมดอายุ", revoked: "ยกเลิกแล้ว" };
+    $("inviteList").replaceChildren(...inv.slice(0, 30).map((i) => el("div", { class: "item" },
+      el("div", { class: "nm" }, `${i.nickname || i.first_name || "ไม่ระบุชื่อ"} · ${IST[i.status]}`,
+        el("small", { text: `สร้าง ${dt(i.created_at)} · หมดอายุ ${dt(i.expires_at)}${i.opened_at ? " · เปิดดูแล้ว" : ""}${i.used_username ? " · สมัครเป็น " + i.used_username : ""}` })),
+      i.status === "pending" ? el("button", { class: "red", text: "ยกเลิก", onclick: () => act("ยกเลิกคำเชิญ", () => auth.apiPost("/api/invites/revoke", { id: i.id })) }) : null)));
+    const ev = await auth.apiGet("/api/events?limit=40");
+    $("eventList").replaceChildren(...(ev.length ? ev.map(evLine) : [el("div", { text: "ยังไม่มี" })]));
+  } catch (e) { $("memberList").replaceChildren(el("div", { class: "item mut", text: "โหลดรายชื่อไม่ได้: " + e.message })); }
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
   authorMark();
+  auth.onNotice((t) => log("⚠️ " + t));
   applyRole(await auth.initAuth());
   document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => actions[b.dataset.act]()));
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -2814,7 +2867,9 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   // auto delete settings
   $("autoEvery").value = String(auto.every); $("autoPct").value = String(auto.pct);
-  $("autoEvery").addEventListener("change", (e) => { auto.every = +e.target.value; scheduleAuto(); log(auto.every ? `เปิดลบอัตโนมัติทุก ${auto.every} นาที` : "ปิดลบอัตโนมัติ"); });
+  $("autoEvery").addEventListener("change", async (e) => {
+    if (+e.target.value && !auto.every && !(await auth.guard("autodelete", "ทุก " + e.target.value + " นาที").catch(() => false))) { e.target.value = "0"; return; }
+    auto.every = +e.target.value; scheduleAuto(); log(auto.every ? `เปิดลบอัตโนมัติทุก ${auto.every} นาที` : "ปิดลบอัตโนมัติ"); });
   $("autoPct").addEventListener("change", (e) => { auto.pct = +e.target.value; scheduleAuto(); });
   $("ptAuto").addEventListener("change", (e) => st.save("portalAuto", e.target.checked));
   $("ptShow").addEventListener("change", (e) => ($("ptPass").type = e.target.checked ? "text" : "password"));

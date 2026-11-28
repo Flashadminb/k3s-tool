@@ -1432,21 +1432,12 @@ async function saveDeviceLockList(d, list) {
   await d.sh(list.length ? `printf '%s\\n' ${list.map(q).join(" ")} > ${LOCK_FILE}` : `rm -f ${LOCK_FILE}`);
 }
 /*
- * "ปิด Settings" on Android 7+: the Settings app also holds the screen shown while the phone starts up (FallbackHome).
- * Switching the whole app off made those phones slow to start, so there every Settings screen is switched off
- * except the start-up ones. Android 6 has no such screen: the whole app is switched off as before.
- * The switched-off screens are listed in a file on the device, so any computer can unlock.
- * (The older "Settings off except Wi-Fi" option was removed: holding the Wi-Fi icon led back into Settings.)
+ * "ปิด Settings" switches the whole Settings app off. Closing it screen by screen (to keep the start-up screen) does not
+ * work on real devices: Android refuses component changes from ADB ("Shell cannot change component state"), so a
+ * CT48 locked that way still opened Settings. An older version of the page tried it, and an even older experiment
+ * kept the Wi-Fi screens: their leftover list (SETTINGS_FILE) is still switched back on when unlocking.
  */
 const SETTINGS_FILE = "/data/local/tmp/idata-tools-settings.txt";
-const SETTINGS_BOOT = "FallbackHome|CryptKeeper|Encrypt|Provision|SetupRedirect";
-const settingsByScreens = (d) => (parseInt(d.info.sdk, 10) || caps(d).sdk || 0) >= 24;
-const SETTINGS_ACTIVITIES = "dumpsys package com.android.settings | awk '/^Activity Resolver Table:/{a=1;next} /Resolver Table:/{a=0} a' | grep -oE 'com\\.android\\.settings/[A-Za-z0-9_.$]+' | sort -u";
-async function lockSettingsScreens(d, onCount) {
-  // decided and done on the device in one go: list Settings screens, keep the start-up ones, switch the rest off
-  const r = await d.shStream(`${SETTINGS_ACTIVITIES} | grep -viE '${SETTINGS_BOOT}' | while read c; do o=$(pm disable --user 0 "$c" 2>&1); case "$o" in *disabled*) echo "$c" >> ${SETTINGS_FILE}; echo "$c";; esac; done`, () => onCount && onCount());
-  return r.out.split("\n").filter(Boolean).length;
-}
 async function unlockSettingsScreens(d) {
   const r = await d.sh(`[ -f ${SETTINGS_FILE} ] || { echo 0; exit 0; }; n=0; while read c; do pm enable --user 0 "$c" >/dev/null 2>&1; n=$((n+1)); done < ${SETTINGS_FILE}; rm -f ${SETTINGS_FILE}; echo $n`);
   return parseInt(r.out.trim().split(/\s+/).pop(), 10) || 0;
@@ -1490,17 +1481,8 @@ async function readLockState(d) {
 }
 async function lockDevice(d) {
   if (!d.info.apps) await loadApps(d);
-  const full = lockPlan(d).filter((x) => x.block);
-  // Android 7+: Settings is closed screen by screen below (keeps the start-up screen), not switched off whole
-  const screens = settingsByScreens(d) && full.some((x) => x.isSettings);
-  const plan = screens ? full.filter((x) => !x.isSettings) : full;
+  const plan = lockPlan(d).filter((x) => x.block);
   const done = [], fails = [];
-  if (screens && (await deviceLockList(d)).includes(SETTINGS_PKG)) {
-    // locked whole by an older version: switch the app back on so the phone starts normally, then close its screens
-    await d.sh(`pm enable ${SETTINGS_PKG}`);
-    const left = (await deviceLockList(d)).filter((p) => p !== SETTINGS_PKG);
-    await saveDeviceLockList(d, left); st.save(lockedKey(d), st.load(lockedKey(d), []).filter((p) => p !== SETTINGS_PKG));
-  }
   setStatus(d, { title: "กำลังล็อก", big: "0/" + plan.length, ring: 0 });
   for (const [i, x] of plan.entries()) {
     const r = await d.sh(`pm disable-user --user 0 ${q(x.pkg)}`);
@@ -1511,14 +1493,6 @@ async function lockDevice(d) {
   st.save(lockedKey(d), all); d.info.locked = all;
   await saveDeviceLockList(d, all);
   if (all.length) { st.updateRegistry(d.serial, { fieldLock: "ล็อก", fieldLockAt: Date.now() }); d.info.resetSuspect = false; }
-  if (screens) {
-    let n = 0;
-    setStatus(d, { title: "ปิด Settings", big: "0", ring: 50 });
-    const c = await lockSettingsScreens(d, () => { n++; if (n % 10 === 0) setStatus(d, { title: "ปิด Settings", big: String(n), ring: 50 }); });
-    d.info.settingsLocked = (d.info.settingsLocked || 0) + c;
-    if (c) { st.updateRegistry(d.serial, { fieldLock: "ล็อก", fieldLockAt: Date.now() }); d.info.resetSuspect = false; }
-    log(`${label(d)}: ปิด Settings แล้ว (${c} หน้า) · เว้นหน้าที่ใช้ตอนเปิดเครื่องไว้ เครื่องจะเปิดได้ตามปกติ`);
-  }
   await loadApps(d);
   setStatus(d, { title: "ล็อกออกงานแล้ว", big: String(done.length), unit: "แอปถูกปิด", ring: 100, done: true });
   log(`${label(d)}: โหมดออกงาน ปิด ${done.length} แอป${fails.length ? " (ปิดไม่ได้: " + fails.join(", ") + ")" : ""}`);
@@ -1798,13 +1772,7 @@ async function openPortal(d) {
   //    switched on for this and off again afterwards
   const settingsOff = /package:com\.android\.settings\s*$/m.test((await d.sh("pm list packages -d 2>/dev/null")).out);
   if (settingsOff) await d.sh(`pm enable ${SETTINGS_PKG}`);
-  // Android 7+ lock closes Settings screen by screen: open just the Wi-Fi ones for this, close them again after
-  const wifiScreens = pkgList((await d.sh(`grep -iE 'wifi|NetworkProvider|Internet|SettingsPanel' ${SETTINGS_FILE} 2>/dev/null | sed 's/^/package:/'`)).out);
-  for (const c of wifiScreens) await d.sh(`pm enable --user 0 ${q(c)}`);
-  const putBack = async () => {
-    if (settingsOff) await d.sh(`pm disable-user --user 0 ${SETTINGS_PKG}`).catch(() => {});
-    for (const c of wifiScreens) await d.sh(`pm disable --user 0 ${q(c)}`).catch(() => {});
-  };
+  const putBack = async () => { if (settingsOff) await d.sh(`pm disable-user --user 0 ${SETTINGS_PKG}`).catch(() => {}); };
   await d.sh("am start -a android.settings.WIFI_SETTINGS");
   for (let i = 0; i < 5; i++) {
     await sleep(1500);

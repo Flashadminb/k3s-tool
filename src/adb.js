@@ -191,11 +191,16 @@ async function open(usbDev, onAuth) {
     } else if (/busy|access denied|in use/i.test(msg)) throw new Error("BUSY");
     else throw e;
   }
-  // From here the device may show "Allow USB debugging?" and we wait until someone taps it
-  onAuth && onAuth(usbDev.serial);
+  // The keys are tried first (signatures); only when none is accepted does the library go over them again to send
+  // a public key, and that is when the device shows "Allow USB debugging?". Tell the page then, not before.
+  let rounds = 0;
+  const connStore = {
+    generateKey: () => store.generateKey(),
+    iterateKeys() { if (++rounds === 2 && onAuth) onAuth(usbDev.serial); return store.iterateKeys(); }
+  };
   waiting.set(usbDev.serial, usbDev.raw);
   try {
-    const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: store });
+    const transport = await AdbDaemonTransport.authenticate({ serial: usbDev.serial, connection: conn, credentialStore: connStore });
     return new Device(new Adb(transport), usbDev.serial);
   } catch (e) {
     if (waiting.get(usbDev.serial) === "cancelled") throw new Error("CANCELLED");

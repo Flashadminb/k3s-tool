@@ -492,6 +492,7 @@ async function autoConnect() {
           log("พบเครื่องที่เคยอนุญาต " + usb.serial.slice(-6) + " กำลังเชื่อมต่อ ...");
           adb.authTrace.local = adb.authTrace.shared = 0;
           const d0 = await adb.openUsb(usb, () => authWait(true, usb.serial));
+          authWait(false, usb.serial);   // in: no longer waiting for "Allow" while the device info loads
           keyNote(usb.serial);
           await addDevice(d0);
           break;

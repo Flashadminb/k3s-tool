@@ -40,3 +40,5 @@ export const setSharedKeys = () => {};
 export async function localKeys() { return []; }
 export const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 export const unb64u = (t) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+export const authTrace = { local: 0, shared: 0, made: false };
+export const sharedKeyCount = () => 0;

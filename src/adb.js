@@ -8,14 +8,17 @@ const webStore = new AdbWebCredentialStore("K3S Tool");
 // of them connects without asking again. This browser's own key is tried first; new keys are still made here.
 let sharedKeys = [];
 export const setSharedKeys = (list) => { sharedKeys = list; };
+// what the last connection tried (shown in the log when a device still asks for "Allow")
+export const authTrace = { local: 0, shared: 0, made: false };
 const store = {
-  generateKey: () => webStore.generateKey(),
+  generateKey: () => { authTrace.made = true; return webStore.generateKey(); },
   async *iterateKeys() {
     const seen = new Set();
-    for await (const k of webStore.iterateKeys()) { seen.add(b64u(k.buffer)); yield k; }
-    for (const b of sharedKeys) if (!seen.has(b64u(b))) yield { buffer: b, name: "K3S Tool@" + location.hostname };
+    for await (const k of webStore.iterateKeys()) { seen.add(b64u(k.buffer)); authTrace.local++; yield k; }
+    for (const b of sharedKeys) if (!seen.has(b64u(b))) { authTrace.shared++; yield { buffer: b, name: "K3S Tool@" + location.hostname }; }
   }
 };
+export const sharedKeyCount = () => sharedKeys.length;
 /** this browser's own ADB keys (PKCS#8), as base64url text */
 export async function localKeys() {
   const out = [];

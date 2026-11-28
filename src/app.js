@@ -461,9 +461,15 @@ async function connectNew() {
   }
   if (pending.has(usb.serial)) { log(`รหัส ${usb.serial.slice(-6)} กำลังรอกด Allow อยู่แล้ว ดูที่หน้าจอเครื่อง`); return false; }
   let d;
+  Object.assign(adb.authTrace, { local: 0, shared: 0, made: false });
+  // if the device still asks for "Allow" after a moment, say which keys it refused (helps tracing a missed key move)
+  const why = setTimeout(() => {
+    const t = adb.authTrace;
+    if (auth.me.role !== "local") log(`เครื่องรหัส ${usb.serial.slice(-6)} ไม่รู้จักกุญแจที่ลอง: ของคอมนี้ ${Math.max(0, t.local - (t.made ? 1 : 0))} ชุด + จากระบบ ${t.shared} ชุด (ระบบมีทั้งหมด ${adb.sharedKeyCount()} ชุด) จึงขอ Allow ใหม่`);
+  }, 4000);
   try { d = await adb.openUsb(usb, (s) => { busyMsg(`รอกด Allow ที่เครื่องรหัส ${String(s || "").slice(-6)}`); authWait(true, s); }); }
   catch (e) { if (e.message === "CANCELLED") { log(`ยกเลิกการรอเครื่องรหัส ${usb.serial.slice(-6)}`); return false; } throw e; }
-  finally { authWait(false, usb.serial); }
+  finally { authWait(false, usb.serial); clearTimeout(why); }
   busyMsg("กำลังอ่านข้อมูลเครื่อง");
   await addDevice(d);
 }

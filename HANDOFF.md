@@ -6,7 +6,7 @@
 ## โปรเจกต์คืออะไร
 
 - หน้าเว็บสำหรับแอดมินฮับ ใช้จัดการเครื่อง PDA ของ iData (K3S, Q9, 95W Series ที่เป็น Android 6) ผ่านสาย USB บนเบราว์เซอร์ (WebUSB) ไม่ต้องติดตั้งโปรแกรม
-- เว็บจริง: https://flashadminb.github.io/k3s-tool/
+- เว็บจริง (มีล็อกอิน): https://idata-tools.flashbplbhub.workers.dev · เว็บเก่า GitHub Pages ให้ปิด
 - โค้ด: GitHub `Flashadminb/k3s-tool` (branch `main`) push แล้วขึ้นเว็บอัตโนมัติ
 - ใช้ `@yume-chan/adb` 2.6.4 และ build ด้วย esbuild
 - ไฟล์หลัก:
@@ -115,7 +115,7 @@
 
 ## งานที่ค้าง
 
-1. **ระบบล็อกอิน (Cloudflare Worker + D1)**: โค้ดเสร็จและทดสอบแล้ว รอเปิดใช้บน Cloudflare
+1. **ระบบล็อกอิน (Cloudflare Worker + D1)**: เปิดใช้แล้วที่ https://idata-tools.flashbplbhub.workers.dev (secret ใส่ครบ, deploy อัตโนมัติทุกครั้งที่ push)
    - ระบบที่มี:
      - Owner / พนักงาน
      - คำเชิญแบบลิงก์และรหัส ใช้สมัครได้ครั้งเดียว ยกเลิกได้ และมีวันหมดอายุ
